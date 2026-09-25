@@ -199,7 +199,12 @@ def convert(
         if out is None or str(out) == "-":
             click.echo(content)
         else:
-            out.write_text(content + "\n", encoding="utf-8")
+            if out.exists() and no_overwrite:
+                raise click.UsageError(f"输出文件已存在：{out}（去掉 --no-overwrite 覆盖）")
+            try:
+                out.write_text(content + "\n", encoding="utf-8")
+            except OSError as e:
+                raise click.UsageError(f"无法写入目录文件：{e}") from e
         return
 
     if cfg.font:

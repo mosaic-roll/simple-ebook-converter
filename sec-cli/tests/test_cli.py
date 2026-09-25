@@ -189,6 +189,37 @@ def test_toc_output_file(tmp_path):
     assert "第一章 开端" in out.read_text(encoding="utf-8")
 
 
+def test_toc_output_overwrites_by_default(tmp_path):
+    src = _write_sample(tmp_path)
+    out = tmp_path / "toc.txt"
+    out.write_text("旧内容", encoding="utf-8")
+    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "旧内容" not in out.read_text(encoding="utf-8")
+
+
+def test_toc_output_no_overwrite_refuses(tmp_path):
+    src = _write_sample(tmp_path)
+    out = tmp_path / "toc.txt"
+    out.write_text("旧内容", encoding="utf-8")
+    result = CliRunner().invoke(
+        convert, [str(src), "--toc-only", "-o", str(out), "--no-overwrite"]
+    )
+    assert result.exit_code != 0
+    assert "已存在" in result.output
+    assert out.read_text(encoding="utf-8") == "旧内容"
+
+
+def test_toc_output_no_overwrite_allows_new_file(tmp_path):
+    src = _write_sample(tmp_path)
+    out = tmp_path / "toc.txt"
+    result = CliRunner().invoke(
+        convert, [str(src), "--toc-only", "-o", str(out), "--no-overwrite"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "第一章 开端" in out.read_text(encoding="utf-8")
+
+
 def test_toc_missing_input():
     result = CliRunner().invoke(convert, ["--toc-only"])
     assert result.exit_code != 0
