@@ -23,7 +23,10 @@ def test_build_levels_presets_override_default():
     assert len(levels) == len(default_levels())
     assert next(r for r in levels if r.level == 2).pattern == "^第[0-9]+[卷]"
     assert next(r for r in levels if r.level == 3).pattern == "^第[0-9]+[章]"
-    assert next(r for r in levels if r.level == 4).pattern != None
+    section = next(r for r in levels if r.level == 4)
+    assert section.pattern == ""
+    assert section.class_name == "section"
+    assert section.active is False
 
 
 def test_build_levels_extra_rule_list():
