@@ -69,19 +69,7 @@ def _page_html(cfg: Config, node: Node) -> str:
     cls = node.cls or f"level{node.level}" if node.level > 0 else "preface"
     heading = f"<h{level} class=\"{esc(cls)}\">{esc(node.title)}</h{level}>"
     paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
-    return f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{esc(cfg.language)}" lang="{esc(cfg.language)}">
-<head>
-  <meta charset="utf-8"/>
-  <title>{esc(node.title)}</title>
-  <link rel="stylesheet" type="text/css" href="style.css"/>
-</head>
-<body>
-{heading}
-{paragraphs}
-</body>
-</html>"""
+    return f"{heading}\n{paragraphs}"
 
 
 def _ordered(nodes: list[Node]) -> list[Node]:
@@ -147,6 +135,8 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
             file_name=f"text/{node.anchor}.xhtml",
             content=_page_html(cfg, node).encode("utf-8"),
         )
+        page.add_meta(charset="utf-8")
+        page.add_link(href="../style.css", rel="stylesheet", type="text/css")
         book.add_item(page)
         page_map[id(node)] = page
         pages.append(page)
