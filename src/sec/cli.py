@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -76,6 +77,8 @@ def _load_replacements(replace_json: str | None, replace_file: Path | None) -> l
 def _resolve_output(input_path: Path, out: Path | None) -> Path:
     if out is None:
         out = input_path.with_suffix(".epub")
+    elif str(out) == "-":
+        raise click.UsageError("二进制 EPUB 不能输出到 stdout，请省略 -o 或指定文件路径")
     elif out.suffix.lower() != ".epub":
         out = out.with_name(out.name + ".epub")
     return out
@@ -84,7 +87,6 @@ def _resolve_output(input_path: Path, out: Path | None) -> Path:
 def _validate_date(value: str | None) -> str | None:
     if value is None:
         return None
-    from datetime import datetime
 
     try:
         datetime.fromisoformat(value.strip())
@@ -164,12 +166,9 @@ def convert(
     input_path = Path(input_opt) if input_opt else Path(input_txt) if input_txt else None
     if input_path is None:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
-    if not input_path.is_file():
-        raise click.BadParameter(f"文件不存在：{input_path}")
 
     cfg = Config(
         input=input_path,
-        output=out,
         encoding=encoding,
         overwrite=not no_overwrite,
         title=title,
@@ -192,14 +191,7 @@ def convert(
         volume_align=volume_align,
         font=font,
         css_file=css_file,
-        dump_css=dump_css,
     )
-
-    if cfg.font:
-        try:
-            font_media_type(cfg.font)
-        except ValueError as e:
-            raise click.UsageError(str(e))
 
     lines, used = read_lines(input_path, encoding)
     fallback = title or input_path.stem
@@ -218,6 +210,12 @@ def convert(
             out.write_text(content + "\n", encoding="utf-8")
         return
 
+    if cfg.font:
+        try:
+            font_media_type(cfg.font)
+        except ValueError as e:
+            raise click.UsageError(str(e))
+
     css = build_css(cfg)
     if dump_css is not None:
         dump_css.write_text(css, encoding="utf-8")
@@ -235,7 +233,11 @@ def convert(
 
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
-    convert.main(args=args, prog_name="sec-cli", standalone_mode=False)
+    try:
+        convert.main(args=args, prog_name="sec-cli", standalone_mode=False)
+    except click.ClickException as exc:
+        exc.show()
+        raise SystemExit(exc.exit_code) from exc
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from pathlib import Path
 from ebooklib import epub
 
 from .config import Config, Node
+from .parser import walk
 
 _MEDIA_TYPES = {
     ".jpg": "image/jpeg",
@@ -73,18 +74,10 @@ h1, h2, h3, h4, h5, h6 {{
 def _page_html(cfg: Config, node: Node) -> str:
     esc = html.escape
     level = max(1, node.level)
-    cls = node.class_name or f"level{node.level}" if node.level > 0 else "preface"
+    cls = node.class_name or (f"level{node.level}" if node.level > 0 else "preface")
     heading = f"<h{level} class=\"{esc(cls)}\">{esc(node.title)}</h{level}>"
     paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
     return f"{heading}\n{paragraphs}"
-
-
-def _ordered(nodes: list[Node]) -> list[Node]:
-    out: list[Node] = []
-    for node in nodes:
-        out.append(node)
-        out.extend(_ordered(node.children))
-    return out
 
 
 def _build_toc(nodes: list[Node], page_map: dict[int, epub.EpubHtml], depth: int) -> list:
@@ -136,7 +129,7 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         book.add_item(cover_page)
         pages.append(cover_page)
 
-    for node in _ordered(nodes):
+    for node in walk(nodes):
         page = epub.EpubHtml(
             title=node.title,
             file_name=f"text/{node.anchor}.xhtml",

@@ -106,7 +106,7 @@ def parse(
 
 def _assign_anchors(tree: list[Node]) -> None:
     counter = 0
-    for node in _walk(tree):
+    for node in walk(tree):
         if node.level == 0:
             node.anchor = "preface"
             continue
@@ -114,7 +114,8 @@ def _assign_anchors(tree: list[Node]) -> None:
         node.anchor = f"p{counter:04d}"
 
 
-def _walk(nodes: list[Node]):
+def walk(nodes: list[Node]):
+    """先序遍历章节树。"""
     for node in nodes:
         yield node
-        yield from _walk(node.children)
+        yield from walk(node.children)

@@ -3,24 +3,23 @@ from __future__ import annotations
 from .config import Node
 
 
-def node_to_dict(node: Node) -> dict:
-    return {
+def _to_dict(node: Node, depth: int) -> dict:
+    entry = {
         "title": node.title,
         "raw_title": node.raw_title,
         "level": node.level,
         "class_name": node.class_name,
-        "children": [node_to_dict(c) for c in node.children],
     }
+    if depth <= 0:
+        entry["children"] = []
+    else:
+        entry["children"] = [_to_dict(c, depth) for c in node.children if c.level <= depth]
+    return entry
 
 
 def to_json(tree: list[Node], depth: int = 6) -> list[dict]:
-    out = []
-    for node in tree:
-        entry = node_to_dict(node)
-        if depth > 0:
-            entry["children"] = [c for c in entry["children"] if c["level"] <= depth]
-        out.append(entry)
-    return out
+    """章节树转 JSON，逐层按 depth 裁剪（与 to_text 语义一致）。"""
+    return [_to_dict(node, depth) for node in tree]
 
 
 def to_text(tree: list[Node], depth: int = 6) -> str:

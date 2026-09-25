@@ -2,22 +2,15 @@ from __future__ import annotations
 
 from .cleaner import clean_lines
 from .config import Config, Node
-from .parser import ParseStats, parse
-from .replace import apply_lines
-
-_NodeList = list[Node]
+from .parser import ParseStats, parse, walk
+from .replace import apply, apply_lines, compile_rules
 
 
-def walk(nodes: _NodeList):
-    for node in nodes:
-        yield node
-        yield from walk(node.children)
-
-
-def process(lines: list[str], cfg: Config, fallback_title: str) -> tuple[_NodeList, ParseStats]:
+def process(lines: list[str], cfg: Config, fallback_title: str) -> tuple[list[Node], ParseStats]:
     """统一处理管线：切分 → 清理 → 替换（标题与正文）。
 
     标题替换后存在 node.title，原始标题保留在 node.raw_title。
+    正则只编译一次，避免对每章反复编译。
     """
     tree, stats = parse(
         lines,
@@ -30,7 +23,9 @@ def process(lines: list[str], cfg: Config, fallback_title: str) -> tuple[_NodeLi
     if not cfg.no_clean:
         for node in walk(tree):
             node.paragraphs = clean_lines(node.paragraphs)
-    for node in walk(tree):
-        node.title = apply_lines([node.title], cfg.replacements)[0]
-        node.paragraphs = apply_lines(node.paragraphs, cfg.replacements)
+    if cfg.replacements:
+        compiled = compile_rules(cfg.replacements)
+        for node in walk(tree):
+            node.title = apply(node.title, cfg.replacements, compiled)
+            node.paragraphs = apply_lines(node.paragraphs, cfg.replacements, compiled)
     return tree, stats

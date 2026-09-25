@@ -45,7 +45,6 @@ def default_levels() -> list[LevelRule]:
 @dataclass
 class Config:
     input: Path | None = None
-    output: Path | None = None
     encoding: str = "auto"
     overwrite: bool = True
 
@@ -73,7 +72,3 @@ class Config:
     volume_align: str = "right"
     font: Path | None = None
     css_file: Path | None = None
-
-    toc_file: str = "-"
-    toc_format: str = "text"
-    dump_css: Path | None = None

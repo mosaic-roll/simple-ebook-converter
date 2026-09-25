@@ -197,6 +197,40 @@ def test_main_toc_only(tmp_path, capsys):
     assert "第一章 开端" in out
 
 
+def test_toc_json_depth_pruning(tmp_path):
+    p = tmp_path / "novel.txt"
+    p.write_text("第一卷\n第一章\n第一幕\n正文\n", encoding="utf-8")
+    deep = CliRunner().invoke(
+        convert,
+        [str(p), "--toc-only", "--toc-format", "json", "--level", "4:^第[0-9一二三四五六七八九十]+幕", "--toc-depth", "6"],
+    )
+    assert deep.exit_code == 0, deep.output
+    assert "第一幕" in deep.output
+    shallow = CliRunner().invoke(
+        convert,
+        [str(p), "--toc-only", "--toc-format", "json", "--level", "4:^第[0-9一二三四五六七八九十]+幕", "--toc-depth", "3"],
+    )
+    assert shallow.exit_code == 0, shallow.output
+    assert "第一章" in shallow.output
+    assert "第一幕" not in shallow.output
+
+
+def test_main_error_clean(tmp_path, capsys):
+    import pytest
+
+    missing = tmp_path / "nope.txt"
+    with pytest.raises(SystemExit):
+        main([str(missing)])
+    assert "Error:" in capsys.readouterr().err
+
+
+def test_convert_out_stdout_epub_rejected(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "-o", "-"])
+    assert result.exit_code != 0
+    assert "stdout" in result.output
+
+
 def test_main_convert(tmp_path):
     src = _write_sample(tmp_path)
     main([str(src)])
