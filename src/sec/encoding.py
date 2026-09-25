@@ -10,7 +10,7 @@ _BOMS = (
     (b"\xfe\xff", "utf-16-be"),
 )
 
-_FALLBACKS = ("utf-8", "gb18030", "big5")
+_FALLBACKS = ("utf-8", "gb18030", "big5", "cp932", "euc_jp")
 
 
 class EncodingError(Exception):
