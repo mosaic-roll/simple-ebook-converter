@@ -70,6 +70,34 @@ def test_convert_replace_json_and_file_conflict(tmp_path):
     assert "二选一" in result.output
 
 
+def test_replace_applies_to_title_and_toc(tmp_path):
+    src = _write_sample(tmp_path, text="#第1章 开头\n第一段正文\n")
+    result = CliRunner().invoke(
+        convert,
+        [
+            "--chapter",
+            r"^#.*",
+            "--replace-json",
+            json.dumps(
+                [
+                    {"pattern": r"^#\s*第", "replace": "章节 "},
+                    {"pattern": r"#", "replace": ""},
+                ]
+            ),
+            str(src),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    out = tmp_path / "novel.epub"
+    with zipfile.ZipFile(out) as z:
+        nav = next(n for n in z.namelist() if n.endswith("nav.xhtml"))
+        text = z.read(nav).decode("utf-8")
+        assert "章节 1章 开头" in text
+        page = next(n for n in z.namelist() if n.endswith("text/p0001.xhtml"))
+        content = z.read(page).decode("utf-8")
+        assert "章节 1章 开头" in content
+
+
 def test_convert_date(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "--date", "2024-05-13"])

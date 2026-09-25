@@ -215,6 +215,7 @@ def convert(
         for node in _ordered(tree):
             node.paragraphs = clean_lines(node.paragraphs)
     for node in _ordered(tree):
+        node.title = apply_lines([node.title], cfg.replacements)[0]
         node.paragraphs = apply_lines(node.paragraphs, cfg.replacements)
 
     css = build_css(cfg)
