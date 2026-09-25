@@ -1,8 +1,8 @@
 [project]
 name = "ebook-builder"
 version = "0.1.0"
-description = "TXT 转 EPUB3 工具工作区（CLI + GUI）"
+description = "TXT 转 EPUB3 工具工作区（core + CLI + GUI）"
 requires-python = ">=3.12"
 
 [tool.uv.workspace]
-members = ["sec-cli", "sec-gui"]
+members = ["sec-core", "sec-cli", "sec-gui"]

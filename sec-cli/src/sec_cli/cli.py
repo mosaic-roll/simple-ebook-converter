@@ -7,15 +7,15 @@ from pathlib import Path
 
 import click
 
-from .builder import build_css, build_epub, font_media_type
-from .config import Config, LevelRule
-from .encoding import EncodingError, read_lines
-from .levels import build_levels
-from .meta import guess_metadata
-from .pipeline import process
-from .parser import NoEnabledRulesError
-from .replace import Rule, rules_from_json
-from .toc import to_json, to_text
+from sec_core.builder import build_css, build_epub, font_media_type
+from sec_core.config import Config, LevelRule
+from sec_core.encoding import EncodingError, read_lines
+from sec_core.levels import build_levels
+from sec_core.meta import resolve_metadata
+from sec_core.parser import NoEnabledRulesError
+from sec_core.pipeline import process
+from sec_core.replace import Rule, rules_from_json
+from sec_core.toc import to_json, to_text
 
 VERSION = "0.1.0"
 
@@ -152,9 +152,7 @@ def convert(
     if input_path is None:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
 
-    guessed_title, guessed_author = guess_metadata(input_path.stem)
-    title = title or guessed_title
-    author = author or guessed_author or ""
+    title, author = resolve_metadata(input_path, title, author)
 
     cfg = Config(
         input=input_path,
@@ -183,9 +181,8 @@ def convert(
     )
 
     lines, used = _read_input(input_path, encoding)
-    fallback = title or input_path.stem
     try:
-        tree, stats = process(lines, cfg, fallback)
+        tree, stats = process(lines, cfg, title)
     except NoEnabledRulesError as e:
         raise click.UsageError(str(e)) from e
     if not tree:

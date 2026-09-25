@@ -6,8 +6,8 @@ import pytest
 from click.testing import CliRunner
 
 from sec_cli.cli import convert, main
-from sec_cli.encoding import EncodingError
-from sec_cli.parser import NoEnabledRulesError
+from sec_core.encoding import EncodingError
+from sec_core.parser import NoEnabledRulesError
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):

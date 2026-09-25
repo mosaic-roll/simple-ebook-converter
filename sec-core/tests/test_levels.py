@@ -2,9 +2,9 @@ import re
 
 import pytest
 
-from sec_cli.config import default_levels
-from sec_cli.levels import build_levels, parse_level_spec
-from sec_cli.replace import Rule, rules_from_json
+from sec_core.config import default_levels
+from sec_core.levels import build_levels, parse_level_spec
+from sec_core.replace import Rule, rules_from_json
 
 
 def test_parse_level_spec():

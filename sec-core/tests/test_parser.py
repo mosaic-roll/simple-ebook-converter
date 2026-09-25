@@ -1,5 +1,5 @@
-from sec_cli.config import LevelRule, default_levels
-from sec_cli.parser import NoEnabledRulesError, parse
+from sec_core.config import LevelRule, default_levels
+from sec_core.parser import NoEnabledRulesError, parse
 
 import pytest
 

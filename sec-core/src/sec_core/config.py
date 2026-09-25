@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from .replace import Rule
@@ -91,3 +91,39 @@ class Config:
     volume_align: str = "right"
     font: Path | None = None
     css_file: Path | None = None
+
+
+#: `config_defaults()` 里把 levels 拆成单条正则的字段（前端每条一个输入框）
+LEVEL_FIELDS = {2: "volume", 3: "chapter", 4: "section"}
+
+
+def config_defaults() -> dict[str, object]:
+    """从 `Config()` 派生全部默认值，供 CLI / GUI 填表用（唯一真源，不重复硬编码）。
+
+    额外给出 `volume`/`chapter`/`section` 三个由 `levels` 拆出的正则字符串，
+    以及取反后的 `no_overwrite`（`Config.overwrite` 的反面，勾选框语义）。
+    """
+    cfg = Config()
+    by_level = {r.level: r.pattern for r in cfg.levels}
+    defaults: dict[str, object] = {
+        "overwrite": cfg.overwrite,
+        "max_title_len": cfg.max_title_len,
+        "preface_title": cfg.preface_title,
+        "no_volume": cfg.no_volume,
+        "no_clean": cfg.no_clean,
+        "no_toc": cfg.no_toc,
+        "toc_depth": cfg.toc_depth,
+        "indent": cfg.indent,
+        "line_height": cfg.line_height,
+        "para_spacing": cfg.para_spacing,
+        "chapter_align": cfg.chapter_align,
+        "volume_align": cfg.volume_align,
+    }
+    defaults.update({name: by_level.get(level, "") for level, name in LEVEL_FIELDS.items()})
+    for field in fields(Config):
+        if field.name in ("levels", "overwrite"):
+            continue
+        value = getattr(cfg, field.name)
+        defaults[field.name] = "" if value is None else value
+    defaults["no_overwrite"] = not cfg.overwrite
+    return defaults

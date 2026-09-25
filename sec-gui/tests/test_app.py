@@ -1,10 +1,11 @@
+import re
 import zipfile
 from pathlib import Path
 
 import pytest
 
-from sec_cli.config import DEFAULT_VOLUME_RE
-from sec_gui.app import build_book, config_defaults, make_config, preview_data, split_extra
+from sec_core.config import DEFAULT_VOLUME_RE, config_defaults
+from sec_gui.app import build_book, make_config, preview_data, split_extra
 
 SAMPLE = """前言。
 
@@ -18,6 +19,12 @@ SAMPLE = """前言。
 第三章 出发
 正文第三段。
 """
+
+
+def _opf(epub_path: Path) -> str:
+    with zipfile.ZipFile(epub_path) as z:
+        name = next(n for n in z.namelist() if n.endswith("content.opf"))
+        return z.read(name).decode("utf-8")
 
 
 def _fields(tmp_path: Path, **overrides) -> dict:
@@ -74,6 +81,13 @@ def test_config_defaults_reads_config():
     assert d["no_toc"] is False
 
 
+def test_config_defaults_is_the_core_one():
+    """GUI 用的默认值就是 core 的那一份，不再各维护一套。"""
+    from sec_gui import app
+
+    assert app.config_defaults is config_defaults
+
+
 def test_make_config_defaults(tmp_path):
     cfg = make_config(_fields(tmp_path))
     assert cfg.no_volume is False
@@ -114,12 +128,40 @@ def test_preview_data_tree_and_replacement(tmp_path):
     assert children[0]["class_name"] == "chapter"
 
 
-def test_preview_data_uses_guessed_metadata_title(tmp_path):
+def test_build_book_guesses_metadata_from_filename(tmp_path):
+    """直接填路径（不经「浏览」按钮）也要用上 core 的元数据猜测。"""
     txt = tmp_path / "《测试集》作者：张三.txt"
     txt.write_text(SAMPLE, encoding="utf-8")
-    fields = _fields(tmp_path)
+    fields = _fields(tmp_path, output=str(tmp_path / "guessed"))
     fields["input"] = str(txt)
-    make_config(fields)  # 仅验证可构建，书名由主流程填充
+    out = build_book(fields)
+    opf = _opf(out)
+    assert "<dc:title>测试集</dc:title>" in opf
+    assert "张三" in opf
+
+
+def test_build_book_never_writes_none_metadata(tmp_path):
+    """文件名不含《》与「作者：」时，不能把 None 写进 EPUB 元数据。"""
+    txt = tmp_path / "novel.txt"
+    txt.write_text(SAMPLE, encoding="utf-8")
+    fields = _fields(tmp_path, output=str(tmp_path / "plain"))
+    fields["input"] = str(txt)
+    opf = _opf(build_book(fields))
+    titles = re.findall(r"<dc:title[^>]*>([^<]*)<", opf)
+    assert titles == ["novel"]
+    # 猜不到作者就不写 dc:creator，但绝不能是字符串 "None"
+    assert re.findall(r"<dc:creator[^>]*>([^<]*)<", opf) == []
+    assert "None" not in opf
+
+
+def test_build_book_explicit_title_overrides_filename(tmp_path):
+    txt = tmp_path / "《测试集》作者：张三.txt"
+    txt.write_text(SAMPLE, encoding="utf-8")
+    fields = _fields(tmp_path, output=str(tmp_path / "explicit"), title="手动标题", author="手动作者")
+    fields["input"] = str(txt)
+    opf = _opf(build_book(fields))
+    assert "<dc:title>手动标题</dc:title>" in opf
+    assert "手动作者" in opf
 
 
 def test_build_book_creates_epub(tmp_path):

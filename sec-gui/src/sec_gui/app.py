@@ -5,14 +5,14 @@ from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from sec_cli.builder import build_css, build_epub
-from sec_cli.config import Config
-from sec_cli.encoding import read_lines
-from sec_cli.levels import build_levels
-from sec_cli.meta import guess_metadata
-from sec_cli.pipeline import process
-from sec_cli.replace import Rule, rules_from_json
-from sec_cli.toc import to_json
+from sec_core.builder import build_css, build_epub
+from sec_core.config import Config, config_defaults
+from sec_core.encoding import read_lines
+from sec_core.levels import build_levels
+from sec_core.meta import resolve_metadata
+from sec_core.pipeline import process
+from sec_core.replace import Rule, rules_from_json
+from sec_core.toc import to_json
 
 _ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "cp932", "euc_jp"]
 
@@ -20,34 +20,6 @@ _ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "cp932", "euc_jp"]
 def split_extra(text: str) -> tuple[str, ...]:
     """把「每行一条 级别:正则[:类名]」拆成规则元组。"""
     return tuple(line.strip() for line in text.splitlines() if line.strip())
-
-
-def config_defaults() -> dict:
-    """从 sec_cli.config 的默认 Config 读取界面默认值（不重复硬编码）。"""
-    cfg = Config()
-    by_level = {r.level: r.pattern for r in cfg.levels}
-    return {
-        "encoding": cfg.encoding,
-        "title": cfg.title or "",
-        "author": cfg.author or "",
-        "date": cfg.date or "",
-        "language": cfg.language,
-        "no_overwrite": not cfg.overwrite,
-        "no_volume": cfg.no_volume,
-        "no_clean": cfg.no_clean,
-        "no_toc": cfg.no_toc,
-        "volume": by_level.get(2, ""),
-        "chapter": by_level.get(3, ""),
-        "section": by_level.get(4, ""),
-        "max_title_len": cfg.max_title_len,
-        "preface_title": cfg.preface_title,
-        "toc_depth": cfg.toc_depth,
-        "indent": cfg.indent,
-        "line_height": cfg.line_height,
-        "para_spacing": cfg.para_spacing,
-        "chapter_align": cfg.chapter_align,
-        "volume_align": cfg.volume_align,
-    }
 
 
 def make_config(fields: dict) -> Config:
@@ -115,8 +87,9 @@ def preview_data(fields: dict) -> list[dict]:
     """按当前设置解析目录树（JSON 列表），供预览与测试。"""
     cfg = make_config(fields)
     src = cfg.input
+    cfg.title, cfg.author = resolve_metadata(src, cfg.title, cfg.author)
     lines, _used = read_lines(src, cfg.encoding)
-    tree, _stats = process(lines, cfg, cfg.title or src.stem)
+    tree, _stats = process(lines, cfg, cfg.title)
     return to_json(tree, cfg.toc_depth)
 
 
@@ -124,8 +97,9 @@ def build_book(fields: dict) -> Path:
     """按当前设置生成 EPUB，返回输出路径，出错抛 ValueError。"""
     cfg = make_config(fields)
     src = cfg.input
+    cfg.title, cfg.author = resolve_metadata(src, cfg.title, cfg.author)
     lines, _used = read_lines(src, cfg.encoding)
-    tree, _stats = process(lines, cfg, cfg.title or src.stem)
+    tree, _stats = process(lines, cfg, cfg.title)
     if not tree:
         raise ValueError("没有可生成的内容（文件为空或全是空行）")
 
@@ -399,10 +373,10 @@ class SecGui:
             return
         self.v_input.set(path)
         p = Path(path)
-        if not self.v_title.get():
-            title, author = guess_metadata(p.stem)
-            self.v_title.set(title)
-            self.v_author.set(author)
+        # 已在输入框里填过的书名/作者优先，否则从文件名猜（猜不到退回文件名本身）
+        title, author = resolve_metadata(p, self.v_title.get().strip(), self.v_author.get().strip())
+        self.v_title.set(title)
+        self.v_author.set(author)
         if not self.v_output.get():
             self.v_output.set(str(p.with_suffix("")))
 

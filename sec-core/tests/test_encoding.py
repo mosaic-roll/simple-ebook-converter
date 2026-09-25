@@ -1,6 +1,6 @@
 import pytest
 
-from sec_cli.encoding import EncodingError, decode, read_lines
+from sec_core.encoding import EncodingError, decode, read_lines
 
 
 def test_bom_utf8():

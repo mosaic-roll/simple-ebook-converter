@@ -1,16 +1,19 @@
 # sec-cli — TXT 转 EPUB3 命令行工具
 
-将 TXT 文本解析为章节并生成 EPUB3。核心模块（`sec_cli.parser` / `sec_cli.builder` / `sec_cli.toc` 等）设计为可被 CLI 与 `sec-gui` 共用。
+将 TXT 文本解析为章节并生成 EPUB3。命令行前端；解析、切分、清理、替换与组装等核心实现都在
+[`sec-core`](../sec-core)（`sec_core.*`），与 `sec-gui` 共用同一套逻辑。
 
-依赖：`click` / `ebooklib` / `chardet`。使用 [uv](https://github.com/astral-sh/uv) 管理。
+依赖：`click` + `sec-core`（后者带来 `ebooklib` / `chardet`）。使用 [uv](https://github.com/astral-sh/uv) 管理。
 
 ## 安装
 
-`sec-cli` 是 `sec` 工作区（`sec-cli` + `sec-gui`）的成员，在工作区根目录执行：
+工作区成员为 `sec-core` / `sec-cli` / `sec-gui`。在**工作区根目录**执行：
 
 ```bash
-uv sync
+uv sync --all-packages
 ```
+
+> 直接 `uv sync` 只会装根工程（无依赖），不会安装三个成员包。
 
 ## 用法
 
@@ -23,6 +26,8 @@ uv run sec-cli 我的小说.txt --toc-only            # 只输出目录（stdout
 uv run sec-cli 我的小说.txt --toc-only --toc-format json
 uv run sec-cli 我的小说.txt --toc-only -o toc.json # 目录写入文件
 ```
+
+书名与作者未显式指定时，会先从文件名猜（`《书名》作者：作者`，见 `sec_core.meta.resolve_metadata`）。
 
 完整选项见 `uv run sec-cli --help`。
 

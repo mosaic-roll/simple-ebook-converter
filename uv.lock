@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 members = [
     "ebook-builder",
     "sec-cli",
+    "sec-core",
     "sec-gui",
 ]
 
@@ -253,8 +254,30 @@ name = "sec-cli"
 version = "0.1.0"
 source = { editable = "sec-cli" }
 dependencies = [
-    { name = "chardet" },
     { name = "click" },
+    { name = "sec-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click", specifier = ">=8.5.0" },
+    { name = "sec-core", editable = "sec-core" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
+
+[[package]]
+name = "sec-core"
+version = "0.1.0"
+source = { editable = "sec-core" }
+dependencies = [
+    { name = "chardet" },
     { name = "ebooklib" },
 ]
 
@@ -266,7 +289,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chardet", specifier = ">=7.6.0" },
-    { name = "click", specifier = ">=8.5.0" },
     { name = "ebooklib", specifier = ">=0.20" },
 ]
 
@@ -278,7 +300,7 @@ name = "sec-gui"
 version = "0.1.0"
 source = { editable = "sec-gui" }
 dependencies = [
-    { name = "sec-cli" },
+    { name = "sec-core" },
 ]
 
 [package.dev-dependencies]
@@ -287,7 +309,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sec-cli", editable = "sec-cli" }]
+requires-dist = [{ name = "sec-core", editable = "sec-core" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]
