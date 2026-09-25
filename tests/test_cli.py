@@ -231,6 +231,32 @@ def test_convert_out_stdout_epub_rejected(tmp_path):
     assert "stdout" in result.output
 
 
+def test_convert_metadata_from_filename(tmp_path):
+    src = _write_sample(tmp_path, name="《希灵帝国》（校对版全本）作者：远瞳.txt")
+    result = CliRunner().invoke(convert, [str(src)])
+    assert result.exit_code == 0, result.output
+    out = tmp_path / "《希灵帝国》（校对版全本）作者：远瞳.epub"
+    assert out.exists()
+    with zipfile.ZipFile(out) as z:
+        opf = next(n for n in z.namelist() if n.endswith("content.opf"))
+        data = z.read(opf).decode("utf-8")
+    assert "希灵帝国" in data
+    assert "远瞳" in data
+
+
+def test_convert_explicit_metadata_overrides_filename(tmp_path):
+    src = _write_sample(tmp_path, name="《A》作者：B.txt")
+    result = CliRunner().invoke(convert, [str(src), "--title", "手动标题", "--author", "手动作者"])
+    assert result.exit_code == 0, result.output
+    out = tmp_path / "《A》作者：B.epub"
+    with zipfile.ZipFile(out) as z:
+        opf = next(n for n in z.namelist() if n.endswith("content.opf"))
+        data = z.read(opf).decode("utf-8")
+    assert "手动标题" in data
+    assert "手动作者" in data
+    assert ">A<" not in data
+
+
 def test_main_convert(tmp_path):
     src = _write_sample(tmp_path)
     main([str(src)])

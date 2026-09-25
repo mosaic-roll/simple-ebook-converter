@@ -10,6 +10,7 @@ import click
 from .builder import build_css, build_epub, font_media_type
 from .config import Config, LevelRule, default_levels
 from .encoding import read_lines
+from .meta import guess_metadata
 from .pipeline import process
 from .replace import Rule
 from .toc import to_json, to_text
@@ -166,6 +167,10 @@ def convert(
     input_path = Path(input_opt) if input_opt else Path(input_txt) if input_txt else None
     if input_path is None:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
+
+    guessed_title, guessed_author = guess_metadata(input_path.stem)
+    title = title or guessed_title
+    author = author or guessed_author or ""
 
     cfg = Config(
         input=input_path,
