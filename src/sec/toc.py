@@ -23,16 +23,12 @@ def to_json(tree: list[Node], depth: int = 6) -> list[dict]:
     return out
 
 
-def to_text(tree: list[Node], depth: int = 6, show_raw: bool = False) -> str:
+def to_text(tree: list[Node], depth: int = 6) -> str:
     lines: list[str] = []
 
     def walk(nodes: list[Node]) -> None:
         for node in nodes:
-            indent = "  " * max(0, node.level - 1)
-            if show_raw and node.raw_title and node.raw_title != node.title:
-                lines.append(f"{indent}{node.raw_title} → {node.title}")
-            else:
-                lines.append(indent + node.title)
+            lines.append("  " * max(0, node.level - 1) + node.title)
             walk([c for c in node.children if c.level <= depth])
 
     walk(tree)

@@ -233,7 +233,6 @@ def convert(
 @click.argument("toc_txt", type=_PATH, required=False)
 @click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
 @_with_common_options
-@click.option("--show-raw", is_flag=True, help="文本目录显示两列：原始标题 → 替换后标题")
 @click.option("--toc-file", default="-", show_default=True, help='写入的文件，"-" 为 stdout')
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
 @click.option("--toc-depth", default=6, type=int, show_default=True)
@@ -250,7 +249,6 @@ def toc(
     preface_title: str,
     replace_json: str | None,
     replace_file: Path | None,
-    show_raw: bool,
     toc_file: str,
     toc_format: str,
     toc_depth: int,
@@ -274,7 +272,7 @@ def toc(
     if toc_format == "json":
         content = json.dumps(to_json(tree, toc_depth), ensure_ascii=False, indent=2)
     else:
-        content = to_text(tree, toc_depth, show_raw=show_raw)
+        content = to_text(tree, toc_depth)
     if toc_file == "-":
         click.echo(content)
     else:
