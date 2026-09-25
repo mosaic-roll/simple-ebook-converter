@@ -148,11 +148,10 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         page_map[id(node)] = page
         pages.append(page)
 
-    has_toc = bool(nodes) and not cfg.no_toc
-    if has_toc:
+    if nodes:
         book.toc = _build_toc(nodes, page_map, cfg.toc_depth)
-        book.add_item(epub.EpubNav())
+    book.add_item(epub.EpubNav())
     book.add_item(epub.EpubNcx())
 
-    book.spine = (["nav"] if has_toc else []) + [p for p in pages]
+    book.spine = (["nav"] if not cfg.no_toc else []) + [p for p in pages]
     epub.write_epub(output, book)

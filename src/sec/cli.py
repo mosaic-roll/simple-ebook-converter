@@ -129,7 +129,7 @@ def _ordered(nodes):
 @click.option("--font", type=_PATH, help="嵌入正文字体")
 @click.option("--css-file", type=_PATH, help="加载外部 CSS（追加到内置样式之后）")
 @click.option("--dump-css", type=_OUT_PATH, help="输出当前生效 CSS 后退出")
-@click.option("--no-toc", is_flag=True, help="不生成目录页")
+@click.option("--no-toc", is_flag=True, help="目录不出现在书页中（仍保留导航文档供阅读器使用）")
 @click.option("--toc-depth", default=6, type=int, show_default=True, help="目录包含到第几级")
 @click.version_option(VERSION, prog_name="sec-cli")
 def convert(

@@ -175,3 +175,25 @@ def test_author_and_date_written(tmp_path):
     opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
     assert "<dc:creator id=\"creator\">张三</dc:creator>" in opf
     assert "<dc:date>2024-05-13</dc:date>" in opf
+
+
+def test_no_toc_nav_not_in_spine(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", no_toc=True)
+    out = _build(tmp_path, cfg=cfg)
+    entries = _entries(out)
+    assert "EPUB/nav.xhtml" in entries
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    spine = opf.split("<spine", 1)[1].split("</spine>", 1)[0]
+    assert "nav" not in spine
+    assert 'properties="nav"' in opf
+    ncx = entries[next(n for n in entries if "toc.ncx" in n)].decode("utf-8")
+    assert "第1章" in ncx or "一" in ncx
+
+
+def test_toc_nav_in_spine_by_default(tmp_path):
+    out = _build(tmp_path)
+    entries = _entries(out)
+    assert "EPUB/nav.xhtml" in entries
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    spine = opf.split("<spine", 1)[1].split("</spine>", 1)[0]
+    assert '"nav"' in spine or "nav\"" in spine
