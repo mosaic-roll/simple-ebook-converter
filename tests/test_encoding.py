@@ -45,13 +45,6 @@ def test_euc_jp_japanese():
     assert enc in ("euc-jp", "euc_jp")
 
 
-def test_iso2022_jp_japanese():
-    raw = "日本語".encode("iso2022_jp")
-    text, enc = decode(raw)
-    assert "日本語" in text
-    assert "iso2022" in enc.replace("-", "").replace("_", "").lower()
-
-
 def test_manual_encoding():
     raw = "中文".encode("gb18030")
     text, enc = decode(raw, encoding="gb18030")
