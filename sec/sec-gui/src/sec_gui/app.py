@@ -22,6 +22,34 @@ def split_extra(text: str) -> tuple[str, ...]:
     return tuple(line.strip() for line in text.splitlines() if line.strip())
 
 
+def config_defaults() -> dict:
+    """从 sec_cli.config 的默认 Config 读取界面默认值（不重复硬编码）。"""
+    cfg = Config()
+    by_level = {r.level: r.pattern for r in cfg.levels}
+    return {
+        "encoding": cfg.encoding,
+        "title": cfg.title or "",
+        "author": cfg.author or "",
+        "date": cfg.date or "",
+        "language": cfg.language,
+        "no_overwrite": not cfg.overwrite,
+        "no_volume": cfg.no_volume,
+        "no_clean": cfg.no_clean,
+        "no_toc": cfg.no_toc,
+        "volume": by_level.get(2, ""),
+        "chapter": by_level.get(3, ""),
+        "section": by_level.get(4, ""),
+        "max_title_len": cfg.max_title_len,
+        "preface_title": cfg.preface_title,
+        "toc_depth": cfg.toc_depth,
+        "indent": cfg.indent,
+        "line_height": cfg.line_height,
+        "para_spacing": cfg.para_spacing,
+        "chapter_align": cfg.chapter_align,
+        "volume_align": cfg.volume_align,
+    }
+
+
 def make_config(fields: dict) -> Config:
     """把界面字段合并成 Config，出错抛 ValueError。GUI 与测试共用。"""
     src = Path(fields["input"])
@@ -124,30 +152,31 @@ class SecGui:
 
     # ---------- 变量 ----------
     def _build_vars(self) -> None:
+        d = config_defaults()
         self.v_input = tk.StringVar()
         self.v_output = tk.StringVar()
-        self.v_encoding = tk.StringVar(value="auto")
-        self.v_no_overwrite = tk.BooleanVar(value=False)
-        self.v_title = tk.StringVar()
-        self.v_author = tk.StringVar()
-        self.v_date = tk.StringVar()
-        self.v_language = tk.StringVar(value="zh")
+        self.v_encoding = tk.StringVar(value=d["encoding"])
+        self.v_no_overwrite = tk.BooleanVar(value=d["no_overwrite"])
+        self.v_title = tk.StringVar(value=d["title"])
+        self.v_author = tk.StringVar(value=d["author"])
+        self.v_date = tk.StringVar(value=d["date"])
+        self.v_language = tk.StringVar(value=d["language"])
         self.v_cover = tk.StringVar()
-        self.v_volume = tk.StringVar()
-        self.v_chapter = tk.StringVar()
-        self.v_section = tk.StringVar()
-        self.v_no_volume = tk.BooleanVar(value=False)
+        self.v_volume = tk.StringVar(value=d["volume"])
+        self.v_chapter = tk.StringVar(value=d["chapter"])
+        self.v_section = tk.StringVar(value=d["section"])
+        self.v_no_volume = tk.BooleanVar(value=d["no_volume"])
         self.v_extra_levels = tk.StringVar()
-        self.v_max_title_len = tk.IntVar(value=35)
-        self.v_preface_title = tk.StringVar(value="前言")
-        self.v_no_clean = tk.BooleanVar(value=False)
-        self.v_no_toc = tk.BooleanVar(value=False)
-        self.v_toc_depth = tk.IntVar(value=6)
-        self.v_indent = tk.IntVar(value=2)
-        self.v_line_height = tk.StringVar(value="1.5")
-        self.v_para_spacing = tk.StringVar(value="1em")
-        self.v_chapter_align = tk.StringVar(value="center")
-        self.v_volume_align = tk.StringVar(value="right")
+        self.v_max_title_len = tk.IntVar(value=d["max_title_len"])
+        self.v_preface_title = tk.StringVar(value=d["preface_title"])
+        self.v_no_clean = tk.BooleanVar(value=d["no_clean"])
+        self.v_no_toc = tk.BooleanVar(value=d["no_toc"])
+        self.v_toc_depth = tk.IntVar(value=d["toc_depth"])
+        self.v_indent = tk.IntVar(value=d["indent"])
+        self.v_line_height = tk.StringVar(value=d["line_height"])
+        self.v_para_spacing = tk.StringVar(value=d["para_spacing"])
+        self.v_chapter_align = tk.StringVar(value=d["chapter_align"])
+        self.v_volume_align = tk.StringVar(value=d["volume_align"])
         self.v_status = tk.StringVar(value="就绪")
 
     def _fields(self) -> dict:

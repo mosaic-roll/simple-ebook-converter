@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from sec_gui.app import build_book, make_config, preview_data, split_extra
+from sec_cli.config import DEFAULT_VOLUME_RE
+from sec_gui.app import build_book, config_defaults, make_config, preview_data, split_extra
 
 SAMPLE = """前言。
 
@@ -59,6 +60,18 @@ def test_split_extra():
         "2:^第[0-9]+章",
     )
     assert split_extra("") == ()
+
+
+def test_config_defaults_reads_config():
+    d = config_defaults()
+    assert d["preface_title"] == "前言"
+    assert d["max_title_len"] == 35
+    assert d["toc_depth"] == 6
+    assert d["chapter_align"] == "center"
+    assert d["volume_align"] == "right"
+    assert d["volume"] == DEFAULT_VOLUME_RE
+    assert d["section"] == ""
+    assert d["no_toc"] is False
 
 
 def test_make_config_defaults(tmp_path):
