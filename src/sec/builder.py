@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import html
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ebooklib import epub
@@ -98,7 +97,8 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
     if cfg.author:
         book.add_author(cfg.author)
     book.set_language(cfg.language)
-    book.add_metadata("DC", "date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    if cfg.date:
+        book.add_metadata("DC", "date", cfg.date)
 
     book.add_item(
         epub.EpubItem(uid="style", file_name="style.css", media_type="text/css", content=css.encode("utf-8"))

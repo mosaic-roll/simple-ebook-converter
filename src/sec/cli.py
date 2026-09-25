@@ -82,6 +82,18 @@ def _resolve_output(input_path: Path, out: Path | None) -> Path:
     return out
 
 
+def _validate_date(value: str | None) -> str | None:
+    if value is None:
+        return None
+    from datetime import datetime
+
+    try:
+        datetime.fromisoformat(value.strip())
+    except ValueError:
+        raise click.UsageError(f"--date 格式应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]，收到：{value}")
+    return value.strip()
+
+
 def _ordered(nodes):
     for node in nodes:
         yield node
@@ -95,7 +107,8 @@ def _ordered(nodes):
 @click.option("-o", "--out", type=_OUT_PATH, help="输出文件（不含扩展名，默认取输入名）")
 @click.option("--no-overwrite", is_flag=True, help="不覆盖已存在文件")
 @click.option("--title", help="书名（默认取输入文件名）")
-@click.option("--author", default="Unknown", show_default=True)
+@click.option("--author", default="", help="作者，留空则不写入元数据")
+@click.option("--date", default=None, help="出版日期，如 2024-05-13；留空则 dc:date 省略（规范可选）")
 @click.option("--language", default="zh", show_default=True)
 @click.option("--cover", type=_PATH, help="封面图片路径")
 @click.option("--volume", help="卷标题正则，h2 + class=volume")
@@ -127,6 +140,7 @@ def convert(
     no_overwrite: bool,
     title: str | None,
     author: str,
+    date: str | None,
     language: str,
     cover: Path | None,
     volume: str | None,
@@ -163,6 +177,7 @@ def convert(
         overwrite=not no_overwrite,
         title=title,
         author=author,
+        date=_validate_date(date),
         language=language,
         cover=cover,
         levels=_build_levels(volume, chapter, section, extra_levels),

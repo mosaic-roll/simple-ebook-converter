@@ -49,7 +49,8 @@ class Config:
     overwrite: bool = True
 
     title: str | None = None
-    author: str = "Unknown"
+    author: str = ""
+    date: str | None = None
     language: str = "zh"
     cover: Path | None = None
 

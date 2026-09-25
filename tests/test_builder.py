@@ -126,3 +126,28 @@ def test_cover_packaged(tmp_path):
         names = z.namelist()
     assert any("cover-image" in n for n in names) or any(n.endswith("c.png") for n in names)
     assert any("cover.xhtml" in n for n in names)
+
+
+def _opf(tmp_path):
+    entries = _entries(_build(tmp_path))
+    opf = next(n for n in entries if n.endswith("content.opf"))
+    return entries[opf].decode("utf-8")
+
+
+def test_author_empty_omits_creator(tmp_path):
+    opf = _opf(tmp_path)
+    assert "<dc:creator" not in opf
+
+
+def test_date_empty_omits_dc_date(tmp_path):
+    opf = _opf(tmp_path)
+    assert "<dc:date" not in opf
+
+
+def test_author_and_date_written(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", author="张三", date="2024-05-13")
+    out = _build(tmp_path, cfg=cfg)
+    entries = _entries(out)
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    assert "<dc:creator id=\"creator\">张三</dc:creator>" in opf
+    assert "<dc:date>2024-05-13</dc:date>" in opf

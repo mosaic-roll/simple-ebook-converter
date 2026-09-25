@@ -70,6 +70,24 @@ def test_convert_replace_json_and_file_conflict(tmp_path):
     assert "二选一" in result.output
 
 
+def test_convert_date(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "--date", "2024-05-13"])
+    assert result.exit_code == 0, result.output
+    out = tmp_path / "novel.epub"
+    with zipfile.ZipFile(out) as z:
+        opf = next(n for n in z.namelist() if n.endswith("content.opf"))
+        text = z.read(opf).decode("utf-8")
+    assert "<dc:date>2024-05-13</dc:date>" in text
+
+
+def test_convert_date_invalid(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "--date", "not-a-date"])
+    assert result.exit_code != 0
+    assert "--date" in result.output
+
+
 def test_toc_text(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(toc, [str(src)])
