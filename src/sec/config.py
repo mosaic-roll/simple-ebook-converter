@@ -31,6 +31,7 @@ class Node:
     paragraphs: list[str] = field(default_factory=list)
     children: list["Node"] = field(default_factory=list)
     anchor: str = ""
+    raw_title: str = ""
 
 
 def default_levels() -> list[LevelRule]:

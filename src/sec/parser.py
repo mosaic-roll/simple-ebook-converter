@@ -65,7 +65,7 @@ def parse(
         while stack and stack[-1].level >= hit.level:
             stack.pop()
         parent = stack[-1] if stack else None
-        node = Node(title=text, level=hit.level, cls=hit.cls or f"level{hit.level}")
+        node = Node(title=text, level=hit.level, cls=hit.cls or f"level{hit.level}", raw_title=text)
         if parent is None:
             tree.append(node)
         else:
@@ -78,12 +78,27 @@ def parse(
     has_titles = bool(tree)
     if not has_titles and preface_paras:
         tree = [
-            Node(title=fallback_title, level=2, cls="chapter", paragraphs=preface_paras)
+            Node(
+                title=fallback_title,
+                level=2,
+                cls="chapter",
+                paragraphs=preface_paras,
+                raw_title=fallback_title,
+            )
         ]
         preface_paras = []
     if has_titles and preface_paras:
         stats.has_preface = True
-        tree.insert(0, Node(title=preface_title, level=0, cls="preface", paragraphs=preface_paras))
+        tree.insert(
+            0,
+            Node(
+                title=preface_title,
+                level=0,
+                cls="preface",
+                paragraphs=preface_paras,
+                raw_title=preface_title,
+            ),
+        )
 
     _assign_anchors(tree)
     return tree, stats

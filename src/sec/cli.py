@@ -7,11 +7,10 @@ from pathlib import Path
 import click
 
 from .builder import build_css, build_epub, font_media_type
-from .cleaner import clean_lines
 from .config import Config, LevelRule, default_levels
 from .encoding import read_lines
-from .parser import parse
-from .replace import Rule, apply_lines
+from .pipeline import process
+from .replace import Rule
 from .toc import to_json, to_text
 
 VERSION = "0.1.0"
@@ -92,12 +91,6 @@ def _validate_date(value: str | None) -> str | None:
     except ValueError:
         raise click.UsageError(f"--date 格式应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]，收到：{value}")
     return value.strip()
-
-
-def _ordered(nodes):
-    for node in nodes:
-        yield node
-        yield from _ordered(node.children)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -206,23 +199,9 @@ def convert(
 
     lines, used = read_lines(input_path, encoding)
     fallback = title or input_path.stem
-    tree, stats = parse(
-        lines,
-        cfg.levels,
-        max_title_len=max_title_len,
-        preface_title=preface_title,
-        fallback_title=fallback,
-        no_volume=no_volume,
-    )
+    tree, stats = process(lines, cfg, fallback)
     if not tree:
         raise click.UsageError(f"文件为空，没有可生成的内容：{input_path.name}")
-
-    if not cfg.no_clean:
-        for node in _ordered(tree):
-            node.paragraphs = clean_lines(node.paragraphs)
-    for node in _ordered(tree):
-        node.title = apply_lines([node.title], cfg.replacements)[0]
-        node.paragraphs = apply_lines(node.paragraphs, cfg.replacements)
 
     css = build_css(cfg)
     if dump_css is not None:
@@ -249,6 +228,9 @@ def convert(
 @click.option("--level", "extra_levels", multiple=True, help="额外层级规则，格式 级别:正则[:类名]")
 @click.option("--max-title-len", default=35, type=int, show_default=True)
 @click.option("--preface-title", default="前言", show_default=True)
+@click.option("--replace-json", "replace_json", default=None, help="一段 JSON 替换规则（与 convert 一致）")
+@click.option("--replace-file", type=_PATH, help="从 JSON 文件读取替换规则")
+@click.option("--show-raw", is_flag=True, help="文本目录显示两列：原始标题 → 替换后标题")
 @click.option("--toc-file", default="-", show_default=True, help='写入的文件，"-" 为 stdout')
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
 @click.option("--toc-depth", default=6, type=int, show_default=True)
@@ -262,24 +244,28 @@ def toc(
     extra_levels: tuple[str, ...],
     max_title_len: int,
     preface_title: str,
+    replace_json: str | None,
+    replace_file: Path | None,
+    show_raw: bool,
     toc_file: str,
     toc_format: str,
     toc_depth: int,
 ) -> None:
-    lines, _ = read_lines(Path(toc_txt), encoding)
-    levels = _build_levels(volume, chapter, section, extra_levels)
-    tree, _ = parse(
-        lines,
-        levels,
+    cfg = Config(
+        input=Path(toc_txt),
+        encoding=encoding,
+        levels=_build_levels(volume, chapter, section, extra_levels),
         max_title_len=max_title_len,
         preface_title=preface_title,
-        fallback_title=Path(toc_txt).stem,
         no_volume=no_volume,
+        replacements=_load_replacements(replace_json, replace_file),
     )
+    lines, _ = read_lines(Path(toc_txt), encoding)
+    tree, _ = process(lines, cfg, Path(toc_txt).stem)
     if toc_format == "json":
         content = json.dumps(to_json(tree, toc_depth), ensure_ascii=False, indent=2)
     else:
-        content = to_text(tree, toc_depth)
+        content = to_text(tree, toc_depth, show_raw=show_raw)
     if toc_file == "-":
         click.echo(content)
     else:

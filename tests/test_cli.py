@@ -142,6 +142,34 @@ def test_toc_json(tmp_path):
     assert data[0]["children"][0]["title"] == "第一章 开端"
 
 
+def test_toc_replace_and_show_raw(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(
+        toc,
+        [
+            "--replace-json",
+            json.dumps([{"pattern": r"第一章", "replace": "第1章"}]),
+            "--show-raw",
+            str(src),
+        ],
+    )
+    assert result.exit_code == 0
+    assert "第一章 开端 → 第1章 开端" in result.output
+    assert "第一卷 起源" in result.output
+
+
+def test_toc_json_has_raw_title(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(
+        toc,
+        [str(src), "--replace-json", json.dumps([{"pattern": r"卷", "replace": "部"}]), "--toc-format", "json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data[0]["title"] == "第一部 起源"
+    assert data[0]["raw_title"] == "第一卷 起源"
+
+
 def test_main_dispatches_toc(tmp_path, capsys):
     src = _write_sample(tmp_path)
     main(["toc", str(src)])
