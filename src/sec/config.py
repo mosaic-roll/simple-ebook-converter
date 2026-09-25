@@ -15,7 +15,7 @@ class LevelRule:
 
     level: int
     pattern: str
-    cls: str = ""
+    class_name: str = ""
     enabled: bool = True
 
     @property
@@ -27,7 +27,7 @@ class LevelRule:
 class Node:
     title: str
     level: int
-    cls: str = ""
+    class_name: str = ""
     paragraphs: list[str] = field(default_factory=list)
     children: list["Node"] = field(default_factory=list)
     anchor: str = ""

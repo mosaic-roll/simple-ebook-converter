@@ -73,7 +73,7 @@ h1, h2, h3, h4, h5, h6 {{
 def _page_html(cfg: Config, node: Node) -> str:
     esc = html.escape
     level = max(1, node.level)
-    cls = node.cls or f"level{node.level}" if node.level > 0 else "preface"
+    cls = node.class_name or f"level{node.level}" if node.level > 0 else "preface"
     heading = f"<h{level} class=\"{esc(cls)}\">{esc(node.title)}</h{level}>"
     paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
     return f"{heading}\n{paragraphs}"

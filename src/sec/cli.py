@@ -27,12 +27,12 @@ def _build_levels(
 ) -> list[LevelRule]:
     levels = default_levels()
     presets = {2: ("volume", volume), 3: ("chapter", chapter), 4: ("section", section)}
-    for level, (cls, pat) in presets.items():
+    for level, (class_name, pat) in presets.items():
         if pat is not None:
             for r in levels:
                 if r.level == level:
                     r.pattern = pat
-                    r.cls = cls
+                    r.class_name = class_name
     for spec in extra:
         parts = spec.split(":", 2)
         if len(parts) < 2:
@@ -43,14 +43,14 @@ def _build_levels(
             raise click.UsageError(f"--level 级别必须是数字，收到：{parts[0]}")
         if not 1 <= level <= 6:
             raise click.UsageError(f"--level 级别需在 1~6 之间，收到：{level}")
-        cls = parts[2] if len(parts) > 2 else f"level{level}"
+        class_name = parts[2] if len(parts) > 2 else f"level{level}"
         for r in levels:
             if r.level == level:
                 r.pattern = parts[1]
-                r.cls = cls
+                r.class_name = class_name
                 break
         else:
-            levels.append(LevelRule(level, parts[1], cls))
+            levels.append(LevelRule(level, parts[1], class_name))
     return levels
 
 

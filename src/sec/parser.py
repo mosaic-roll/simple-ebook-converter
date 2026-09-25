@@ -39,7 +39,7 @@ def parse(
 
     返回 (顶层节点列表, 统计信息)。preface 有内容时位于列表最前。
     """
-    rules = [l for l in levels if l.active and not (no_volume and l.cls == "volume")]
+    rules = [l for l in levels if l.active and not (no_volume and l.class_name == "volume")]
     rules.sort(key=lambda l: l.level)
     if not rules:
         raise NoEnabledRulesError("没有启用的标题规则")
@@ -65,7 +65,7 @@ def parse(
         while stack and stack[-1].level >= hit.level:
             stack.pop()
         parent = stack[-1] if stack else None
-        node = Node(title=text, level=hit.level, cls=hit.cls or f"level{hit.level}", raw_title=text)
+        node = Node(title=text, level=hit.level, class_name=hit.class_name or f"level{hit.level}", raw_title=text)
         if parent is None:
             tree.append(node)
         else:
@@ -81,7 +81,7 @@ def parse(
             Node(
                 title=fallback_title,
                 level=2,
-                cls="chapter",
+                class_name="chapter",
                 paragraphs=preface_paras,
                 raw_title=fallback_title,
             )
@@ -94,7 +94,7 @@ def parse(
             Node(
                 title=preface_title,
                 level=0,
-                cls="preface",
+                class_name="preface",
                 paragraphs=preface_paras,
                 raw_title=preface_title,
             ),
