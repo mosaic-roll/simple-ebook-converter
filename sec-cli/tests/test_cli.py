@@ -1,6 +1,8 @@
 import json
+import re
 import zipfile
 
+import pytest
 from click.testing import CliRunner
 
 from sec_cli.cli import convert, main
@@ -274,3 +276,20 @@ def test_convert_dump_css(tmp_path):
 def test_convert_missing_input():
     result = CliRunner().invoke(convert, [])
     assert result.exit_code != 0
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--chapter", "("],
+        ["--volume", "["],
+        ["--section", "(?"],
+        ["--level", "2:("],
+    ],
+)
+def test_invalid_level_regex_reports_clean_error(tmp_path, args):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), *args])
+    assert result.exit_code == 2, result.output
+    assert "正则非法" in result.output
+    assert not isinstance(result.exception, re.error)

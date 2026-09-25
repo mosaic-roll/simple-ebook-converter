@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from sec_cli.config import default_levels
@@ -30,6 +32,20 @@ def test_build_levels_extra_rule_list():
     assert len(new) == 1
     assert new[0].pattern == "^注解"
     assert new[0].class_name == "note"
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (("(", None, None), "--volume"),
+        ((None, "[", None), "--chapter"),
+        ((None, None, "(?",), "--section"),
+        ((None, None, None, ("5:^ok", "2:(")), "--level 2:("),
+    ],
+)
+def test_build_levels_rejects_invalid_pattern(args, expected):
+    with pytest.raises(ValueError, match=re.escape(expected)):
+        build_levels(*args)
 
 
 def test_rules_from_json():

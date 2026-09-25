@@ -1,6 +1,18 @@
 from __future__ import annotations
 
+import re
+
 from .config import LevelRule, default_levels
+
+_PRESET_OPTIONS = {2: "--volume", 3: "--chapter", 4: "--section"}
+
+
+def compile_pattern(pattern: str, source: str) -> re.Pattern[str]:
+    """编译用户提供的正则，非法时抛 ValueError（CLI/GUI 共用，转成友好报错）。"""
+    try:
+        return re.compile(pattern)
+    except re.error as e:
+        raise ValueError(f"{source} 正则非法：{e}") from e
 
 
 def parse_level_spec(spec: str) -> tuple[int, str, str]:
@@ -29,12 +41,14 @@ def build_levels(
     presets = {2: ("volume", volume), 3: ("chapter", chapter), 4: ("section", section)}
     for level, (class_name, pat) in presets.items():
         if pat is not None:
+            compile_pattern(pat, _PRESET_OPTIONS[level])
             for r in levels:
                 if r.level == level:
                     r.pattern = pat
                     r.class_name = class_name
     for spec in extra:
         level, pattern, class_name = parse_level_spec(spec)
+        compile_pattern(pattern, f"--level {spec}")
         for r in levels:
             if r.level == level:
                 r.pattern = pattern
