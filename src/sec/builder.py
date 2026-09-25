@@ -147,4 +147,4 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
     book.add_item(epub.EpubNcx())
 
     book.spine = (["nav"] if not cfg.no_toc else []) + [p for p in pages]
-    epub.write_epub(output, book)
+    epub.write_epub(output, book, options={"compresslevel": 9})
