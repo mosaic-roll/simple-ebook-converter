@@ -170,6 +170,18 @@ def test_toc_json_has_raw_title(tmp_path):
     assert data[0]["raw_title"] == "第一卷 起源"
 
 
+def test_toc_input_option(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(toc, ["-i", str(src)])
+    assert result.exit_code == 0
+    assert "第一卷 起源" in result.output
+
+
+def test_toc_missing_input():
+    result = CliRunner().invoke(toc, [])
+    assert result.exit_code != 0
+
+
 def test_main_dispatches_toc(tmp_path, capsys):
     src = _write_sample(tmp_path)
     main(["toc", str(src)])

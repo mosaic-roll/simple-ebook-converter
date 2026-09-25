@@ -219,7 +219,8 @@ def convert(
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.argument("toc_txt", type=_PATH)
+@click.argument("toc_txt", type=_PATH, required=False)
+@click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
 @click.option("-e", "--encoding", default="auto", show_default=True)
 @click.option("--volume", help="卷标题正则")
 @click.option("--chapter", help="章标题正则")
@@ -235,7 +236,8 @@ def convert(
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
 @click.option("--toc-depth", default=6, type=int, show_default=True)
 def toc(
-    toc_txt: str,
+    toc_txt: str | None,
+    input_opt: Path | None,
     encoding: str,
     volume: str | None,
     chapter: str | None,
@@ -251,8 +253,13 @@ def toc(
     toc_format: str,
     toc_depth: int,
 ) -> None:
+    input_path = Path(input_opt) if input_opt else Path(toc_txt) if toc_txt else None
+    if input_path is None:
+        raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
+    if not input_path.is_file():
+        raise click.BadParameter(f"文件不存在：{input_path}")
     cfg = Config(
-        input=Path(toc_txt),
+        input=input_path,
         encoding=encoding,
         levels=_build_levels(volume, chapter, section, extra_levels),
         max_title_len=max_title_len,
@@ -260,8 +267,8 @@ def toc(
         no_volume=no_volume,
         replacements=_load_replacements(replace_json, replace_file),
     )
-    lines, _ = read_lines(Path(toc_txt), encoding)
-    tree, _ = process(lines, cfg, Path(toc_txt).stem)
+    lines, _ = read_lines(input_path, encoding)
+    tree, _ = process(lines, cfg, input_path.stem)
     if toc_format == "json":
         content = json.dumps(to_json(tree, toc_depth), ensure_ascii=False, indent=2)
     else:
