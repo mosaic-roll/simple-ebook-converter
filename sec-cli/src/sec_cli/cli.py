@@ -9,7 +9,7 @@ import click
 
 from .builder import build_css, build_epub, font_media_type
 from .config import Config, LevelRule
-from .encoding import read_lines
+from .encoding import EncodingError, read_lines
 from .levels import build_levels
 from .meta import guess_metadata
 from .pipeline import process
@@ -47,6 +47,15 @@ def _load_replacements(replace_json: str | None, replace_file: Path | None) -> l
         return rules_from_json(text)
     except ValueError as e:
         raise click.UsageError(str(e))
+
+
+def _read_input(input_path: Path, encoding: str) -> tuple[list[str], str]:
+    try:
+        return read_lines(input_path, encoding)
+    except EncodingError as e:
+        raise click.UsageError(str(e)) from e
+    except OSError as e:
+        raise click.UsageError(f"无法读取输入文件：{e}") from e
 
 
 def _resolve_output(input_path: Path, out: Path | None) -> Path:
@@ -172,7 +181,7 @@ def convert(
         css_file=css_file,
     )
 
-    lines, used = read_lines(input_path, encoding)
+    lines, used = _read_input(input_path, encoding)
     fallback = title or input_path.stem
     tree, stats = process(lines, cfg, fallback)
     if not tree:

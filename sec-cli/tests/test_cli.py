@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from sec_cli.cli import convert, main
+from sec_cli.encoding import EncodingError
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):
@@ -293,3 +294,19 @@ def test_invalid_level_regex_reports_clean_error(tmp_path, args):
     assert result.exit_code == 2, result.output
     assert "正则非法" in result.output
     assert not isinstance(result.exception, re.error)
+
+
+def test_wrong_manual_encoding_reports_clean_error(tmp_path):
+    src = tmp_path / "gb.txt"
+    src.write_bytes("第一章 甲\n正文".encode("gb18030"))
+    result = CliRunner().invoke(convert, [str(src), "-e", "utf-8"])
+    assert result.exit_code == 2, result.output
+    assert "无法用编码 utf-8 解码" in result.output
+    assert not isinstance(result.exception, EncodingError)
+
+
+def test_unknown_encoding_name_reports_clean_error(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "-e", "no-such-encoding"])
+    assert result.exit_code == 2, result.output
+    assert "无法用编码 no-such-encoding 解码" in result.output
