@@ -66,6 +66,23 @@ def test_pian_not_volume():
     assert tree[0].title == "书名"
 
 
+def test_traditional_chinese_titles():
+    lines = ["第二部 風雲", "第一章 相遇", "正文一", "第五節 夜", "正文二"]
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
+    assert tree[0].title == "第二部 風雲"
+    assert tree[0].level == 2
+    assert [c.title for c in tree[0].children] == ["第一章 相遇", "第五節 夜"]
+    assert tree[0].children[1].level == 3
+
+
+def test_japanese_titles():
+    lines = ["第一巻 出会い", "第一話 始まり", "正文一", "第五節 夜", "正文二"]
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
+    assert tree[0].title == "第一巻 出会い"
+    assert tree[0].level == 2
+    assert [c.title for c in tree[0].children] == ["第一話 始まり", "第五節 夜"]
+
+
 def test_trailing_content_merges_into_last_chapter():
     lines = ["第一章 a", "正文", "结尾杂句"]
     tree, _ = parse(lines, default_levels(), fallback_title="书名")
