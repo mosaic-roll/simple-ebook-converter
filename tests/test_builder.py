@@ -128,6 +128,19 @@ def test_cover_packaged(tmp_path):
     assert any("cover.xhtml" in n for n in names)
 
 
+def test_cover_avif_media_type(tmp_path):
+    cover = tmp_path / "c.avif"
+    cover.write_bytes(b"\x00\x00\x00 ftypfavif")
+    cfg = Config(input=tmp_path / "novel.txt", cover=cover)
+    tree, _ = parse(["第1章 一", "正文"], cfg.levels, fallback_title="x")
+    out = tmp_path / "out.epub"
+    build_epub(cfg, tree, build_css(cfg), out)
+    with zipfile.ZipFile(out) as z:
+        opf = next(n for n in z.namelist() if n.endswith("content.opf"))
+        text = z.read(opf).decode("utf-8")
+    assert 'media-type="image/avif"' in text
+
+
 def _opf(tmp_path):
     entries = _entries(_build(tmp_path))
     opf = next(n for n in entries if n.endswith("content.opf"))

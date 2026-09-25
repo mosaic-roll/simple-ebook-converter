@@ -15,6 +15,8 @@ _MEDIA_TYPES = {
     ".gif": "image/gif",
     ".svg": "image/svg+xml",
     ".webp": "image/webp",
+    ".avif": "image/avif",
+    ".avifs": "image/avif",
 }
 
 _FONT_TYPES = {
