@@ -93,10 +93,30 @@ def _validate_date(value: str | None) -> str | None:
     return value.strip()
 
 
+_COMMON_OPTIONS = [
+    click.option("-e", "--encoding", default="auto", show_default=True, help="输入编码，auto 为自动检测"),
+    click.option("--volume", help="卷标题正则，h2 + class=volume"),
+    click.option("--chapter", help="章标题正则，h3 + class=chapter"),
+    click.option("--section", help="节标题正则，h4 + class=section"),
+    click.option("--no-volume", is_flag=True, help="无卷名模式：卷不作为标题"),
+    click.option("--level", "extra_levels", multiple=True, help="额外层级规则，格式 级别:正则[:类名]"),
+    click.option("--max-title-len", default=35, type=int, show_default=True, help="标题最大字数，超过视为正文"),
+    click.option("--preface-title", default="前言", show_default=True, help="首个标题之前的无标题段落默认名"),
+    click.option("--replace-json", "replace_json", default=None, help="一段 JSON 替换规则（有序列表）"),
+    click.option("--replace-file", type=_PATH, help="从 JSON 文件读取替换规则"),
+]
+
+
+def _with_common_options(fn):
+    for opt in reversed(_COMMON_OPTIONS):
+        fn = opt(fn)
+    return fn
+
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("input_txt", type=_PATH, required=False)
 @click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
-@click.option("-e", "--encoding", default="auto", show_default=True, help="输入编码，auto 为自动检测")
+@_with_common_options
 @click.option("-o", "--out", type=_OUT_PATH, help="输出文件（不含扩展名，默认取输入名）")
 @click.option("--no-overwrite", is_flag=True, help="不覆盖已存在文件")
 @click.option("--title", help="书名（默认取输入文件名）")
@@ -104,15 +124,6 @@ def _validate_date(value: str | None) -> str | None:
 @click.option("--date", default=None, help="出版日期，如 2024-05-13；留空则 dc:date 省略（规范可选）")
 @click.option("--language", default="zh", show_default=True)
 @click.option("--cover", type=_PATH, help="封面图片路径")
-@click.option("--volume", help="卷标题正则，h2 + class=volume")
-@click.option("--chapter", help="章标题正则，h3 + class=chapter")
-@click.option("--section", help="节标题正则，h4 + class=section")
-@click.option("--no-volume", is_flag=True, help="无卷名模式：卷不作为标题")
-@click.option("--level", "extra_levels", multiple=True, help="额外层级规则，格式 级别:正则[:类名]")
-@click.option("--max-title-len", default=35, type=int, show_default=True, help="标题最大字数，超过视为正文")
-@click.option("--preface-title", default="前言", show_default=True, help="首个标题之前的无标题段落默认名")
-@click.option("--replace-json", "replace_json", default=None, help="一段 JSON 替换规则（有序列表）")
-@click.option("--replace-file", type=_PATH, help="从 JSON 文件读取替换规则")
 @click.option("--no-clean", is_flag=True, help="不清理文本（保留空行/段首段尾空格）")
 @click.option("--indent", default=2, show_default=True, help="段落缩进字数，0 为不缩进")
 @click.option("--line-height", default="1.5", show_default=True)
@@ -221,16 +232,7 @@ def convert(
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("toc_txt", type=_PATH, required=False)
 @click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
-@click.option("-e", "--encoding", default="auto", show_default=True)
-@click.option("--volume", help="卷标题正则")
-@click.option("--chapter", help="章标题正则")
-@click.option("--section", help="节标题正则")
-@click.option("--no-volume", is_flag=True)
-@click.option("--level", "extra_levels", multiple=True, help="额外层级规则，格式 级别:正则[:类名]")
-@click.option("--max-title-len", default=35, type=int, show_default=True)
-@click.option("--preface-title", default="前言", show_default=True)
-@click.option("--replace-json", "replace_json", default=None, help="一段 JSON 替换规则（与 convert 一致）")
-@click.option("--replace-file", type=_PATH, help="从 JSON 文件读取替换规则")
+@_with_common_options
 @click.option("--show-raw", is_flag=True, help="文本目录显示两列：原始标题 → 替换后标题")
 @click.option("--toc-file", default="-", show_default=True, help='写入的文件，"-" 为 stdout')
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
