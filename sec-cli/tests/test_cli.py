@@ -3,7 +3,7 @@ import zipfile
 
 from click.testing import CliRunner
 
-from sec.cli import convert, main
+from sec_cli.cli import convert, main
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):

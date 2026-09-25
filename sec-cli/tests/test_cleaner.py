@@ -1,4 +1,4 @@
-from sec.cleaner import clean_line, clean_lines
+from sec_cli.cleaner import clean_line, clean_lines
 
 
 def test_strip_leading():

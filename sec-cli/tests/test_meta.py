@@ -1,4 +1,4 @@
-from sec.meta import guess_metadata
+from sec_cli.meta import guess_metadata
 
 
 def test_guess_full():

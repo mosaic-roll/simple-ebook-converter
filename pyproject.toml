@@ -1,29 +1,8 @@
 [project]
-name = "sec"
+name = "ebook-builder"
 version = "0.1.0"
-description = "TXT 转 EPUB3 命令行工具"
-readme = "README.md"
-authors = [
-    { name = "mosaic-roll", email = "48566087+mosaic-roll@users.noreply.github.com" }
-]
+description = "TXT 转 EPUB3 工具工作区（CLI + GUI）"
 requires-python = ">=3.12"
-dependencies = [
-    "chardet>=7.6.0",
-    "click>=8.5.0",
-    "ebooklib>=0.20",
-]
 
-[project.scripts]
-sec-cli = "sec.cli:main"
-
-[build-system]
-requires = ["uv_build>=0.8.14,<0.9.0"]
-build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+[tool.uv.workspace]
+members = ["sec-cli", "sec-gui"]

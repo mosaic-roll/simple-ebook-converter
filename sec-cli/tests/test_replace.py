@@ -1,4 +1,4 @@
-from sec.replace import Rule, apply, apply_lines
+from sec_cli.replace import Rule, apply, apply_lines
 
 
 def test_ordered_rules():

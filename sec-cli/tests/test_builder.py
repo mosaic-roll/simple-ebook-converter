@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from sec.builder import build_css, build_epub, font_media_type
-from sec.config import Config
-from sec.parser import parse
+from sec_cli.builder import build_css, build_epub, font_media_type
+from sec_cli.config import Config
+from sec_cli.parser import parse
 
 
 def _default_tree():
