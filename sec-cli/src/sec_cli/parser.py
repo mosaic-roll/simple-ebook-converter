@@ -16,7 +16,7 @@ class ParseStats:
     warnings: list[str] = field(default_factory=list)
 
 
-class NoEnabledRulesError(Exception):
+class NoEnabledRulesError(ValueError):
     pass
 
 
@@ -42,7 +42,7 @@ def parse(
     rules = [l for l in levels if l.active and not (no_volume and l.class_name == "volume")]
     rules.sort(key=lambda l: l.level)
     if not rules:
-        raise NoEnabledRulesError("没有启用的标题规则")
+        raise NoEnabledRulesError("没有启用的标题规则：--volume/--chapter/--section 至少要有一个非空正则")
 
     compiled = [(r, re.compile(r.pattern)) for r in rules]
     stats = ParseStats(total_lines=len(lines))

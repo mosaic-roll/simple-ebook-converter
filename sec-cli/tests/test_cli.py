@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from sec_cli.cli import convert, main
 from sec_cli.encoding import EncodingError
+from sec_cli.parser import NoEnabledRulesError
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):
@@ -325,3 +326,13 @@ def test_invalid_replace_regex_reports_clean_error(tmp_path, source):
     assert result.exit_code == 2, result.output
     assert "替换规则正则非法" in result.output
     assert not isinstance(result.exception, re.error)
+
+
+def test_all_levels_disabled_reports_clean_error(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(
+        convert, [str(src), "--volume", "", "--chapter", "", "--section", ""]
+    )
+    assert result.exit_code == 2, result.output
+    assert "没有启用的标题规则" in result.output
+    assert not isinstance(result.exception, NoEnabledRulesError)

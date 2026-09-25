@@ -13,6 +13,7 @@ from .encoding import EncodingError, read_lines
 from .levels import build_levels
 from .meta import guess_metadata
 from .pipeline import process
+from .parser import NoEnabledRulesError
 from .replace import Rule, rules_from_json
 from .toc import to_json, to_text
 
@@ -183,7 +184,10 @@ def convert(
 
     lines, used = _read_input(input_path, encoding)
     fallback = title or input_path.stem
-    tree, stats = process(lines, cfg, fallback)
+    try:
+        tree, stats = process(lines, cfg, fallback)
+    except NoEnabledRulesError as e:
+        raise click.UsageError(str(e)) from e
     if not tree:
         raise click.UsageError(f"文件为空，没有可生成的内容：{input_path.name}")
 

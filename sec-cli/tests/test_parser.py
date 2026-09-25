@@ -125,6 +125,12 @@ def test_no_enabled_rules():
         parse([], [LevelRule(2, "", "volume")], fallback_title="x")
 
 
+def test_no_enabled_rules_is_value_error():
+    assert issubclass(NoEnabledRulesError, ValueError)
+    with pytest.raises(ValueError):
+        parse([], [LevelRule(2, "", "volume")], fallback_title="x")
+
+
 def test_empty_input():
     tree, _ = parse([], default_levels(), fallback_title="x")
     assert tree == []
