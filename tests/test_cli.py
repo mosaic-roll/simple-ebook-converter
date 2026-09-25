@@ -3,7 +3,7 @@ import zipfile
 
 from click.testing import CliRunner
 
-from sec.cli import convert, main, toc
+from sec.cli import convert, main
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):
@@ -127,7 +127,7 @@ def test_convert_unsupported_font(tmp_path):
 
 def test_toc_text(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(toc, [str(src)])
+    result = CliRunner().invoke(convert, [str(src), "--toc-only"])
     assert result.exit_code == 0
     assert "第一卷 起源" in result.output
     assert "第一章 开端" in result.output
@@ -135,7 +135,7 @@ def test_toc_text(tmp_path):
 
 def test_toc_json(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(toc, [str(src), "--toc-format", "json", "--toc-file", "-"])
+    result = CliRunner().invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data[0]["title"] == "第一卷 起源"
@@ -145,9 +145,10 @@ def test_toc_json(tmp_path):
 def test_toc_replace_applies_to_text(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
-        toc,
+        convert,
         [
             str(src),
+            "--toc-only",
             "--replace-json",
             json.dumps([{"pattern": r"第一章", "replace": "第1章"}]),
         ],
@@ -160,8 +161,8 @@ def test_toc_replace_applies_to_text(tmp_path):
 def test_toc_json_has_raw_title(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
-        toc,
-        [str(src), "--replace-json", json.dumps([{"pattern": r"卷", "replace": "部"}]), "--toc-format", "json"],
+        convert,
+        [str(src), "--toc-only", "--replace-json", json.dumps([{"pattern": r"卷", "replace": "部"}]), "--toc-format", "json"],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -171,19 +172,27 @@ def test_toc_json_has_raw_title(tmp_path):
 
 def test_toc_input_option(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(toc, ["-i", str(src)])
+    result = CliRunner().invoke(convert, ["-i", str(src), "--toc-only"])
     assert result.exit_code == 0
     assert "第一卷 起源" in result.output
 
 
+def test_toc_output_file(tmp_path):
+    src = _write_sample(tmp_path)
+    out = tmp_path / "toc.txt"
+    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", str(out)])
+    assert result.exit_code == 0
+    assert "第一章 开端" in out.read_text(encoding="utf-8")
+
+
 def test_toc_missing_input():
-    result = CliRunner().invoke(toc, [])
+    result = CliRunner().invoke(convert, ["--toc-only"])
     assert result.exit_code != 0
 
 
-def test_main_dispatches_toc(tmp_path, capsys):
+def test_main_toc_only(tmp_path, capsys):
     src = _write_sample(tmp_path)
-    main(["toc", str(src)])
+    main([str(src), "--toc-only"])
     out = capsys.readouterr().out
     assert "第一章 开端" in out
 
