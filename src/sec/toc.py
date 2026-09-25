@@ -8,7 +8,7 @@ def node_to_dict(node: Node) -> dict:
         "title": node.title,
         "raw_title": node.raw_title,
         "level": node.level,
-        "class": node.cls,
+        "class_name": node.cls,
         "children": [node_to_dict(c) for c in node.children],
     }
 
