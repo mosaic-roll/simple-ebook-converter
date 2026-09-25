@@ -116,6 +116,15 @@ def test_convert_date_invalid(tmp_path):
     assert "--date" in result.output
 
 
+def test_convert_unsupported_font(tmp_path):
+    src = _write_sample(tmp_path)
+    bad = tmp_path / "font.ttc"
+    bad.write_bytes(b"\x00\x00\x00\x00tc")
+    result = CliRunner().invoke(convert, [str(src), "--font", str(bad)])
+    assert result.exit_code != 0
+    assert "font.ttc" in result.output
+
+
 def test_toc_text(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(toc, [str(src)])

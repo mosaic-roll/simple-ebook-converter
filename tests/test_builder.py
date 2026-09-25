@@ -1,8 +1,11 @@
 import posixpath
 import re
 import zipfile
+from pathlib import Path
 
-from sec.builder import build_css, build_epub
+import pytest
+
+from sec.builder import build_css, build_epub, font_media_type
 from sec.config import Config
 from sec.parser import parse
 from sec.encoding import read_lines
@@ -139,6 +142,14 @@ def test_cover_avif_media_type(tmp_path):
         opf = next(n for n in z.namelist() if n.endswith("content.opf"))
         text = z.read(opf).decode("utf-8")
     assert 'media-type="image/avif"' in text
+
+
+def test_font_media_type():
+    assert font_media_type(Path("a.ttf")) == "font/ttf"
+    assert font_media_type(Path("A.OTF")) == "font/otf"
+    assert font_media_type(Path("b.woff2")) == "font/woff2"
+    with pytest.raises(ValueError):
+        font_media_type(Path("font.ttc"))
 
 
 def _opf(tmp_path):

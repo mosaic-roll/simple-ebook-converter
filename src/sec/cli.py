@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from .builder import build_css, build_epub
+from .builder import build_css, build_epub, font_media_type
 from .cleaner import clean_lines
 from .config import Config, LevelRule, default_levels
 from .encoding import read_lines
@@ -197,6 +197,12 @@ def convert(
         css_file=css_file,
         dump_css=dump_css,
     )
+
+    if cfg.font:
+        try:
+            font_media_type(cfg.font)
+        except ValueError as e:
+            raise click.UsageError(str(e))
 
     lines, used = read_lines(input_path, encoding)
     fallback = title or input_path.stem

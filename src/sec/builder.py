@@ -26,6 +26,13 @@ _FONT_TYPES = {
 }
 
 
+def font_media_type(path: Path) -> str:
+    mt = _FONT_TYPES.get(path.suffix.lower())
+    if mt is None:
+        raise ValueError(f"不支持的字体格式：{path.name}（仅支持 ttf/otf/woff/woff2）")
+    return mt
+
+
 def build_css(cfg: Config) -> str:
     css: list[str] = []
     if cfg.font:
@@ -107,12 +114,11 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
 
     if cfg.font:
         path = Path(cfg.font)
-        ext = path.suffix.lower()
         book.add_item(
             epub.EpubItem(
                 uid="font",
                 file_name=f"fonts/{path.name}",
-                media_type=_FONT_TYPES.get(ext, "application/octet-stream"),
+                media_type=font_media_type(path),
                 content=path.read_bytes(),
             )
         )
