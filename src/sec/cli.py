@@ -8,11 +8,12 @@ from pathlib import Path
 import click
 
 from .builder import build_css, build_epub, font_media_type
-from .config import Config, LevelRule, default_levels
+from .config import Config, LevelRule
 from .encoding import read_lines
+from .levels import build_levels
 from .meta import guess_metadata
 from .pipeline import process
-from .replace import Rule
+from .replace import Rule, rules_from_json
 from .toc import to_json, to_text
 
 VERSION = "0.1.0"
@@ -27,52 +28,25 @@ def _build_levels(
     section: str | None,
     extra: tuple[str, ...],
 ) -> list[LevelRule]:
-    levels = default_levels()
-    presets = {2: ("volume", volume), 3: ("chapter", chapter), 4: ("section", section)}
-    for level, (class_name, pat) in presets.items():
-        if pat is not None:
-            for r in levels:
-                if r.level == level:
-                    r.pattern = pat
-                    r.class_name = class_name
-    for spec in extra:
-        parts = spec.split(":", 2)
-        if len(parts) < 2:
-            raise click.UsageError(f"--level 格式应为 级别:正则[:类名]，收到：{spec}")
-        try:
-            level = int(parts[0])
-        except ValueError:
-            raise click.UsageError(f"--level 级别必须是数字，收到：{parts[0]}")
-        if not 1 <= level <= 6:
-            raise click.UsageError(f"--level 级别需在 1~6 之间，收到：{level}")
-        class_name = parts[2] if len(parts) > 2 else f"level{level}"
-        for r in levels:
-            if r.level == level:
-                r.pattern = parts[1]
-                r.class_name = class_name
-                break
-        else:
-            levels.append(LevelRule(level, parts[1], class_name))
-    return levels
+    try:
+        return build_levels(volume, chapter, section, extra)
+    except ValueError as e:
+        raise click.UsageError(str(e))
 
 
 def _load_replacements(replace_json: str | None, replace_file: Path | None) -> list[Rule]:
     if replace_json is not None and replace_file is not None:
         raise click.UsageError("--replace-json 与 --replace-file 二选一")
     if replace_json is not None:
-        data = json.loads(replace_json)
+        text = replace_json
     elif replace_file is not None:
-        data = json.loads(Path(replace_file).read_text(encoding="utf-8"))
+        text = Path(replace_file).read_text(encoding="utf-8")
     else:
         return []
-    if not isinstance(data, list):
-        raise click.UsageError("替换规则必须是 JSON 列表")
-    rules: list[Rule] = []
-    for item in data:
-        if not isinstance(item, dict) or "pattern" not in item:
-            raise click.UsageError(f"替换规则条目格式错误：{item!r}")
-        rules.append(Rule(item["pattern"], item.get("replace", "")))
-    return rules
+    try:
+        return rules_from_json(text)
+    except ValueError as e:
+        raise click.UsageError(str(e))
 
 
 def _resolve_output(input_path: Path, out: Path | None) -> Path:
