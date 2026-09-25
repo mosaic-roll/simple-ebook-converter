@@ -93,7 +93,7 @@ def _ordered(nodes):
 @click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
 @click.option("-e", "--encoding", default="auto", show_default=True, help="输入编码，auto 为自动检测")
 @click.option("-o", "--out", type=_OUT_PATH, help="输出文件（不含扩展名，默认取输入名）")
-@click.option("--overwrite", is_flag=True, help="覆盖已存在文件")
+@click.option("--overwrite/--no-overwrite", default=True, show_default=True, help="覆盖已存在文件")
 @click.option("--title", help="书名（默认取输入文件名）")
 @click.option("--author", default="Unknown", show_default=True)
 @click.option("--language", default="zh", show_default=True)

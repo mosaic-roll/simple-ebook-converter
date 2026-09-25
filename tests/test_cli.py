@@ -22,21 +22,22 @@ def test_convert_default(tmp_path):
         assert "META-INF/container.xml" in z.namelist()
 
 
-def test_convert_no_overwrite(tmp_path):
+def test_convert_overwrites_by_default(tmp_path):
     src = _write_sample(tmp_path)
     out = tmp_path / "novel.epub"
     out.write_bytes(b"existing")
     result = CliRunner().invoke(convert, [str(src)])
-    assert result.exit_code != 0
-    assert "已存在" in result.output
+    assert result.exit_code == 0, result.output
+    assert out.read_bytes()[:2] == b"PK"
 
 
-def test_convert_overwrite(tmp_path):
+def test_convert_no_overwrite_refuses(tmp_path):
     src = _write_sample(tmp_path)
     out = tmp_path / "novel.epub"
     out.write_bytes(b"existing")
-    result = CliRunner().invoke(convert, [str(src), "--overwrite"])
-    assert result.exit_code == 0, result.output
+    result = CliRunner().invoke(convert, [str(src), "--no-overwrite"])
+    assert result.exit_code != 0
+    assert "已存在" in result.output
 
 
 def test_convert_metadata_and_replace(tmp_path):

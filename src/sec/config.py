@@ -46,7 +46,7 @@ class Config:
     input: Path | None = None
     output: Path | None = None
     encoding: str = "auto"
-    overwrite: bool = False
+    overwrite: bool = True
 
     title: str | None = None
     author: str = "Unknown"
