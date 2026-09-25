@@ -48,9 +48,9 @@ def test_no_titles_single_chapter():
 
 
 def test_special_titles_match_chapter():
-    lines = ["楔子", "引", "序章", "正文", "番外 日常", "正文二", "完本感言"]
+    lines = ["楔子", "引", "序章", "正文", "最终章 决战", "正文二", "番外 日常", "正文三", "完本感言"]
     tree, _ = parse(lines, default_levels(), fallback_title="书名")
-    assert [n.title for n in tree] == ["楔子", "序章", "番外 日常", "完本感言"]
+    assert [n.title for n in tree] == ["楔子", "序章", "最终章 决战", "番外 日常", "完本感言"]
 
 
 def test_english_and_numbered_titles_match_chapter():

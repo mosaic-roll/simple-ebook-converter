@@ -8,7 +8,6 @@ import pytest
 from sec.builder import build_css, build_epub, font_media_type
 from sec.config import Config
 from sec.parser import parse
-from sec.encoding import read_lines
 
 
 def _default_tree():
