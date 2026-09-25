@@ -47,6 +47,25 @@ def test_no_titles_single_chapter():
     assert tree[0].paragraphs == lines
 
 
+def test_special_titles_match_chapter():
+    lines = ["楔子", "引", "序章", "正文", "番外 日常", "正文二", "完本感言"]
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
+    assert [n.title for n in tree] == ["楔子", "序章", "番外 日常", "完本感言"]
+
+
+def test_english_and_numbered_titles_match_chapter():
+    lines = ["Chapter 1", "正文一", "Section 2", "正文二", "Page 3", "正文三", "12", "正文四", "5、", "正文五"]
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
+    assert [n.title for n in tree] == ["Chapter 1", "Section 2", "Page 3", "12", "5、"]
+
+
+def test_pian_not_volume():
+    lines = ["第一篇 习作", "这一篇应该不是卷"]
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
+    assert len(tree) == 1
+    assert tree[0].title == "书名"
+
+
 def test_trailing_content_merges_into_last_chapter():
     lines = ["第一章 a", "正文", "结尾杂句"]
     tree, _ = parse(lines, default_levels(), fallback_title="书名")
