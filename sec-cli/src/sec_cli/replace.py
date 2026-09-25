@@ -20,10 +20,15 @@ def rules_from_json(text: str) -> list[Rule]:
     if not isinstance(data, list):
         raise ValueError("替换规则必须是 JSON 列表")
     rules: list[Rule] = []
-    for item in data:
+    for index, item in enumerate(data, start=1):
         if not isinstance(item, dict) or "pattern" not in item:
             raise ValueError(f"替换规则条目格式错误：{item!r}")
-        rules.append(Rule(item["pattern"], item.get("replace", "")))
+        pattern = item["pattern"]
+        try:
+            re.compile(pattern)
+        except re.error as e:
+            raise ValueError(f"第 {index} 条替换规则正则非法：{e}") from e
+        rules.append(Rule(pattern, item.get("replace", "")))
     return rules
 
 

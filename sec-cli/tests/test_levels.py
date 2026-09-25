@@ -60,3 +60,8 @@ def test_rules_from_json_rejects_invalid():
         rules_from_json('[{"replace": "乙"}]')
     with pytest.raises(ValueError):
         rules_from_json("not json")
+
+
+def test_rules_from_json_rejects_invalid_pattern():
+    with pytest.raises(ValueError, match="第 2 条替换规则正则非法"):
+        rules_from_json('[{"pattern": "甲", "replace": "乙"}, {"pattern": "("}]')

@@ -310,3 +310,18 @@ def test_unknown_encoding_name_reports_clean_error(tmp_path):
     result = CliRunner().invoke(convert, [str(src), "-e", "no-such-encoding"])
     assert result.exit_code == 2, result.output
     assert "无法用编码 no-such-encoding 解码" in result.output
+
+
+@pytest.mark.parametrize("source", ["--replace-json", "--replace-file"])
+def test_invalid_replace_regex_reports_clean_error(tmp_path, source):
+    src = _write_sample(tmp_path)
+    bad = '[{"pattern": "("}]'
+    args = [str(src), source, bad]
+    if source == "--replace-file":
+        rules = tmp_path / "rules.json"
+        rules.write_text(bad, encoding="utf-8")
+        args[-1] = str(rules)
+    result = CliRunner().invoke(convert, args)
+    assert result.exit_code == 2, result.output
+    assert "替换规则正则非法" in result.output
+    assert not isinstance(result.exception, re.error)
