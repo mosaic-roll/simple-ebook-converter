@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from sec.core.replace import (
+from simple_ebook_converter.core.replace import (
     DEFAULT_SCOPE,
     SCOPE_ALL,
     SCOPE_BODY,

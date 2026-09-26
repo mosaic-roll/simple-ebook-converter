@@ -2,9 +2,9 @@ import re
 
 import pytest
 
-from sec.core.config import default_levels
-from sec.core.levels import build_levels, parse_level_spec
-from sec.core.replace import Rule, rules_from_json
+from simple_ebook_converter.core.config import default_levels
+from simple_ebook_converter.core.levels import build_levels, parse_level_spec
+from simple_ebook_converter.core.replace import Rule, rules_from_json
 
 
 def test_parse_level_spec():

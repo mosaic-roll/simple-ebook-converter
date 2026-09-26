@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from sec.cli.cli import convert, main
-from sec.core.config import Config, config_defaults
-from sec.core.encoding import EncodingError
-from sec.core.parser import NoEnabledRulesError
+from simple_ebook_converter.cli.cli import convert, main
+from simple_ebook_converter.core.config import Config, config_defaults
+from simple_ebook_converter.core.encoding import EncodingError
+from simple_ebook_converter.core.parser import NoEnabledRulesError
 
 
 def _write_sample(tmp_path, name="novel.txt", text=None):

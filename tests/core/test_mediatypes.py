@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from sec.core.config import Config
-from sec.core.mediatypes import (
+from simple_ebook_converter.core.config import Config
+from simple_ebook_converter.core.mediatypes import (
     COVER_TYPES,
     FONT_TYPES,
     cover_media_type,

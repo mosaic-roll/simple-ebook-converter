@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from sec.core.config import DEFAULT_VOLUME_RE, config_defaults
-from sec.core.encoding import ENCODING_CHOICES, FALLBACK_ENCODINGS, decode
-from sec.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_LABELS, SCOPE_TITLE
-from sec.gui.app import (
+from simple_ebook_converter.core.config import DEFAULT_VOLUME_RE, config_defaults
+from simple_ebook_converter.core.encoding import ENCODING_CHOICES, FALLBACK_ENCODINGS, decode
+from simple_ebook_converter.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_LABELS, SCOPE_TITLE
+from simple_ebook_converter.gui.app import (
     _SCOPE_LABELS_TUPLE,
     build_book,
     make_config,
@@ -92,7 +92,7 @@ def test_config_defaults_reads_config():
 
 def test_config_defaults_is_the_core_one():
     """GUI 用的默认值就是 core 的那一份，不再各维护一套。"""
-    from sec.gui import app
+    from simple_ebook_converter.gui import app
 
     assert app.config_defaults is config_defaults
 
@@ -238,7 +238,7 @@ def test_build_book_complains_when_not_overwrite(tmp_path):
 
 def test_encoding_choices_come_from_core():
     """编码下拉框 = core 的候选链，不要在 GUI 里另写一份。"""
-    from sec.gui import app
+    from simple_ebook_converter.gui import app
 
     assert tuple(app._ENCODINGS) == ENCODING_CHOICES
     assert ENCODING_CHOICES[0] == "auto"

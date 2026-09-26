@@ -1,4 +1,4 @@
-from sec.core.cleaner import clean_line, clean_lines
+from simple_ebook_converter.core.cleaner import clean_line, clean_lines
 
 
 def test_strip_leading():

@@ -1,6 +1,6 @@
 import pytest
 
-from sec.core.encoding import EncodingError, decode, read_lines
+from simple_ebook_converter.core.encoding import EncodingError, decode, read_lines
 
 
 def test_bom_utf8():

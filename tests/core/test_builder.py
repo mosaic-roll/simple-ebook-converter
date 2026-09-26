@@ -2,9 +2,9 @@ import posixpath
 import re
 import zipfile
 
-from sec.core.builder import build_css, build_epub
-from sec.core.config import Config
-from sec.core.parser import parse
+from simple_ebook_converter.core.builder import build_css, build_epub
+from simple_ebook_converter.core.config import Config
+from simple_ebook_converter.core.parser import parse
 
 
 def _default_tree():

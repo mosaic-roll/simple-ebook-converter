@@ -4,25 +4,26 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from sec.core.builder import build_css, build_epub
-from sec.core.config import ALIGN_CHOICES, Config, config_defaults
-from sec.core.encoding import ENCODING_CHOICES, read_lines
-from sec.core.levels import build_levels
-from sec.core.meta import resolve_metadata
-from sec.core.pipeline import process
-from sec.core.replace import (
+from .._meta import DIST_NAME
+from simple_ebook_converter.core.builder import build_css, build_epub
+from simple_ebook_converter.core.config import ALIGN_CHOICES, Config, config_defaults
+from simple_ebook_converter.core.encoding import ENCODING_CHOICES, read_lines
+from simple_ebook_converter.core.levels import build_levels
+from simple_ebook_converter.core.meta import resolve_metadata
+from simple_ebook_converter.core.pipeline import process
+from simple_ebook_converter.core.replace import (
     DEFAULT_SCOPE,
     SCOPE_CHOICES,
     SCOPE_LABELS,
     Rule,
     rules_from_json,
 )
-from sec.core.toc import to_json
+from simple_ebook_converter.core.toc import to_json
 
 #: 编码下拉框直接用 core 的候选链，core 加编码这里自动跟着变
 _ENCODINGS = list(ENCODING_CHOICES)
 
-#: 字段缺省值取自 sec.core 的 Config，界面不再另写一份字面量
+#: 字段缺省值取自 simple_ebook_converter.core 的 Config，界面不再另写一份字面量
 _DEFAULTS = config_defaults()
 
 #: 作用范围下拉框用 core 的中文标签，两个方向都齐全
@@ -136,10 +137,10 @@ def build_book(fields: dict) -> Path:
     return out
 
 
-class SecGui:
+class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title("sec-gui — TXT 电子书生成器")
+        root.title(f"{DIST_NAME} — TXT 电子书生成器")
         root.geometry("1100x740")
 
         self._build_vars()
@@ -444,7 +445,7 @@ class SecGui:
         try:
             fn()
         except ValueError as e:
-            messagebox.showerror("sec-gui", str(e))
+            messagebox.showerror(DIST_NAME, str(e))
 
     def do_preview(self) -> None:
         tree = []
@@ -471,17 +472,17 @@ class SecGui:
             out = build_book(self._fields())
         except ValueError as e:
             self.root.config(cursor="")
-            messagebox.showerror("sec-gui", str(e))
+            messagebox.showerror(DIST_NAME, str(e))
             self.v_status.set("生成失败")
             return
         self.root.config(cursor="")
         self.v_status.set(f"已生成：{out}")
-        messagebox.showinfo("sec-gui", f"已生成：\n{out}")
+        messagebox.showinfo(DIST_NAME, f"已生成：\n{out}")
 
 
 def main() -> None:
     root = tk.Tk()
-    SecGui(root)
+    App(root)
     root.mainloop()
 
 

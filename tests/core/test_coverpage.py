@@ -1,4 +1,4 @@
-from sec.core.coverpage import COVER_SECTION_TYPE, image_cover_body, text_cover_body
+from simple_ebook_converter.core.coverpage import COVER_SECTION_TYPE, image_cover_body, text_cover_body
 
 
 def test_cover_section_type_is_epub_standard():

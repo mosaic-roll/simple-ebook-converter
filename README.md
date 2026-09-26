@@ -1,15 +1,16 @@
-# sec — TXT 转 EPUB3 工具
+# simple-ebook-converter — TXT 转 EPUB3 工具
 
 将 TXT 文本解析为章节并生成 EPUB3。一个 distribution 装三个顶层子包：
 
-| 子包      | 说明                                                          |
-| --------- | ------------------------------------------------------------- |
-| `sec.core` | 核心库，不依赖任何前端；唯一总入口 `process()`                 |
-| `sec.cli`  | 命令行前端，入口点 `sec-cli`                                   |
-| `sec.gui`  | Tkinter 图形界面前端，入口点 `sec-gui`                         |
+| 子包                            | 说明                                                |
+| ------------------------------- | --------------------------------------------------- |
+| `simple_ebook_converter.core`   | 核心库，不依赖任何前端；唯一总入口 `process()`       |
+| `simple_ebook_converter.cli`    | 命令行前端，入口点 `simple-ebook-converter-cli`     |
+| `simple_ebook_converter.gui`    | Tkinter 图形界面前端，入口点 `simple-ebook-converter` |
 
-版本号只有一处：根 `pyproject.toml` 的 `version`。`sec.__version__`、`sec.core.__version__`
-等全部由 `importlib.metadata` 读同一个值，代码里不写死。
+版本号只有一处：根 `pyproject.toml` 的 `version`。`simple_ebook_converter.__version__`、
+`simple_ebook_converter.core.__version__` 等全部由 `simple_ebook_converter._meta` 里的
+`DIST_NAME` 查同一个值，代码里不写死。
 
 依赖：`ebooklib` + `chardet` + `click`。使用 [uv](https://github.com/astral-sh/uv) 管理。
 
@@ -26,33 +27,33 @@ uv sync
 命令行：
 
 ```bash
-uv run sec-cli 我的小说.txt                        # 生成 我的小说.epub
-uv run sec-cli 我的小说.txt --title "书名" --author "作者"
-uv run sec-cli 我的小说.txt --toc-only             # 只输出目录（stdout）
-uv run sec-cli 我的小说.txt --toc-only --toc-format json
-uv run sec-cli 我的小说.txt --toc-only -o toc.json  # 目录写入文件
-uv run sec-cli 我的小说.txt --dump-css out.css     # 只导出 CSS
+uv run simple-ebook-converter-cli 我的小说.txt                        # 生成 我的小说.epub
+uv run simple-ebook-converter-cli 我的小说.txt --title "书名" --author "作者"
+uv run simple-ebook-converter-cli 我的小说.txt --toc-only             # 只输出目录（stdout）
+uv run simple-ebook-converter-cli 我的小说.txt --toc-only --toc-format json
+uv run simple-ebook-converter-cli 我的小说.txt --toc-only -o toc.json  # 目录写入文件
+uv run simple-ebook-converter-cli 我的小说.txt --dump-css out.css     # 只导出 CSS
 ```
 
-单一命令，靠 `--toc-only` 切换「只输出目录」模式。完整选项见 `uv run sec-cli --help`。
+单一命令，靠 `--toc-only` 切换「只输出目录」模式。完整选项见 `uv run simple-ebook-converter-cli --help`。
 
 图形界面：
 
 ```bash
-uv run sec-gui
+uv run simple-ebook-converter
 ```
 
 作为库：
 
 ```python
-from sec.core import Config, process, read_lines
+from simple_ebook_converter.core import Config, process, read_lines
 
 lines, used = read_lines(src, "auto")
 tree, stats = process(lines, Config(input=src, title="书名"))
 ```
 
 书名与作者未显式指定时，`process()` 会先从文件名猜（`《书名》作者：作者`，
-见 `sec.core.meta.resolve_metadata`），并写回 `cfg`。
+见 `simple_ebook_converter.core.meta.resolve_metadata()`），并写回 `cfg`。
 
 ## 替换规则的作用范围
 
@@ -94,14 +95,14 @@ tree, stats = process(lines, Config(input=src, title="书名"))
 （各家阅读器对 CSS 里带命名空间的 `epub|type` 属性选择器支持不一致，所以没拿它来选）。
 
 ```bash
-sec-cli novel.txt                          # 同目录没 cover.* → 生成文字封面页
-sec-cli novel.txt --no-text-cover          # 不要文字封面页
-sec-cli novel.txt --cover cover.png        # 显式给图
+simple-ebook-converter-cli novel.txt                          # 同目录没 cover.* → 生成文字封面页
+simple-ebook-converter-cli novel.txt --no-text-cover          # 不要文字封面页
+simple-ebook-converter-cli novel.txt --cover cover.png        # 显式给图
 ```
 
 ## 处理流程
 
-`sec.core.pipeline.process()` 是唯一入口，按顺序做完这六步：
+`simple_ebook_converter.core.pipeline.process()` 是唯一入口，按顺序做完这六步：
 
 1. 封面自动发现（没给 `--cover` 时找同目录的 `cover.*`），结果写回 `cfg`
 2. `Config.validate()` —— 校验取值范围、日期格式、字体/封面格式

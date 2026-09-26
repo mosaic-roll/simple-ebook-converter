@@ -1,4 +1,4 @@
-from sec.core.meta import guess_metadata, resolve_metadata
+from simple_ebook_converter.core.meta import guess_metadata, resolve_metadata
 
 
 def test_guess_full():

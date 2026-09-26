@@ -4,8 +4,7 @@
 前端不必各自实现。
 """
 
-from importlib.metadata import version
-
+from .._meta import __version__
 from .builder import build_css, build_epub, font_media_type
 from .cleaner import clean_line, clean_lines
 from .config import (
@@ -60,9 +59,6 @@ from .replace import (
     split_by_scope,
 )
 from .toc import to_json, to_text
-
-#: 版本号以 pyproject.toml 为唯一真源
-__version__ = version("sec")
 
 __all__ = [
     "ALIGN_CHOICES",

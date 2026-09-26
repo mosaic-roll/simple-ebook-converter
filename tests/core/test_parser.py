@@ -1,5 +1,5 @@
-from sec.core.config import LevelRule, default_levels
-from sec.core.parser import NoEnabledRulesError, parse
+from simple_ebook_converter.core.config import LevelRule, default_levels
+from simple_ebook_converter.core.parser import NoEnabledRulesError, parse
 
 import pytest
 

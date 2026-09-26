@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from sec.core.config import Config, LevelRule, default_levels
-from sec.core.parser import NoEnabledRulesError
-from sec.core.pipeline import fallback_title, process
-from sec.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_TITLE, Rule
+from simple_ebook_converter.core.config import Config, LevelRule, default_levels
+from simple_ebook_converter.core.parser import NoEnabledRulesError
+from simple_ebook_converter.core.pipeline import fallback_title, process
+from simple_ebook_converter.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_TITLE, Rule
 
 SAMPLE = [
     "封面文案",

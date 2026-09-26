@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from sec.core.config import (
+from simple_ebook_converter.core.config import (
     ALIGN_CHOICES,
     DEFAULT_CHAPTER_RE,
     DEFAULT_VOLUME_RE,
@@ -116,7 +116,7 @@ def test_align_choices_are_the_only_allowed():
 
 def test_library_function_defaults_come_from_config():
     """parse()/to_json()/to_text() 的缺省值也必须跟着 Config 走，不能另写一份。"""
-    from sec.core import parser, toc
+    from simple_ebook_converter.core import parser, toc
 
     defaults = config_defaults()
     parse_params = inspect.signature(parser.parse).parameters

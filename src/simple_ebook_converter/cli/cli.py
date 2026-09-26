@@ -2,27 +2,27 @@ from __future__ import annotations
 
 import json
 import sys
-from importlib.metadata import version
 from pathlib import Path
 
 import click
 
-from sec.core.builder import build_css, build_epub
-from sec.core.config import ALIGN_CHOICES, Config, LevelRule, Node, config_defaults
-from sec.core.encoding import EncodingError, read_lines
-from sec.core.levels import build_levels
-from sec.core.parser import ParseStats
-from sec.core.pipeline import process
-from sec.core.replace import Rule, rules_from_json
-from sec.core.toc import to_json, to_text
+from .._meta import CLI_PROG, __version__
+from simple_ebook_converter.core.builder import build_css, build_epub
+from simple_ebook_converter.core.config import ALIGN_CHOICES, Config, LevelRule, Node, config_defaults
+from simple_ebook_converter.core.encoding import EncodingError, read_lines
+from simple_ebook_converter.core.levels import build_levels
+from simple_ebook_converter.core.parser import ParseStats
+from simple_ebook_converter.core.pipeline import process
+from simple_ebook_converter.core.replace import Rule, rules_from_json
+from simple_ebook_converter.core.toc import to_json, to_text
 
-#: 版本号以 pyproject.toml 为唯一真源，这里读出来给 --version 用，不要再写死一份
-VERSION = version("sec")
+#: 来自 `_meta`，即 pyproject.toml 那一个版本号；这里不要再写死一份
+VERSION = __version__
 
 _PATH = click.Path(exists=True, dir_okay=False, path_type=Path)
 _OUT_PATH = click.Path(dir_okay=False, path_type=Path)
 
-#: 选项默认值一律取自 sec.core 的 Config，不再在 CLI 里另写一份字面量。
+#: 选项默认值一律取自 simple_ebook_converter.core 的 Config，不再在 CLI 里另写一份字面量。
 #: 改 Config 的默认值会同时改掉这里的行为与 --help 里显示的默认值。
 _DEFAULTS = config_defaults()
 
@@ -166,7 +166,7 @@ def _emit_epub(
 @click.option("--toc-depth", default=_DEFAULTS["toc_depth"], type=int, show_default=True, help="目录包含到第几级")
 @click.option("--toc-only", is_flag=True, help="只输出目录（配合 --toc-format），不生成 EPUB")
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
-@click.version_option(VERSION, prog_name="sec-cli")
+@click.version_option(VERSION, prog_name=CLI_PROG)
 def convert(
     input_txt: str | None,
     input_opt: Path | None,
@@ -254,7 +254,7 @@ def convert(
 def main(argv: list[str] | None = None) -> None:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
-        convert.main(args=args, prog_name="sec-cli", standalone_mode=False)
+        convert.main(args=args, prog_name=CLI_PROG, standalone_mode=False)
     except click.ClickException as exc:
         exc.show()
         raise SystemExit(exc.exit_code) from exc
