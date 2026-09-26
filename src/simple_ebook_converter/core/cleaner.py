@@ -12,9 +12,4 @@ def clean_line(line: str) -> str:
 
 def clean_lines(lines: list[str]) -> list[str]:
     """清理一个节点的段落，清空后为空的行直接不要。"""
-    out: list[str] = []
-    for line in lines:
-        cleaned = clean_line(line)
-        if cleaned:
-            out.append(cleaned)
-    return out
+    return [cleaned for line in lines if (cleaned := clean_line(line))]

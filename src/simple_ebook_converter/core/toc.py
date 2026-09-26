@@ -40,11 +40,10 @@ def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:
 
 
 def _entry(node: Node, depth: int) -> dict:
-    children = [] if depth <= 0 else [c for c in node.children if c.level <= depth]
     return {
         "title": node.title,
         "raw_title": node.raw_title,
         "level": node.level,
         "class_name": node.class_name,
-        "children": [_entry(c, depth) for c in children],
+        "children": [_entry(c, depth) for c in node.children if c.level <= depth],
     }

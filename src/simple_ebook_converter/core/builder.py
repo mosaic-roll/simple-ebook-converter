@@ -20,14 +20,17 @@ from .parser import walk
 #: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
 COVER_SECTION_TYPE = "cover"
 
+#: 内置字体的 CSS 家族名：@font-face 声明与正文引用共用这一份
+_FONT_FAMILY = "sec-font"
+
 
 def build_css(cfg: Config) -> str:
     """当前设置下的完整 CSS：@font-face → 正文样式 → 封面页样式 → 外部 CSS。"""
     css: list[str] = []
     if cfg.font:
         name = Path(cfg.font).name
-        css.append(f'@font-face {{\n  font-family: "sec-font";\n  src: url("fonts/{name}");\n}}')
-    family = '"sec-font", ' if cfg.font else ""
+        css.append(f'@font-face {{\n  font-family: "{_FONT_FAMILY}";\n  src: url("fonts/{name}");\n}}')
+    family = f'"{_FONT_FAMILY}", ' if cfg.font else ""
     css.append(
         f"""body {{
   margin: 5%;
@@ -129,7 +132,7 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         )
 
     pages: list[epub.EpubHtml] = []
-    page_map: dict[int, epub.EpubHtml] = {}
+    page_map: dict[str, epub.EpubHtml] = {}
     _add_cover(book, cfg, pages)
 
     for node in walk(nodes):
@@ -141,7 +144,7 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         page.add_meta(charset="utf-8")
         page.add_link(href="../style.css", rel="stylesheet", type="text/css")
         book.add_item(page)
-        page_map[id(node)] = page
+        page_map[node.anchor] = page
         pages.append(page)
 
     if nodes:
@@ -161,12 +164,12 @@ def _page_html(node: Node) -> str:
 
 
 def _toc_entries(
-    nodes: list[Node], page_map: dict[int, epub.EpubHtml], depth: int
+    nodes: list[Node], page_map: dict[str, epub.EpubHtml], depth: int
 ) -> list:
     """章节树转 ebooklib 的 toc 结构；`depth` 之外的层级不写进目录。"""
     out = []
     for node in nodes:
-        page = page_map[id(node)]
+        page = page_map[node.anchor]
         if node.children and node.level < depth:
             out.append((page, _toc_entries(node.children, page_map, depth)))
         elif node.level <= depth:

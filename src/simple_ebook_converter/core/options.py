@@ -173,6 +173,11 @@ def option_default(opt: Option) -> Any:
 # ---------- 原始值 → Config ----------
 
 
+def _option(name: str) -> Option:
+    """按名字取选项表里的一条（同名选项唯一）。"""
+    return next(opt for opt in OPTIONS if opt.name == name)
+
+
 def build_config(values: Mapping[str, Any]) -> Config:
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
@@ -180,13 +185,15 @@ def build_config(values: Mapping[str, Any]) -> Config:
     留空一律表示「用缺省值」，取值范围由 `Config.validate()` 负责。
     """
     values = dict(values)
-    if values.get("no_volume") and values.get("volume") is None:
+    if values.pop("no_volume", None) and values.get("volume") is None:
         values["volume"] = ""  # --no-volume only wins when --volume is not given
-    raw = {opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS}
     return Config(
         levels=build_levels(_level_specs(values)),
-        replacements=rules_from_source(_text(raw["replace_json"]), raw["replace_file"]),
-        **{opt.name: raw[opt.name] for opt in OPTIONS if opt.in_config},
+        replacements=rules_from_source(
+            _text(values.get("replace_json")),
+            _path(_option("replace_file"), values.get("replace_file")),
+        ),
+        **{opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS if opt.in_config},
     )
 
 
