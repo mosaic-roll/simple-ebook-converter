@@ -1,7 +1,7 @@
-from simple_ebook_converter.core.config import LevelRule, default_levels
-from simple_ebook_converter.core.parser import NoEnabledRulesError, parse
-
 import pytest
+
+from simple_ebook_converter.core.config import LevelRule, default_levels
+from simple_ebook_converter.core.parser import NoEnabledRulesError, parse, walk
 
 
 def test_volume_chapter_nesting():
@@ -114,7 +114,7 @@ def test_custom_level_hierarchy():
 
 def test_no_volume_flag_ignores_volume():
     lines = ["第一卷 甲", "第一章 a", "正文"]
-    tree, _ = parse(lines, default_levels(), no_volume=True, fallback_title="书名")
+    tree, _ = parse(lines, default_levels(), volume_titles=False, fallback_title="书名")
     assert [n.title for n in tree] == ["前言", "第一章 a"]
     assert tree[0].paragraphs == ["第一卷 甲"]
     assert tree[1].paragraphs == ["正文"]
@@ -134,3 +134,27 @@ def test_no_enabled_rules_is_value_error():
 def test_empty_input():
     tree, _ = parse([], default_levels(), fallback_title="x")
     assert tree == []
+
+
+def test_anchors_number_chapters_and_pin_preface():
+    lines = ["前言内容", "第一卷 风起", "第一章 a", "第二章 b", "尾句"]
+    tree, _ = parse(lines, default_levels())
+    assert [n.anchor for n in walk(tree)] == ["preface", "p0001", "p0002", "p0003"]
+
+
+def test_titles_are_stripped_but_paragraphs_are_not():
+    tree, _ = parse(["  第一章 a  ", "　正文　"], default_levels(), fallback_title="x")
+    assert tree[0].title == "第一章 a"
+    assert tree[0].raw_title == "第一章 a"
+    assert tree[0].paragraphs == ["　正文　"]
+
+
+def test_paragraphs_follow_the_nearest_heading():
+    lines = ["第一卷 甲", "卷内正文", "第一章 a", "正文一", "第二章 b", "正文二", "结尾"]
+    tree, _ = parse(lines, default_levels())
+    (volume,) = tree
+    first, second = volume.children
+    assert volume.paragraphs == ["卷内正文"]
+    assert first.paragraphs == ["正文一"]
+    assert second.paragraphs == ["正文二", "结尾"]
+

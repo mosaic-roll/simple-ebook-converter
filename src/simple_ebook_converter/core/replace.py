@@ -1,20 +1,30 @@
+"""替换规则：解析、校验、按作用范围分流、执行。
+
+规则本身是一段 JSON 里的有序列表，因此「先按哪条后按哪条」由列表顺序决定。
+`Replacer` 把一批规则和它们的预编译正则绑在一起，避免在每行、每个标题上重复编译。
+"""
+
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
-#: 替换规则的作用范围。默认只作用于标题：GUI 里只能看到目录，
-#: 「默认只改标题」才符合直觉；需要改正文或两者都改得显式写 `"scope"`。
+#: 替换规则的作用范围
 SCOPE_TITLE = "title"
 SCOPE_BODY = "body"
 SCOPE_ALL = "all"
-
 SCOPE_CHOICES = (SCOPE_TITLE, SCOPE_BODY, SCOPE_ALL)
+
+#: 默认只改标题：GUI 里只能看到目录，「默认也动正文」反而不符合直觉
 DEFAULT_SCOPE = SCOPE_TITLE
 
-#: 供前端显示用的中文标签，避免 GUI 另写一份映射
+#: 中文标签，供前端下拉框直接用
 SCOPE_LABELS = {SCOPE_TITLE: "标题", SCOPE_BODY: "正文", SCOPE_ALL: "全文"}
+
+_SCOPE_BY_LABEL = {label: scope for scope, label in SCOPE_LABELS.items()}
 
 
 @dataclass
@@ -23,47 +33,86 @@ class Rule:
     replace: str
     scope: str = DEFAULT_SCOPE
 
-    def compile(self) -> re.Pattern[str]:
-        return re.compile(self.pattern)
-
     @property
     def scope_label(self) -> str:
         return SCOPE_LABELS.get(self.scope, self.scope)
 
 
-def check_scope(scope: str, index: int | None = None) -> str:
-    """校验作用范围并返回它，出错抛 ValueError（消息可直接展示给用户）。"""
-    if scope not in SCOPE_CHOICES:
-        where = f"第 {index} 条替换规则的 " if index is not None else ""
-        supported = "/".join(SCOPE_CHOICES)
-        raise ValueError(f"{where}scope 只能是 {supported}，收到：{scope!r}")
-    return scope
+def check_scope(scope: str, where: str = "") -> str:
+    """校验作用范围并返回它，中文标签也接受；出错抛 ValueError。"""
+    resolved = _SCOPE_BY_LABEL.get(scope, scope)
+    if resolved not in SCOPE_CHOICES:
+        prefix = f"{where}的 " if where else ""
+        choices = "/".join(SCOPE_LABELS.values())
+        raise ValueError(f"{prefix}作用范围只能是 {choices}（{'/'.join(SCOPE_CHOICES)}），收到：{scope!r}")
+    return resolved
 
 
 def rules_from_json(text: str) -> list[Rule]:
-    """解析一段替换规则 JSON（有序列表），出错抛 ValueError。CLI 与 GUI 共用。
+    """解析一段 JSON 替换规则（有序列表），出错抛 ValueError。
 
-    `scope` 可省略，省略时为 `"title"`（只作用于标题）。
+    每条规则形如 `{"pattern": "...", "replace": "...", "scope": "title"}`：
+    `replace` 省略即删除匹配内容，`scope` 省略即只作用于标题。
     """
-    data = json.loads(text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"替换规则不是合法 JSON：{e}") from e
     if not isinstance(data, list):
         raise ValueError("替换规则必须是 JSON 列表")
     rules: list[Rule] = []
     for index, item in enumerate(data, start=1):
-        if not isinstance(item, dict) or "pattern" not in item:
-            raise ValueError(f"替换规则条目格式错误：{item!r}")
+        if not isinstance(item, dict) or not isinstance(item.get("pattern"), str):
+            raise ValueError(f"第 {index} 条替换规则缺少 pattern：{item!r}")
         pattern = item["pattern"]
         try:
             re.compile(pattern)
         except re.error as e:
             raise ValueError(f"第 {index} 条替换规则正则非法：{e}") from e
-        scope = check_scope(item.get("scope", DEFAULT_SCOPE), index)
-        rules.append(Rule(pattern, item.get("replace", ""), scope))
+        rules.append(
+            Rule(
+                pattern,
+                str(item.get("replace", "")),
+                check_scope(item.get("scope", DEFAULT_SCOPE), f"第 {index} 条替换规则"),
+            )
+        )
     return rules
 
 
-def rules_to_json(rules: list[Rule]) -> str:
-    """把规则序列化成 JSON 文本（GUI 导出用；`scope` 总是显式写出）。"""
+def rules_from_rows(rows: Iterable[Sequence[str] | Rule]) -> list[Rule]:
+    """`(查找, 替换为, 作用范围)` 三元组 → 规则；`Rule` 原样收下。
+
+    作用范围可给中文标签；查找为空的行忽略（表格里的空行）。
+    """
+    rules: list[Rule] = []
+    for row in rows:
+        if isinstance(row, Rule):
+            rules.append(row)
+            continue
+        pattern, replace, scope = (list(row) + ["", ""])[:3]
+        if not pattern:
+            continue
+        rules.append(Rule(pattern, replace, check_scope(scope or DEFAULT_SCOPE, f"规则「{pattern}」")))
+    return rules
+
+
+def rules_from_source(
+    json_text: str | None = None,
+    file: str | Path | None = None,
+) -> list[Rule]:
+    """从 JSON 文本或 JSON 文件读规则，两者只能给一处，都不给返回空列表。"""
+    if json_text and file:
+        raise ValueError("替换规则只能给一处：JSON 文本或 JSON 文件，不能同时给两处")
+    if file:
+        try:
+            json_text = Path(file).read_text(encoding="utf-8")
+        except OSError as e:
+            raise ValueError(f"无法读取替换规则文件：{e}") from e
+    return rules_from_json(json_text) if json_text else []
+
+
+def rules_to_json(rules: Iterable[Rule]) -> str:
+    """序列化成 JSON 文本（`scope` 总是显式写出）。"""
     return json.dumps(
         [{"pattern": r.pattern, "replace": r.replace, "scope": r.scope} for r in rules],
         ensure_ascii=False,
@@ -71,35 +120,31 @@ def rules_to_json(rules: list[Rule]) -> str:
     )
 
 
-def compile_rules(rules: list[Rule]) -> list[re.Pattern[str]]:
-    return [r.compile() for r in rules]
+@dataclass(frozen=True)
+class Replacer:
+    """一批规则连同预编译的正则，按规则顺序依次替换。"""
+
+    rules: tuple[Rule, ...] = ()
+    patterns: tuple[re.Pattern[str], ...] = ()
+
+    @classmethod
+    def of(cls, rules: Iterable[Rule]) -> "Replacer":
+        rules = tuple(rules)
+        return cls(rules, tuple(re.compile(r.pattern) for r in rules))
+
+    def text(self, value: str) -> str:
+        for rule, pattern in zip(self.rules, self.patterns):
+            value = pattern.sub(rule.replace, value)
+        return value
+
+    def lines(self, lines: Iterable[str]) -> list[str]:
+        return [self.text(line) for line in lines]
 
 
-def split_by_scope(rules: list[Rule]) -> tuple[list[Rule], list[Rule]]:
-    """按作用范围拆成 (标题规则, 正文规则)；`scope="all"` 两边都算。
-
-    拆完各自编译一次，避免在每行、每个标题上重复编译正则。
-    """
-    title = [r for r in rules if r.scope in (SCOPE_TITLE, SCOPE_ALL)]
-    body = [r for r in rules if r.scope in (SCOPE_BODY, SCOPE_ALL)]
-    return title, body
-
-
-def apply(text: str, rules: list[Rule], compiled: list[re.Pattern[str]] | None = None) -> str:
-    if not rules:
-        return text
-    if compiled is None:
-        compiled = compile_rules(rules)
-    for rule, pat in zip(rules, compiled):
-        text = pat.sub(rule.replace, text)
-    return text
-
-
-def apply_lines(
-    lines: list[str],
-    rules: list[Rule],
-    compiled: list[re.Pattern[str]] | None = None,
-) -> list[str]:
-    if not rules:
-        return lines
-    return [apply(line, rules, compiled) for line in lines]
+def replacers_by_scope(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
+    """按作用范围拆成 (标题替换器, 正文替换器)，`scope=all` 两边都算。"""
+    rules = list(rules)
+    return (
+        Replacer.of(r for r in rules if r.scope in (SCOPE_TITLE, SCOPE_ALL)),
+        Replacer.of(r for r in rules if r.scope in (SCOPE_BODY, SCOPE_ALL)),
+    )

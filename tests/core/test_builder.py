@@ -2,7 +2,15 @@ import posixpath
 import re
 import zipfile
 
-from simple_ebook_converter.core.builder import build_css, build_epub
+import pytest
+
+from simple_ebook_converter.core.builder import (
+    COVER_SECTION_TYPE,
+    build_css,
+    build_epub,
+    image_cover_body,
+    text_cover_body,
+)
 from simple_ebook_converter.core.config import Config
 from simple_ebook_converter.core.parser import parse
 
@@ -166,7 +174,7 @@ def test_author_and_date_written(tmp_path):
 
 
 def test_no_toc_nav_not_in_spine(tmp_path):
-    cfg = Config(input=tmp_path / "novel.txt", no_toc=True)
+    cfg = Config(input=tmp_path / "novel.txt", toc_in_spine=False)
     out = _build(tmp_path, cfg=cfg)
     entries = _entries(out)
     assert "EPUB/nav.xhtml" in entries
@@ -322,6 +330,60 @@ def test_cover_css_comes_before_user_css(tmp_path):
     cfg = Config(input=tmp_path / "novel.txt", css_file=extra)
     css = build_css(cfg)
     assert css.index("body > section h1 {") > css.index("body > section {")
+
+
+def test_build_css_reports_unreadable_css_file(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", css_file=tmp_path / "nope.css")
+    with pytest.raises(ValueError, match="无法读取外部 CSS"):
+        build_css(cfg)
+
+
+# ---------- 封面页的 body 片段 ----------
+
+
+def test_cover_section_type_is_epub_standard():
+    """用标准语义角色，不自造 class。"""
+    assert COVER_SECTION_TYPE == "cover"
+
+
+def test_image_body_uses_standard_cover_section():
+    body = image_cover_body("images/cover.png", alt="书名")
+    assert body.startswith('<section epub:type="cover">')
+    assert '<img src="images/cover.png" alt="书名"/>' in body
+    assert body.rstrip().endswith("</section>")
+    assert "class=" not in body
+
+
+def test_image_body_escapes_src_and_alt():
+    body = image_cover_body('a"b.png', alt="<x & y>")
+    assert "&quot;" in body
+    assert "&lt;x &amp; y&gt;" in body
+    assert "<x & y>" not in body
+
+
+def test_text_body_title_and_author():
+    body = text_cover_body("书名", "作者")
+    assert '<section epub:type="cover">' in body
+    assert "<h1>书名</h1>" in body
+    assert "<p>作者</p>" in body
+    assert "<img" not in body
+    assert "class=" not in body
+
+
+def test_text_body_omits_missing_parts():
+    assert "<p>" not in text_cover_body("书名")
+    assert "<h1>" not in text_cover_body("", "作者")
+
+
+def test_text_body_empty_still_valid_section():
+    assert text_cover_body("", "") == '<section epub:type="cover">\n</section>'
+
+
+def test_text_body_escapes_markup():
+    body = text_cover_body("<b>书名</b>", "a & b")
+    assert "&lt;b&gt;书名&lt;/b&gt;" in body
+    assert "a &amp; b" in body
+    assert "<b>" not in body
 
 
 def _png(tmp_path):

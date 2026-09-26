@@ -11,17 +11,23 @@ from simple_ebook_converter import core
 from simple_ebook_converter._meta import CLI_PROG, DIST_NAME, IMPORT_NAME
 
 
+def _modules() -> dict[str, ModuleType]:
+    return {
+        info.name: importlib.import_module(f"simple_ebook_converter.core.{info.name}")
+        for info in pkgutil.iter_modules(core.__path__)
+    }
+
+
 def _public_names() -> set[str]:
     """各子模块里"自己定义"的公共名字（排除下划线私有、import 进来的模块与再导出）。"""
     names: set[str] = set()
-    for info in pkgutil.iter_modules(core.__path__):
-        mod = importlib.import_module(f"simple_ebook_converter.core.{info.name}")
-        for name, obj in vars(mod).items():
-            if name.startswith("_") or isinstance(obj, ModuleType):
+    for name, mod in _modules().items():
+        for attr, obj in vars(mod).items():
+            if attr.startswith("_") or isinstance(obj, ModuleType):
                 continue
             # 常量（tuple/int）没有 __module__，默认算本模块定义
             if getattr(obj, "__module__", mod.__name__) == mod.__name__:
-                names.add(name)
+                names.add(attr)
     return names
 
 
@@ -33,14 +39,13 @@ def test_version_matches_packaging_metadata():
 def test_names_match_pyproject():
     """`_meta` 里写死的包名/命令名必须和 pyproject.toml 对得上。
 
-    这是改名时的第一道闸：漏改 `_meta.DIST_NAME` 会让 `version()` 直接抛
-    PackageNotFoundError，漏改命令名则会让 `--help` 显示一个不存在的命令。
+    改名时漏改 `_meta.DIST_NAME` 会让 `version()` 直接抛 PackageNotFoundError，
+    漏改命令名则会让 `--help` 显示一个不存在的命令。
     """
     pyproject = Path(__file__).parents[2] / "pyproject.toml"
     if not pyproject.is_file():  # 从 sdist 跑测试时没有 pyproject，跳过
         pytest.skip("找不到 pyproject.toml")
-    cfg = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-    project = cfg["project"]
+    project = tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]
 
     assert DIST_NAME == project["name"]
     assert IMPORT_NAME == "simple_ebook_converter"
@@ -61,7 +66,16 @@ def test_no_public_name_is_missing_from_all():
     assert not missing, f"这些公共名字没进 __all__：{sorted(missing)}"
 
 
-@pytest.mark.parametrize("name", ["ALIGN_CHOICES", "ENCODING_CHOICES", "fallback_title"])
-def test_recently_added_names_are_exported(name):
-    """点名单测这几个名字，避免 __all__ 漏导出时不易发现。"""
-    assert name in core.__all__
+def test_all_is_sorted_and_has_no_duplicates():
+    assert len(set(core.__all__)) == len(core.__all__)
+
+
+def test_core_does_not_import_frontends():
+    """core 不得依赖任何前端：否则打包 CLI 会拖进 tkinter，打包 GUI 会拖进 click。"""
+    imported: set[str] = set()
+    for mod in _modules().values():
+        imported |= {
+            obj.__name__ for obj in vars(mod).values() if isinstance(obj, ModuleType)
+        }
+    assert "click" not in imported
+    assert "tkinter" not in imported

@@ -4,7 +4,7 @@ import pytest
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
 from simple_ebook_converter.core.parser import NoEnabledRulesError
-from simple_ebook_converter.core.pipeline import fallback_title, process
+from simple_ebook_converter.core.pipeline import process
 from simple_ebook_converter.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_TITLE, Rule
 
 SAMPLE = [
@@ -61,8 +61,8 @@ def test_process_reports_disabled_levels(tmp_path):
         process(SAMPLE, cfg)
 
 
-def test_process_falls_back_to_filename_stem(tmp_path):
-    """没有标题命中时，整篇归到一章，标题取文件名。"""
+def test_process_falls_back_to_book_title(tmp_path):
+    """没有标题命中时，整篇归到一章，标题取书名。"""
     src = tmp_path / "我的小说.txt"
     tree, stats = process(["没有标题的一行", "另一行"], Config(input=src))
     assert stats.has_preface is False
@@ -71,27 +71,25 @@ def test_process_falls_back_to_filename_stem(tmp_path):
     assert tree[0].paragraphs == ["没有标题的一行", "另一行"]
 
 
-def test_fallback_title_prefers_explicit_title(tmp_path):
-    assert fallback_title(Config(title="书名", input=tmp_path / "x.txt")) == "书名"
-
-
-def test_fallback_title_without_input_or_title():
-    assert fallback_title(Config()) == "未命名"
+def test_process_uses_resolved_title_as_fallback(tmp_path):
+    """书名是猜出来的也能当兜底章节名。"""
+    src = tmp_path / "《测试书》作者：某人.txt"
+    tree, _ = process(["没有标题"], Config(input=src))
+    assert tree[0].title == "测试书"
 
 
 def test_process_cleans_by_default(tmp_path):
-    tree, _ = process(["\u3000\u3000正文一　", "", "  ", "正文二"], _cfg(tmp_path))
-    node = tree[0]
-    assert node.paragraphs == ["正文一", "正文二"]
+    tree, _ = process(["　　正文一　", "", "  ", "正文二"], _cfg(tmp_path))
+    assert tree[0].paragraphs == ["正文一", "正文二"]
 
 
-def test_process_no_clean_keeps_blank_lines(tmp_path):
-    tree, _ = process(["正文一", "", "正文二"], _cfg(tmp_path, no_clean=True))
+def test_process_keeps_blank_lines_when_not_cleaning(tmp_path):
+    tree, _ = process(["正文一", "", "正文二"], _cfg(tmp_path, clean=False))
     assert tree[0].paragraphs == ["正文一", "", "正文二"]
 
 
 def test_process_replaces_titles_and_bodies_keeping_raw(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X")])
+    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X", SCOPE_ALL)])
     tree, _ = process(SAMPLE, cfg)
     volume = tree[1]
     assert volume.title == "第X一卷 风起"
@@ -195,7 +193,7 @@ def test_process_returns_stats(tmp_path):
 
 
 def test_levels_are_not_shared_between_configs(tmp_path):
-    """两次调用不能互相污染 default_levels()（process 不应改传入的 list 元素）。"""
+    """两次调用不能互相污染 default_levels()。"""
     a = _cfg(tmp_path)
     b = _cfg(tmp_path, levels=[*default_levels()])
     process(SAMPLE, a)

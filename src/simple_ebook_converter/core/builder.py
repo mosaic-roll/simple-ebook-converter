@@ -1,3 +1,10 @@
+"""把章节树组装成 EPUB3：CSS、章节页、封面页、目录。
+
+封面页只往 `epub.EpubHtml` 塞 `<body>` 片段，`<head>` 交给 `add_meta()` / `add_link()`：
+`EpubHtml.get_content()` 会丢掉外部传入的 head 自己重拼，直接给完整文档会把 charset
+与 CSS 链接弄丢。
+"""
+
 from __future__ import annotations
 
 import html
@@ -7,21 +14,19 @@ from pathlib import Path
 from ebooklib import epub
 
 from .config import Config, Node
-from .coverpage import image_cover_body, text_cover_body
 from .mediatypes import cover_media_type, font_media_type
 from .parser import walk
 
+#: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
+COVER_SECTION_TYPE = "cover"
+
 
 def build_css(cfg: Config) -> str:
+    """当前设置下的完整 CSS：@font-face → 正文样式 → 封面页样式 → 外部 CSS。"""
     css: list[str] = []
     if cfg.font:
         name = Path(cfg.font).name
-        css.append(
-            f"""@font-face {{
-  font-family: "sec-font";
-  src: url("fonts/{name}");
-}}"""
-        )
+        css.append(f'@font-face {{\n  font-family: "sec-font";\n  src: url("fonts/{name}");\n}}')
     family = '"sec-font", ' if cfg.font else ""
     css.append(
         f"""body {{
@@ -44,9 +49,8 @@ h1, h2, h3, h4, h5, h6 {{
   text-align: {cfg.chapter_align};
 }}"""
     )
-    # 封面页：整本书只有封面页的 body 里直接挂 section，章节页没有，所以下面这组
-    # 结构选择器只会命中封面页。这样就不必为了样式自造 class——封面页的语义由
-    # `epub:type="cover"` 声明（见 coverpage.py），这里只负责排版。
+    # 整本书只有封面页的 body 里直接挂 section，章节页没有，所以这组结构选择器
+    # 只命中封面页。不用 epub|type 属性选择器：各家阅读器对它的支持并不一致。
     css.append(
         """body > section {
   margin: 0;
@@ -69,75 +73,41 @@ body > section img {
 }"""
     )
     if cfg.css_file:
-        css.append(Path(cfg.css_file).read_text(encoding="utf-8"))
+        try:
+            css.append(Path(cfg.css_file).read_text(encoding="utf-8"))
+        except OSError as e:
+            raise ValueError(f"无法读取外部 CSS：{e}") from e
     return "\n".join(css)
 
 
-def _page_html(node: Node) -> str:
-    esc = html.escape
-    level = max(1, node.level)
-    cls = node.class_name or (f"level{node.level}" if node.level > 0 else "preface")
-    heading = f"<h{level} class=\"{esc(cls)}\">{esc(node.title)}</h{level}>"
-    paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
-    return f"{heading}\n{paragraphs}"
+def image_cover_body(image_name: str, alt: str = "封面") -> str:
+    """图片封面页的 body 片段：一个指向封面图的 cover section。"""
+    return (
+        f'<section epub:type="{COVER_SECTION_TYPE}">\n'
+        f'  <img src="{_esc(image_name)}" alt="{_esc(alt)}"/>\n'
+        "</section>"
+    )
 
 
-def _build_toc(nodes: list[Node], page_map: dict[int, epub.EpubHtml], depth: int) -> list:
-    out = []
-    for node in nodes:
-        page = page_map[id(node)]
-        if node.children and node.level < depth:
-            out.append((page, _build_toc(node.children, page_map, depth)))
-        elif node.level <= depth:
-            out.append(page)
-    return out
+def text_cover_body(title: str, author: str = "") -> str:
+    """文字封面页的 body 片段：书名 + 作者，没有图片。
 
-
-def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> None:
-    """装配封面页，并把封面页追加到 `pages`（它会进 spine）。
-
-    三种情况：
-
-    - 有封面图：`set_cover()` 写 manifest item（带 `properties="cover-image"`）并补一条
-      `<meta name="cover">`——后者是 EPUB2 时代的约定，ebooklib 自带封面页时会给，
-      少了它一部分旧阅读器/工具就认不出封面。封面页 `linear="no"`，不打断正文流。
-    - 没封面图但 `text_cover` 开着：放一个只含书名/作者的「文字封面页」，
-      `linear="yes"`，它就是书的第一页。
-    - 都没有：整本书没有封面，`spine` 直接从第一章开始。
-
-    两种封面页都只传 body 片段给 `epub.EpubHtml`，`<meta charset>` 与 CSS 链接走
-    `add_meta()` / `add_link()`——`get_content()` 会重建 head，直接塞完整文档会被丢掉。
+    用 `h1` / `p` 而不是自定义 class——这一页的标题层级与署名段落本身就是那个意思。
     """
-    title = cfg.title or Path(str(cfg.input)).stem
-
-    if cfg.cover:
-        path = Path(cfg.cover)
-        media = cover_media_type(path)
-        book.set_cover(f"images/{path.name}", path.read_bytes(), create_page=False)
-        # set_cover 靠扩展名猜 media-type，但标准 mimetypes 不认 .webp（猜出 None），
-        # 猜错就会在 manifest 里写出空的 media-type，所以显式改回 mediatypes 的表。
-        item = book.get_item_with_id("cover-img")
-        if item is not None:
-            item.media_type = media
-        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
-        page.is_linear = False
-        page.content = image_cover_body(f"images/{path.name}", alt=title).encode("utf-8")
-    elif cfg.text_cover:
-        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
-        page.content = text_cover_body(title, cfg.author).encode("utf-8")
-    else:
-        return
-
-    page.add_meta(charset="utf-8")
-    page.add_link(href="style.css", rel="stylesheet", type="text/css")
-    book.add_item(page)
-    pages.append(page)
+    parts = [f'<section epub:type="{COVER_SECTION_TYPE}">']
+    if title:
+        parts.append(f"  <h1>{_esc(title)}</h1>")
+    if author:
+        parts.append(f"  <p>{_esc(author)}</p>")
+    parts.append("</section>")
+    return "\n".join(parts)
 
 
 def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
+    """把 `nodes` 写成 EPUB 文件。`css` 由 `build_css()` 生成。"""
     book = epub.EpubBook()
     book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
-    book.set_title(cfg.title or Path(str(cfg.input)).stem)
+    book.set_title(cfg.book_title)
     if cfg.author:
         book.add_author(cfg.author)
     book.set_language(cfg.language)
@@ -147,7 +117,6 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
     book.add_item(
         epub.EpubItem(uid="style", file_name="style.css", media_type="text/css", content=css.encode("utf-8"))
     )
-
     if cfg.font:
         path = Path(cfg.font)
         book.add_item(
@@ -161,7 +130,6 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
 
     pages: list[epub.EpubHtml] = []
     page_map: dict[int, epub.EpubHtml] = {}
-
     _add_cover(book, cfg, pages)
 
     for node in walk(nodes):
@@ -177,9 +145,63 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         pages.append(page)
 
     if nodes:
-        book.toc = _build_toc(nodes, page_map, cfg.toc_depth)
+        book.toc = _toc_entries(nodes, page_map, cfg.toc_depth)
     book.add_item(epub.EpubNav())
     book.add_item(epub.EpubNcx())
-
-    book.spine = (["nav"] if not cfg.no_toc else []) + [p for p in pages]
+    book.spine = (["nav"] if cfg.toc_in_spine else []) + pages
     epub.write_epub(output, book, options={"compresslevel": 9})
+
+
+def _page_html(node: Node) -> str:
+    esc = html.escape
+    level = max(1, node.level)
+    heading = f'<h{level} class="{esc(node.class_name)}">{esc(node.title)}</h{level}>'
+    paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
+    return f"{heading}\n{paragraphs}"
+
+
+def _toc_entries(
+    nodes: list[Node], page_map: dict[int, epub.EpubHtml], depth: int
+) -> list:
+    """章节树转 ebooklib 的 toc 结构；`depth` 之外的层级不写进目录。"""
+    out = []
+    for node in nodes:
+        page = page_map[id(node)]
+        if node.children and node.level < depth:
+            out.append((page, _toc_entries(node.children, page_map, depth)))
+        elif node.level <= depth:
+            out.append(page)
+    return out
+
+
+def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> None:
+    """装配封面页并追加到 `pages`（它会进 spine）。三种情况：
+
+    - 有封面图：图进 manifest（带 `properties="cover-image"`），另补一条
+      `<meta name="cover">` 兼容 EPUB2 时代的阅读器；封面页 `linear="no"`，不打断正文。
+    - 没图但 `text_cover` 开着：放只含书名/作者的封面页，`linear="yes"`，它就是第一页。
+    - 都没有：整本书没有封面，spine 直接从第一章开始。
+    """
+    title = cfg.book_title
+    if cfg.cover:
+        path = Path(cfg.cover)
+        book.set_cover(f"images/{path.name}", path.read_bytes(), create_page=False)
+        item = book.get_item_with_id("cover-img")
+        if item is not None:
+            item.media_type = cover_media_type(path)
+        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
+        page.is_linear = False
+        page.content = image_cover_body(f"images/{path.name}", alt=title).encode("utf-8")
+    elif cfg.text_cover:
+        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
+        page.content = text_cover_body(title, cfg.author).encode("utf-8")
+    else:
+        return
+    page.add_meta(charset="utf-8")
+    page.add_link(href="style.css", rel="stylesheet", type="text/css")
+    book.add_item(page)
+    pages.append(page)
+
+
+def _esc(text: str) -> str:
+    return html.escape(text or "", quote=True)
