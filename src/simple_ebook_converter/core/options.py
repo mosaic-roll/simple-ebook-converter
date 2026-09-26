@@ -103,9 +103,9 @@ OPTIONS: tuple[Option, ...] = (
     Option("overwrite", "覆盖已有文件", "输出文件已存在时是否覆盖（默认覆盖）", "输出", negative=True),
     Option("dump_css", "导出 CSS", "把当前生效的 CSS 写到这个文件（不必读输入）", "输出", output=True),
     # ---- 书籍信息 ----
-    Option("title", "书名", "留空则从文件名猜《书名》作者：作者", "书籍信息"),
+    Option("title", "书名", "留空则从文件名「《书名》作者：作者」提取", "书籍信息"),
     Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
-    Option("date", "出版日期", "如 2024-05-13，留空则省略 dc:date（规范允许缺省）", "书籍信息"),
+    Option("date", "出版日期", "如 2024-05-13，留空则不写入", "书籍信息"),
     Option("language", "语言", "语言代码", "书籍信息"),
     Option("cover", "封面图", "留空则先找输入同目录的 cover.*，再退回文字封面页", "书籍信息"),
     Option("text_cover", "文字封面页", "没有封面图时是否生成只含书名/作者的封面页（默认生成）", "书籍信息", negative=True),
@@ -144,14 +144,14 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 目录 ----
     Option(
         "toc_in_spine", "书页含目录",
-        "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）",
+        "目录页是否进正文流（阅读器导航目录不受影响，始终生成）",
         "目录", negative=True, flag="no-toc",
     ),
     Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
     Option(
         "toc_file", "目录树文件",
         "从 JSON 目录树生成：跳过正则解析，按行号从输入取正文；"
-        "标题用文件现值，仍会过清理与替换（--toc-only --toc-format json 的产物可编辑后回喂）",
+        "标题用文件里的值，仍会做清理与替换（--toc-only --toc-format json 导出的目录可编辑后再传入）",
         "目录",
     ),
     Option("toc_only", "只输出目录", "只输出目录，不生成 EPUB", "目录"),
