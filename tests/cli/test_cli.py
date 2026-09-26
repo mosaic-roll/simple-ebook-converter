@@ -3,12 +3,14 @@ import re
 import zipfile
 from pathlib import Path
 
+import click
 import pytest
 from click.testing import CliRunner
 
 from simple_ebook_converter.cli.cli import convert, main
-from simple_ebook_converter.core.config import Config, config_defaults
+from simple_ebook_converter.core.config import Config
 from simple_ebook_converter.core.encoding import EncodingError
+from simple_ebook_converter.core.options import OPTIONS, option_default, option_groups
 from simple_ebook_converter.core.parser import NoEnabledRulesError
 
 
@@ -73,7 +75,7 @@ def test_convert_replace_json_and_file_conflict(tmp_path):
         convert, [str(src), "--replace-json", "[]", "--replace-file", str(rf)]
     )
     assert result.exit_code != 0
-    assert "二选一" in result.output
+    assert "只能给一处" in result.output
 
 
 def test_replace_applies_to_title_and_toc(tmp_path):
@@ -177,7 +179,7 @@ def test_replace_rejects_unknown_scope(tmp_path):
         [str(src), "--replace-json", json.dumps([{"pattern": "a", "scope": "chapter"}])],
     )
     assert result.exit_code != 0
-    assert "scope 只能是" in result.output
+    assert "作用范围只能是" in result.output
 
 
 def test_cover_is_discovered_next_to_input(tmp_path):
@@ -454,7 +456,7 @@ def test_convert_out_stdout_epub_rejected(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "-o", "-"])
     assert result.exit_code != 0
-    assert "stdout" in result.output
+    assert "标准输出" in result.output
 
 
 def test_convert_metadata_from_filename(tmp_path):
@@ -560,40 +562,77 @@ def test_all_levels_disabled_reports_clean_error(tmp_path):
     assert not isinstance(result.exception, NoEnabledRulesError)
 
 
-#: CLI 选项名 -> Config 字段名（其余选项无对应字段或为 flag/路径）
-_SCALAR_OPTIONS = {
-    "encoding": "encoding",
-    "max_title_len": "max_title_len",
-    "preface_title": "preface_title",
-    "language": "language",
-    "indent": "indent",
-    "line_height": "line_height",
-    "para_spacing": "para_spacing",
-    "chapter_align": "chapter_align",
-    "volume_align": "volume_align",
-    "toc_depth": "toc_depth",
-}
+#: 这些选项在 `--help` 里要印出默认值，其余（路径、开关、正则）不印
+_SCALAR_OPTIONS = (
+    "encoding",
+    "max_title_len",
+    "preface_title",
+    "language",
+    "indent",
+    "line_height",
+    "para_spacing",
+    "chapter_align",
+    "volume_align",
+    "toc_depth",
+    "toc_format",
+)
 
 
 def test_option_defaults_come_from_config():
     """选项默认值必须等于 Config 的默认值，不能在 CLI 里另写一份字面量。"""
-    defaults = config_defaults()
     params = {p.name: p for p in convert.params}
-    for opt, field in _SCALAR_OPTIONS.items():
-        flag = "--" + opt.replace("_", "-")
-        assert params[opt].default == defaults[field], f"{flag} 的默认值与 Config.{field} 不一致"
-        assert defaults[field] == getattr(Config(), field)
-        assert params[opt].show_default, f"{flag} 未在 --help 里显示默认值"
+    for name in _SCALAR_OPTIONS:
+        default = option_default(next(o for o in OPTIONS if o.name == name))
+        assert params[name].default == default, f"--{name} 的默认值与选项表不一致"
+        assert default == getattr(Config(), name, default)
+        assert params[name].show_default, f"--{name} 未在 --help 里显示默认值"
 
 
 def test_help_shows_config_defaults():
     """--help 里印出来的默认值就是 Config 的默认值（click 折行不影响 [default: X] 这个整体）。"""
     result = CliRunner().invoke(convert, ["--help"])
     assert result.exit_code == 0, result.output
-    defaults = config_defaults()
-    for opt, field in _SCALAR_OPTIONS.items():
-        token = f"[default: {defaults[field]}]"
-        assert token in result.output, f"--{opt.replace('_', '-')} 未显示 Config.{field} 的默认值 {token}"
+    for name in _SCALAR_OPTIONS:
+        default = option_default(next(o for o in OPTIONS if o.name == name))
+        token = f"[default: {default}]"
+        assert token in result.output, f"--{name} 未显示默认值 {token}"
+
+
+def test_cli_flags_come_from_the_option_table():
+    """命令行表面完全由选项表生成：加一个选项只改 core，两边同时生效。"""
+    declared = {opt for param in convert.params for opt in param.opts}
+    for opt in OPTIONS:
+        for flag in opt.flags:
+            assert flag in declared, f"选项表里的 {flag} 没有出现在命令上"
+
+
+def test_help_lists_every_option():
+    result = CliRunner().invoke(convert, ["--help"])
+    assert result.exit_code == 0, result.output
+    for opt in OPTIONS:
+        assert f"--{opt.name.replace('_', '-')}" in result.output, opt.name
+
+
+def test_help_is_grouped_like_the_option_table():
+    """`--help` 按选项表的分组小节打印，不是 click 默认的一长串。"""
+    result = CliRunner().invoke(convert, ["--help"])
+    assert result.exit_code == 0, result.output
+    for title, _options in option_groups():
+        assert f"\n{title}:" in result.output, title
+
+
+def test_help_documents_each_option():
+    """每个选项的说明都进了 --help。
+
+    比对 click 自己的 help record 而不是渲染后的文本：`--help` 会按终端宽度折行，
+    直接在输出里找原句会被折断的中文坑到。
+    """
+    ctx = click.Context(convert)
+    records = {param.name: param.get_help_record(ctx) for param in convert.params}
+    for opt in OPTIONS:
+        _flags, help_text = records[opt.name]
+        assert opt.help in help_text, opt.name
+
 
 
 @pytest.mark.parametrize(

@@ -68,9 +68,9 @@ OPTIONS: tuple[Option, ...] = (
         "输入", short="i", exists=True,
     ),
     Option(
-        "encoding", CHOICE, "编码",
-        "输入编码，auto 为自动检测",
-        "输入", short="e", field="encoding", choices=ENCODING_CHOICES,
+        "encoding", TEXT, "编码",
+        f"输入编码，auto 为自动检测；也可填 Python codec 名（常用：{'/'.join(ENCODING_CHOICES[1:])}）",
+        "输入", short="e", field="encoding",
     ),
     # ---- 输出 ----
     Option(
