@@ -6,6 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from sec_cli.cli import convert, main
+from sec_core.config import Config, config_defaults
 from sec_core.encoding import EncodingError
 from sec_core.parser import NoEnabledRulesError
 
@@ -367,3 +368,39 @@ def test_all_levels_disabled_reports_clean_error(tmp_path):
     assert result.exit_code == 2, result.output
     assert "没有启用的标题规则" in result.output
     assert not isinstance(result.exception, NoEnabledRulesError)
+
+
+#: CLI 选项名 -> Config 字段名（其余选项无对应字段或为 flag/路径）
+_SCALAR_OPTIONS = {
+    "encoding": "encoding",
+    "max_title_len": "max_title_len",
+    "preface_title": "preface_title",
+    "language": "language",
+    "indent": "indent",
+    "line_height": "line_height",
+    "para_spacing": "para_spacing",
+    "chapter_align": "chapter_align",
+    "volume_align": "volume_align",
+    "toc_depth": "toc_depth",
+}
+
+
+def test_option_defaults_come_from_config():
+    """选项默认值必须等于 Config 的默认值，不能在 CLI 里另写一份字面量。"""
+    defaults = config_defaults()
+    params = {p.name: p for p in convert.params}
+    for opt, field in _SCALAR_OPTIONS.items():
+        flag = "--" + opt.replace("_", "-")
+        assert params[opt].default == defaults[field], f"{flag} 的默认值与 Config.{field} 不一致"
+        assert defaults[field] == getattr(Config(), field)
+        assert params[opt].show_default, f"{flag} 未在 --help 里显示默认值"
+
+
+def test_help_shows_config_defaults():
+    """--help 里印出来的默认值就是 Config 的默认值（click 折行不影响 [default: X] 这个整体）。"""
+    result = CliRunner().invoke(convert, ["--help"])
+    assert result.exit_code == 0, result.output
+    defaults = config_defaults()
+    for opt, field in _SCALAR_OPTIONS.items():
+        token = f"[default: {defaults[field]}]"
+        assert token in result.output, f"--{opt.replace('_', '-')} 未显示 Config.{field} 的默认值 {token}"

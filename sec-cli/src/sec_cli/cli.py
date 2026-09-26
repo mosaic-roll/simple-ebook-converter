@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from sec_core.builder import build_css, build_epub, font_media_type
-from sec_core.config import Config, LevelRule
+from sec_core.config import Config, LevelRule, config_defaults
 from sec_core.encoding import EncodingError, read_lines
 from sec_core.levels import build_levels
 from sec_core.meta import resolve_metadata
@@ -21,6 +21,10 @@ VERSION = "0.1.0"
 
 _PATH = click.Path(exists=True, dir_okay=False, path_type=Path)
 _OUT_PATH = click.Path(dir_okay=False, path_type=Path)
+
+#: 选项默认值一律取自 sec-core 的 Config，不再在 CLI 里另写一份字面量。
+#: 改 Config 的默认值会同时改掉这里的行为与 --help 里显示的默认值。
+_DEFAULTS = config_defaults()
 
 
 def _build_levels(
@@ -83,14 +87,14 @@ def _validate_date(value: str | None) -> str | None:
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("input_txt", type=_PATH, required=False)
 @click.option("-i", "--input", "input_opt", type=_PATH, help="输入 txt（也可用位置参数）")
-@click.option("-e", "--encoding", default="auto", show_default=True, help="输入编码，auto 为自动检测")
-@click.option("--volume", help="卷标题正则，h2 + class=volume")
-@click.option("--chapter", help="章标题正则，h3 + class=chapter")
-@click.option("--section", help="节标题正则，h4 + class=section")
+@click.option("-e", "--encoding", default=_DEFAULTS["encoding"], show_default=True, help="输入编码，auto 为自动检测")
+@click.option("--volume", help="卷标题正则，h2 + class=volume；省略则用内置规则")
+@click.option("--chapter", help="章标题正则，h3 + class=chapter；省略则用内置规则")
+@click.option("--section", help="节标题正则，h4 + class=section；省略则用内置规则")
 @click.option("--no-volume", is_flag=True, help="无卷名模式：卷不作为标题")
 @click.option("--level", "extra_levels", multiple=True, help="额外层级规则，格式 级别:正则[:类名]")
-@click.option("--max-title-len", default=35, type=int, show_default=True, help="标题最大字数，超过视为正文")
-@click.option("--preface-title", default="前言", show_default=True, help="首个标题之前的无标题段落默认名")
+@click.option("--max-title-len", default=_DEFAULTS["max_title_len"], type=int, show_default=True, help="标题最大字数，超过视为正文")
+@click.option("--preface-title", default=_DEFAULTS["preface_title"], show_default=True, help="首个标题之前的无标题段落默认名")
 @click.option("--replace-json", "replace_json", default=None, help="一段 JSON 替换规则（有序列表）")
 @click.option("--replace-file", type=_PATH, help="从 JSON 文件读取替换规则")
 @click.option("-o", "--out", type=_OUT_PATH, help="输出文件（不含扩展名，默认取输入名；--toc-only 时不带则输出到 stdout）")
@@ -98,19 +102,19 @@ def _validate_date(value: str | None) -> str | None:
 @click.option("--title", help="书名（未指定则从文件名猜《书名》作者：作者）")
 @click.option("--author", help="作者（留空则从文件名猜，仍留空不写入元数据）")
 @click.option("--date", default=None, help="出版日期，如 2024-05-13；留空则 dc:date 省略（规范可选）")
-@click.option("--language", default="zh", show_default=True)
+@click.option("--language", default=_DEFAULTS["language"], show_default=True)
 @click.option("--cover", type=_PATH, help="封面图片路径")
 @click.option("--no-clean", is_flag=True, help="不清理文本（保留空行/段首段尾空格）")
-@click.option("--indent", default=2, show_default=True, help="段落缩进字数，0 为不缩进")
-@click.option("--line-height", default="1.5", show_default=True)
-@click.option("--para-spacing", default="1em", show_default=True)
-@click.option("--chapter-align", type=click.Choice(["left", "center", "right"]), default="center", show_default=True)
-@click.option("--volume-align", type=click.Choice(["left", "center", "right"]), default="right", show_default=True)
+@click.option("--indent", default=_DEFAULTS["indent"], show_default=True, help="段落缩进字数，0 为不缩进")
+@click.option("--line-height", default=_DEFAULTS["line_height"], show_default=True)
+@click.option("--para-spacing", default=_DEFAULTS["para_spacing"], show_default=True)
+@click.option("--chapter-align", type=click.Choice(["left", "center", "right"]), default=_DEFAULTS["chapter_align"], show_default=True)
+@click.option("--volume-align", type=click.Choice(["left", "center", "right"]), default=_DEFAULTS["volume_align"], show_default=True)
 @click.option("--font", type=_PATH, help="嵌入正文字体")
 @click.option("--css-file", type=_PATH, help="加载外部 CSS（追加到内置样式之后）")
 @click.option("--dump-css", type=_OUT_PATH, help="输出当前生效 CSS 后退出")
 @click.option("--no-toc", is_flag=True, help="目录不出现在书页中（仍保留导航文档供阅读器使用）")
-@click.option("--toc-depth", default=6, type=int, show_default=True, help="目录包含到第几级")
+@click.option("--toc-depth", default=_DEFAULTS["toc_depth"], type=int, show_default=True, help="目录包含到第几级")
 @click.option("--toc-only", is_flag=True, help="只输出目录（配合 --toc-format），不生成 EPUB")
 @click.option("--toc-format", type=click.Choice(["text", "json"]), default="text", show_default=True)
 @click.version_option(VERSION, prog_name="sec-cli")
