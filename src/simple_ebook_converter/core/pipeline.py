@@ -1,8 +1,12 @@
-"""一次转换的完整流程：读输入、切分、产出文件。
+"""一次转换的完整流程：读输入、扫目录、变换、产出文件。
 
-程序是无状态的：`resolve()` 补全参数后返回**新的** `Config`，原始 `read_book()` 读文件、
-切分、清理、替换，把结果装进 `Book`；产出方式由 `cfg` 上的 `toc_only` / `dump_css` 决定，
-所以这里没有「产出类型」参数，也没有需要前端记住的调用顺序。
+程序是无状态的：`resolve()` 补全参数后返回**新的** `Config`，`read_book()` 把结果装进
+`Book`；产出方式由 `cfg` 上的 `toc_only` / `dump_css` 决定，所以这里没有「产出类型」
+参数，也没有需要前端记住的调用顺序。
+
+变换分两个阶段：`scan_toc()` 从原始行扫出目录树（原始标题 + 行号范围），`process()`
+再对树做清理与替换。目录树文件（`cfg.toc_file`）就是两阶段之间的契约——正常流程在
+内存里直接走完，`--toc-file` 则让第一阶段的结果可被人工编辑后从文件读回。
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ from .mediatypes import find_cover
 from .meta import resolve_metadata
 from .parser import ParseStats, parse, walk
 from .replace import replacers_by_scope
-from .toc import render
+from .toc import load_toc, render, tree_from_json
 
 
 @dataclass(frozen=True)
@@ -48,15 +52,42 @@ def resolve(cfg: Config) -> Config:
     return resolved
 
 
-def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
-    """把原始行变成章节树：切分 → 清理 → 按作用范围替换。只动 `lines` 与新节点。"""
-    tree, stats = parse(
+def scan_toc(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
+    """阶段一：从原始行扫出目录树（原始标题 + 行号范围），不做清理与替换。
+
+    `cfg.toc_file` 给了就跳过正则解析，按目录树文件构树（可经界面编辑），
+    卷/章/节正则与 `max_title_len` 在这一形态下都不参与。
+    """
+    if cfg.toc_file is not None:
+        tree = tree_from_json(load_toc(cfg.toc_file), lines)
+        return tree, _stats_from_tree(tree, len(lines))
+    return parse(
         lines,
         cfg.levels,
         max_title_len=cfg.max_title_len,
         preface_title=cfg.preface_title,
         fallback_title=cfg.book_title,
     )
+
+
+def _stats_from_tree(tree: list[Node], total_lines: int) -> ParseStats:
+    """目录树文件没有切分过程，统计信息从树本身数出来。"""
+    stats = ParseStats(total_lines=total_lines)
+    for node in walk(tree):
+        if node.level == 0:
+            stats.has_preface = True
+            continue
+        stats.level_counts[node.level] = stats.level_counts.get(node.level, 0) + 1
+        stats.max_level = max(stats.max_level, node.level)
+    return stats
+
+
+def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
+    """把原始行变成章节树：扫目录（阶段一）→ 清理 → 按作用范围替换（阶段二）。
+
+    只动 `lines` 与新节点。
+    """
+    tree, stats = scan_toc(lines, cfg)
     titles, bodies = replacers_by_scope(cfg.replacements)
     for node in walk(tree):
         if cfg.clean:
@@ -71,16 +102,21 @@ def read_book(cfg: Config) -> Book:
     if cfg.input is None:
         raise ValueError("缺少输入文件")
     resolved = resolve(cfg)
-    try:
-        lines, used = read_lines(resolved.input, resolved.encoding)
-    except EncodingError as e:
-        raise ValueError(str(e)) from e
-    except OSError as e:
-        raise ValueError(f"无法读取输入文件：{e}") from e
+    lines, used = _decode(resolved)
     tree, stats = process(lines, resolved)
     if not any(node.paragraphs for node in walk(tree)):
         raise ValueError(f"文件里没有可生成的内容：{resolved.input.name}")
     return Book(resolved, tree, stats, used)
+
+
+def _decode(cfg: Config) -> tuple[list[str], str]:
+    """读输入文件并探测编码，读不了或解不开转可读的 ValueError。"""
+    try:
+        return read_lines(cfg.input, cfg.encoding)
+    except EncodingError as e:
+        raise ValueError(str(e)) from e
+    except OSError as e:
+        raise ValueError(f"无法读取输入文件：{e}") from e
 
 
 def toc_text(book: Book) -> str:

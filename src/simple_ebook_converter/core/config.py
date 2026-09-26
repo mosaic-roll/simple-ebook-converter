@@ -64,7 +64,12 @@ class LevelRule:
 
 @dataclass
 class Node:
-    """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。"""
+    """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。
+
+    `lines` 是节点在输入里的直属覆盖范围：1-based 闭区间 [标题行, 最后一行直属正文]，
+    不含子节点的行；前言（level 0）的标题不在原文中，范围即正文。供目录树往返
+    （`toc.to_json` / `toc.tree_from_json`）与预览定位用。
+    """
 
     title: str
     level: int
@@ -73,6 +78,10 @@ class Node:
     children: list["Node"] = field(default_factory=list)
     anchor: str = ""
     raw_title: str = ""
+    lines: tuple[int, int] = (0, 0)
+    #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
+    #: dissolves such nodes into their neighbors. Never set by parse().
+    deleted: bool = False
 
 
 def default_levels() -> list[LevelRule]:
@@ -126,6 +135,9 @@ class Config:
     toc_depth: int = 6
     #: 目录输出格式：text | json（见 `toc.FORMATS`）
     toc_format: str = "text"
+    #: 目录树 JSON 文件（`toc.to_json` 的产物，可经界面编辑）。给了就跳过正则解析，
+    #: 按行号从输入取正文，标题用文件现值
+    toc_file: Path | None = None
 
     # 产出
     #: 输出路径。留空时 EPUB 取输入同名，目录由调用方决定（CLI 走 stdout）

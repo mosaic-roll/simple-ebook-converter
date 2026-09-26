@@ -148,6 +148,12 @@ OPTIONS: tuple[Option, ...] = (
         "目录", negative=True, flag="no-toc",
     ),
     Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
+    Option(
+        "toc_file", "目录树文件",
+        "从 JSON 目录树生成：跳过正则解析，按行号从输入取正文；"
+        "标题用文件现值，仍会过清理与替换（--toc-only --toc-format json 的产物可编辑后回喂）",
+        "目录",
+    ),
     Option("toc_only", "只输出目录", "只输出目录，不生成 EPUB", "目录"),
     Option("toc_format", "目录格式", "只输出目录时的格式：text | json", "目录", choices=FORMATS),
 )

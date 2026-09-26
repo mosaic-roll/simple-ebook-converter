@@ -37,6 +37,7 @@ def parse(
 
     正文段落跟随最近的标题；首个标题之前的段落归到 `preface_title`；一条标题都没
     命中时整篇作为一章，标题用 `fallback_title`。不启用某层级就是把它的正则留空。
+    每个节点同时记下它在输入里的行范围（`Node.lines`），供目录树往返与预览定位。
     """
     rules = sorted((r for r in levels if r.active), key=lambda r: r.level)
     if not rules:
@@ -46,25 +47,36 @@ def parse(
     stats = ParseStats(total_lines=len(lines))
     tree: list[Node] = []
     stack: list[Node] = []
-    preface: list[str] = []
+    preface: list[tuple[int, str]] = []
 
-    for line in lines:
+    for lineno, line in enumerate(lines, start=1):
         title = line.strip()
         rule = _match(title, compiled, max_title_len) if title else None
         if rule is None:
-            (stack[-1].paragraphs if stack else preface).append(line)
+            if stack:
+                node = stack[-1]
+                node.paragraphs.append(line)
+                node.lines = (node.lines[0], lineno)
+            else:
+                preface.append((lineno, line))
             continue
         while stack and stack[-1].level >= rule.level:
             stack.pop()
         parent = stack[-1] if stack else None
-        node = Node(title, rule.level, rule.class_name or f"level{rule.level}", raw_title=title)
+        node = Node(
+            title,
+            rule.level,
+            rule.class_name or f"level{rule.level}",
+            raw_title=title,
+            lines=(lineno, lineno),
+        )
         (parent.children if parent else tree).append(node)
         stack.append(node)
         stats.level_counts[rule.level] = stats.level_counts.get(rule.level, 0) + 1
         stats.max_level = max(stats.max_level, rule.level)
 
     _wrap_preface(tree, preface, preface_title, fallback_title, stats)
-    _assign_anchors(tree)
+    assign_anchors(tree)
     return tree, stats
 
 
@@ -82,21 +94,38 @@ def _match(
 
 def _wrap_preface(
     tree: list[Node],
-    preface: list[str],
+    preface: list[tuple[int, str]],
     preface_title: str,
     fallback_title: str,
     stats: ParseStats,
 ) -> None:
     if not preface:
         return
+    paragraphs = [line for _, line in preface]
+    span = (preface[0][0], preface[-1][0])  # preface covers lines 1..first title
     if tree:
         stats.has_preface = True
         tree.insert(
-            0, Node(preface_title, 0, "preface", paragraphs=preface, raw_title=preface_title)
+            0,
+            Node(
+                preface_title,
+                0,
+                "preface",
+                paragraphs=paragraphs,
+                raw_title=preface_title,
+                lines=span,
+            ),
         )
     else:
         tree.append(
-            Node(fallback_title, 2, "chapter", paragraphs=preface, raw_title=fallback_title)
+            Node(
+                fallback_title,
+                2,
+                "chapter",
+                paragraphs=paragraphs,
+                raw_title=fallback_title,
+                lines=span,
+            )
         )
 
 
@@ -107,7 +136,7 @@ def walk(nodes: list[Node]) -> Iterator[Node]:
         yield from walk(node.children)
 
 
-def _assign_anchors(tree: list[Node]) -> None:
+def assign_anchors(tree: list[Node]) -> None:
     """给每个节点分配书内文件名（`p0001` 递增，前言固定 `preface`）。"""
     index = 0
     for node in walk(tree):

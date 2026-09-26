@@ -335,8 +335,8 @@ def test_toc_json(tmp_path):
     result = CliRunner().invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data[0]["title"] == "第一卷 起源"
-    assert data[0]["children"][0]["title"] == "第一章 开端"
+    assert data[0]["raw_title"] == "第一卷 起源"
+    assert data[0]["children"][0]["raw_title"] == "第一章 开端"
 
 
 def test_toc_replace_applies_to_text(tmp_path):
@@ -355,7 +355,8 @@ def test_toc_replace_applies_to_text(tmp_path):
     assert "第一章 开端" not in result.output
 
 
-def test_toc_json_has_raw_title(tmp_path):
+def test_toc_json_stores_raw_title_only(tmp_path):
+    """目录树 JSON 只存原始标题，替换效果不在导出里（组装阶段才做替换）。"""
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
         convert,
@@ -370,8 +371,30 @@ def test_toc_json_has_raw_title(tmp_path):
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data[0]["title"] == "第一部 起源"
     assert data[0]["raw_title"] == "第一卷 起源"
+    assert "title" not in data[0]
+
+
+def test_toc_file_round_trip(tmp_path):
+    """导出的目录树（可编辑）用 --toc-file 回喂：标题用现值，按行号取正文。"""
+    src = _write_sample(tmp_path)
+    runner = CliRunner()
+    exported = runner.invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
+    assert exported.exit_code == 0
+    data = json.loads(exported.output)
+    data[0]["raw_title"] = "第一卷 新名"
+    toc_path = tmp_path / "toc.json"
+    toc_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    out = tmp_path / "book.epub"
+    result = runner.invoke(convert, [str(src), "--toc-file", str(toc_path), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(out) as zf:
+        content = "".join(
+            zf.read(n).decode("utf-8") for n in zf.namelist() if n.endswith(".xhtml")
+        )
+    assert "第一卷 新名" in content
+    assert "第一章 开端" in content
 
 
 def test_toc_input_option(tmp_path):

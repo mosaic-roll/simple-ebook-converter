@@ -13,6 +13,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .._meta import DIST_NAME
 from ..core.config import Config
+from ..core.encoding import EncodingError, read_lines
 from ..core.meta import resolve_metadata
 from ..core.options import (
     OPTIONS,
@@ -21,10 +22,19 @@ from ..core.options import (
     option_default,
     option_groups,
 )
-from ..core.pipeline import read_book, write_css, write_epub, write_text, write_toc
+from ..core.pipeline import (
+    read_book,
+    resolve as resolve_config,
+    scan_toc,
+    write_css,
+    write_epub,
+    write_text,
+    write_toc,
+)
 from ..core.replace import (
     DEFAULT_SCOPE,
     SCOPE_LABELS,
+    replacers_by_scope,
     rules_from_json,
     rules_from_rows,
     rules_to_json,
@@ -76,10 +86,21 @@ def make_config(fields: dict) -> Config:
     return build_config(option_values(fields))
 
 
-def preview_data(fields: dict) -> list[dict]:
-    """按当前设置解析目录树（JSON 列表），供预览与测试。"""
-    cfg = make_config(fields)
-    return to_json(read_book(cfg).tree, cfg.toc_depth)
+def preview_data(fields: dict) -> tuple[list[dict], object]:
+    """扫出目录树（JSON 列表）与标题替换函数；树里只存原始标题，展示时现算。
+
+    只走两阶段里的阶段一，不读正文内容之外的任何重活。
+    """
+    cfg = resolve_config(make_config(fields))
+    try:
+        lines, _ = read_lines(cfg.input, cfg.encoding)
+    except EncodingError as e:
+        raise ValueError(str(e)) from e
+    except OSError as e:
+        raise ValueError(f"无法读取输入文件：{e}") from e
+    tree, _ = scan_toc(lines, cfg)
+    titles, _ = replacers_by_scope(cfg.replacements)
+    return to_json(tree, cfg.toc_depth), titles.text
 
 
 def generate_output(fields: dict) -> Path:
@@ -391,17 +412,18 @@ class App:
             return None
 
     def do_preview(self) -> None:
-        tree = self._run(lambda: preview_data(self._fields()))
-        if tree is None:
+        result = self._run(lambda: preview_data(self._fields()))
+        if result is None:
             return
+        tree, shown = result
         self.preview_tree.delete(*self.preview_tree.get_children())
 
         def add(nodes: list[dict], parent: str = "") -> None:
             for node in nodes:
                 depth = node["level"]
-                raw = node["raw_title"] or node["title"]
+                raw = node["raw_title"]
                 iid = self.preview_tree.insert(
-                    parent, "end", text="  " * min(depth - 1, 3), values=(raw, node["title"])
+                    parent, "end", text="  " * min(depth - 1, 3), values=(raw, shown(raw))
                 )
                 add(node["children"], iid)
 

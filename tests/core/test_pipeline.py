@@ -8,11 +8,12 @@ from pathlib import Path
 import pytest
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
-from simple_ebook_converter.core.parser import NoEnabledRulesError
+from simple_ebook_converter.core.parser import NoEnabledRulesError, walk
 from simple_ebook_converter.core.pipeline import (
     process,
     read_book,
     resolve,
+    scan_toc,
     toc_text,
     write_css,
     write_epub,
@@ -20,6 +21,7 @@ from simple_ebook_converter.core.pipeline import (
     write_toc,
 )
 from simple_ebook_converter.core.replace import Rule
+from simple_ebook_converter.core.toc import to_json, tree_from_json
 
 SAMPLE = [
     "封面文案",
@@ -272,11 +274,36 @@ def test_toc_text_is_indented(cfg):
     assert "  第一章 初遇" in text
 
 
-def test_toc_json_round_trips(cfg, tmp_path):
-    book = read_book(replace(cfg, toc_format="json"))
-    data = json.loads(toc_text(book))
-    assert data[0]["title"] == "第一卷 风起"
-    assert data[0]["children"][0]["title"] == "第一章 初遇"
+def test_toc_json_round_trips(cfg):
+    """目录树 JSON 回喂 `tree_from_json`，原始标题与正文逐节点一致。"""
+    lines = LINES.splitlines()
+    tree, _ = scan_toc(lines, resolve(cfg))
+    data = to_json(tree)
+    assert data[0]["raw_title"] == "第一卷 风起"
+    assert data[0]["lines"] == [1, 1]  # volume has no direct body, children own their lines
+    assert data[0]["children"][0]["lines"] == [2, 3]
+    restored = tree_from_json(data, lines)
+    assert [n.raw_title for n in walk(restored)] == [n.raw_title for n in walk(tree)]
+    assert [n.paragraphs for n in walk(restored)] == [n.paragraphs for n in walk(tree)]
+
+
+def test_scan_toc_from_toc_file(cfg, tmp_path):
+    """--toc-file：跳过正则解析按行号取正文；标题用文件现值，替换照常跑。"""
+    lines = LINES.splitlines()
+    data = to_json(scan_toc(lines, resolve(cfg))[0])
+    data[0]["raw_title"] = "第一卷 改名"
+    toc_path = tmp_path / "toc.json"
+    toc_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    tree, stats = process(
+        lines, replace(resolve(cfg), toc_file=toc_path, replacements=[Rule("初遇", "重逢")])
+    )
+    assert tree[0].title == "第一卷 改名"
+    assert tree[0].children[0].title == "第一章 重逢"
+    assert tree[0].children[0].paragraphs == ["正文一字"]
+    assert tree[0].children[1].paragraphs == ["正文二字"]
+    assert stats.level_counts == {2: 1, 3: 2}
+    assert stats.has_preface is False
 
 
 def test_toc_rejects_unknown_format(cfg):
@@ -294,7 +321,7 @@ def test_write_toc_writes_file(cfg, tmp_path):
 def test_write_toc_json(cfg, tmp_path):
     out = tmp_path / "toc.json"
     write_toc(read_book(replace(cfg, out=out, toc_format="json")))
-    assert json.loads(out.read_text(encoding="utf-8"))[0]["title"] == "第一卷 风起"
+    assert json.loads(out.read_text(encoding="utf-8"))[0]["raw_title"] == "第一卷 风起"
 
 
 # ---------- EPUB ----------
