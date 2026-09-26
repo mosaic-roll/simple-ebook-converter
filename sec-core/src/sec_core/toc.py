@@ -25,10 +25,11 @@ def to_json(tree: list[Node], depth: int = 6) -> list[dict]:
 def to_text(tree: list[Node], depth: int = 6) -> str:
     lines: list[str] = []
 
-    def walk(nodes: list[Node]) -> None:
+    def emit(nodes: list[Node]) -> None:
+        # 名字别叫 walk：与 parser.walk（先序遍历全部节点）语义不同，这里按 depth 裁剪
         for node in nodes:
             lines.append("  " * max(0, node.level - 1) + node.title)
-            walk([c for c in node.children if c.level <= depth])
+            emit([c for c in node.children if c.level <= depth])
 
-    walk(tree)
+    emit(tree)
     return "\n".join(lines)

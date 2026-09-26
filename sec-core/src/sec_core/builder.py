@@ -71,7 +71,7 @@ h1, h2, h3, h4, h5, h6 {{
     return "\n".join(css)
 
 
-def _page_html(cfg: Config, node: Node) -> str:
+def _page_html(node: Node) -> str:
     esc = html.escape
     level = max(1, node.level)
     cls = node.class_name or (f"level{node.level}" if node.level > 0 else "preface")
@@ -133,7 +133,7 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         page = epub.EpubHtml(
             title=node.title,
             file_name=f"text/{node.anchor}.xhtml",
-            content=_page_html(cfg, node).encode("utf-8"),
+            content=_page_html(node).encode("utf-8"),
         )
         page.add_meta(charset="utf-8")
         page.add_link(href="../style.css", rel="stylesheet", type="text/css")
