@@ -10,7 +10,6 @@ from sec_core.builder import build_css, build_epub, font_media_type
 from sec_core.config import ALIGN_CHOICES, Config, LevelRule, config_defaults
 from sec_core.encoding import EncodingError, read_lines
 from sec_core.levels import build_levels
-from sec_core.meta import resolve_metadata
 from sec_core.pipeline import process
 from sec_core.replace import Rule, rules_from_json
 from sec_core.toc import to_json, to_text
@@ -148,14 +147,12 @@ def convert(
     if input_path is None:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
 
-    title, author = resolve_metadata(input_path, title, author)
-
     cfg = Config(
         input=input_path,
         encoding=encoding,
         overwrite=not no_overwrite,
         title=title,
-        author=author,
+        author=author or "",
         date=(date or "").strip() or None,
         language=language,
         cover=cover,
@@ -178,7 +175,8 @@ def convert(
 
     lines, used = _read_input(input_path, encoding)
     try:
-        tree, stats = process(lines, cfg, title)
+        # process() 负责校验、从文件名猜书名/作者并写回 cfg
+        tree, stats = process(lines, cfg)
     except ValueError as e:
         # 含 NoEnabledRulesError 与 Config.validate() 的取值范围错误
         raise click.UsageError(str(e)) from e

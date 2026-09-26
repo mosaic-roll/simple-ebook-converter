@@ -82,9 +82,8 @@ def preview_data(fields: dict) -> list[dict]:
     """按当前设置解析目录树（JSON 列表），供预览与测试。"""
     cfg = make_config(fields)
     src = cfg.input
-    cfg.title, cfg.author = resolve_metadata(src, cfg.title, cfg.author)
     lines, _used = read_lines(src, cfg.encoding)
-    tree, _stats = process(lines, cfg, cfg.title)
+    tree, _stats = process(lines, cfg)
     return to_json(tree, cfg.toc_depth)
 
 
@@ -92,9 +91,8 @@ def build_book(fields: dict) -> Path:
     """按当前设置生成 EPUB，返回输出路径，出错抛 ValueError。"""
     cfg = make_config(fields)
     src = cfg.input
-    cfg.title, cfg.author = resolve_metadata(src, cfg.title, cfg.author)
     lines, _used = read_lines(src, cfg.encoding)
-    tree, _stats = process(lines, cfg, cfg.title)
+    tree, _stats = process(lines, cfg)
     if not tree:
         raise ValueError("没有可生成的内容（文件为空或全是空行）")
 
