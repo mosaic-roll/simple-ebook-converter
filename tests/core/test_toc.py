@@ -1,4 +1,4 @@
-"""`core.toc`：目录树 JSON 的渲染与往返（`--toc-file` 的数据契约）。"""
+"""`core.toc`：扁平目录 JSON 的渲染与往返（`--toc-file` 的数据契约）。"""
 
 import json
 from pathlib import Path
@@ -16,18 +16,17 @@ def _sample_tree() -> list[Node]:
 
 
 def test_to_json_and_tree_from_json_round_trip():
-    """to_json 只存原始标题与行号；回喂构树后标题与正文与原树一致。"""
+    """to_json 只存原始标题与行号（扁平、无 children）；回喂后标题与正文与原树一致。"""
     lines = ["第一卷", "第一章 一", "正文甲"]
     data = to_json(_sample_tree())
-    assert set(data[0]) == {"raw_title", "level", "class_name", "lines", "children"}
+    assert [set(e) for e in data] == [{"raw_title", "level", "class_name", "lines"}] * 2
     # Full-span semantics: the volume covers its chapter's lines too.
-    assert data[0]["lines"] == [1, 3]
-    assert data[0]["children"][0]["lines"] == [2, 3]
+    assert [e["lines"] for e in data] == [[1, 3], [2, 3]]
 
     restored = tree_from_json(data, lines)
     volume, body = restored[0], restored[0].children[0]
     assert (volume.raw_title, volume.level, volume.class_name) == ("第一卷", 2, "volume")
-    assert volume.paragraphs == []  # direct body stops before the first child title
+    assert volume.paragraphs == []  # direct body stops before the next heading
     assert body.paragraphs == ["正文甲"]  # 标题行本身不进正文
 
 
@@ -39,25 +38,26 @@ def test_tree_from_json_uses_titles_as_given():
     assert tree_from_json(data, lines)[0].title == "手改的卷名"
 
 
+def test_tree_from_json_levels_are_stacked():
+    """层级只由 level 决定：乱套的 lines 不影响挂树。"""
+    lines = ["第一卷", "第一章 一", "正文甲", "第二章 二", "正文二"]
+    data = [
+        {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 5]},
+        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [2, 3]},
+        {"raw_title": "第二章 二", "level": 3, "class_name": "chapter", "lines": [4, 5]},
+    ]
+    restored = tree_from_json(data, lines)
+    assert [c.raw_title for c in restored[0].children] == ["第一章 一", "第二章 二"]
+    assert restored[0].children[0].paragraphs == ["正文甲"]
+
+
 def test_tree_from_json_allows_gaps():
     """编辑时删掉的行是空洞：不报错，只是不进书。"""
     lines = ["第一卷", "多余的行", "第一章 一", "正文甲"]
     data = [
-        {
-            "raw_title": "第一卷",
-            "level": 2,
-            "class_name": "volume",
-            "lines": [1, 1],  # narrowed below the first child: line 2 becomes a gap
-            "children": [
-                {
-                    "raw_title": "第一章 一",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [3, 4],
-                    "children": [],
-                }
-            ],
-        }
+        # Narrowed below the next heading: line 2 becomes a gap.
+        {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 1]},
+        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [3, 4]},
     ]
     restored = tree_from_json(data, lines)
     assert restored[0].paragraphs == []
@@ -69,64 +69,16 @@ def test_tree_from_json_keeps_preface_content():
     """前言（level 0）的标题不在原文里，范围整段都是正文。"""
     lines = ["卷首语", "献给某君", "第一卷", "正文"]
     data = [
-        {
-            "raw_title": "前言",
-            "level": 0,
-            "class_name": "preface",
-            "lines": [1, 2],
-            "children": [],
-        },
-        {
-            "raw_title": "第一卷",
-            "level": 2,
-            "class_name": "volume",
-            "lines": [3, 4],
-            "children": [],
-        },
+        {"raw_title": "前言", "level": 0, "class_name": "preface", "lines": [1, 2]},
+        {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [3, 4]},
     ]
     restored = tree_from_json(data, lines)
     assert restored[0].paragraphs == ["卷首语", "献给某君"]
     assert restored[1].paragraphs == ["正文"]  # 标题行本身不进正文
 
 
-def test_tree_from_json_dissolves_deleted_into_parent():
-    """删除线：被删标题消失，正文并入父章节，其余章节不动。"""
-    lines = ["第一卷", "卷首", "第100章 误匹配", "误捕的正文", "第二章 二", "正文二"]
-    data = [
-        {
-            "raw_title": "第一卷",
-            "level": 2,
-            "class_name": "volume",
-            "lines": [1, 2],
-            "children": [
-                {
-                    "raw_title": "第100章 误匹配",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [3, 4],
-                    "deleted": True,
-                    "children": [],
-                },
-                {
-                    "raw_title": "第二章 二",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [5, 6],
-                    "children": [],
-                },
-            ],
-        }
-    ]
-    restored = tree_from_json(data, lines)
-    volume = restored[0]
-    assert [c.raw_title for c in volume.children] == ["第二章 二"]
-    # Body merges in document order; the struck-out title line itself is gone.
-    assert volume.paragraphs == ["卷首", "误捕的正文"]
-    assert volume.children[0].paragraphs == ["正文二"]
-
-
-def test_tree_from_json_dissolves_deleted_into_previous_sibling():
-    """删除线：有前一个未删除的兄弟时正文接在它后面，保持文档顺序。"""
+def test_tree_from_json_dissolves_deleted_into_previous():
+    """删除线：被删标题消失，直属正文并入文档序上一个未删除条目，子条目自动上挂。"""
     lines = [
         "第一卷",
         "第一章 一",
@@ -137,76 +89,45 @@ def test_tree_from_json_dissolves_deleted_into_previous_sibling():
         "正文二",
     ]
     data = [
+        {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 7]},
+        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [2, 3]},
         {
-            "raw_title": "第一卷",
-            "level": 2,
-            "class_name": "volume",
-            "lines": [1, 1],
-            "children": [
-                {
-                    "raw_title": "第一章 一",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [2, 3],
-                    "children": [],
-                },
-                {
-                    "raw_title": "第100章 误匹配",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [4, 5],
-                    "deleted": True,
-                    "children": [],
-                },
-                {
-                    "raw_title": "第二章 二",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [6, 7],
-                    "children": [],
-                },
-            ],
-        }
+            "raw_title": "第100章 误匹配",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [4, 5],
+            "deleted": True,
+        },
+        {"raw_title": "第二章 二", "level": 3, "class_name": "chapter", "lines": [6, 7]},
     ]
     restored = tree_from_json(data, lines)
     volume = restored[0]
     assert [c.raw_title for c in volume.children] == ["第一章 一", "第二章 二"]
+    # Body merges in document order; the struck-out title line itself is gone.
     assert volume.children[0].paragraphs == ["正文一", "误捕的正文"]
     assert volume.children[1].paragraphs == ["正文二"]
 
 
-def test_tree_from_json_lifts_children_of_deleted_top_node():
-    """顶层节点被删：正文并入前一个顶层章节，未删除的子章节原地提升到顶层。"""
+def test_tree_from_json_lifts_children_of_deleted_volume():
+    """整卷被删：直属正文并入上一条目，未删除的章自动挂到更上层的未删除祖先。"""
     lines = ["第一卷", "误匹配的卷", "卷二的正文", "第一章 x", "正文x"]
     data = [
-        {
-            "raw_title": "第一卷",
-            "level": 2,
-            "class_name": "volume",
-            "lines": [1, 1],
-            "children": [],
-        },
+        {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 5]},
         {
             "raw_title": "误匹配的卷",
             "level": 2,
             "class_name": "volume",
             "lines": [2, 3],
             "deleted": True,
-            "children": [
-                {
-                    "raw_title": "第一章 x",
-                    "level": 3,
-                    "class_name": "chapter",
-                    "lines": [4, 5],
-                    "children": [],
-                }
-            ],
         },
+        {"raw_title": "第一章 x", "level": 3, "class_name": "chapter", "lines": [4, 5]},
     ]
     restored = tree_from_json(data, lines)
-    assert [n.raw_title for n in restored] == ["第一卷", "第一章 x"]
+    assert [n.raw_title for n in restored] == ["第一卷"]
+    # 误匹配的卷's body goes to the previous kept entry; 第一章 x hangs off 第一卷.
     assert restored[0].paragraphs == ["卷二的正文"]
-    assert restored[1].paragraphs == ["正文x"]
+    assert [c.raw_title for c in restored[0].children] == ["第一章 x"]
+    assert restored[0].children[0].paragraphs == ["正文x"]
 
 
 def test_load_toc_rejects_bad_files(tmp_path):
@@ -237,3 +158,7 @@ def test_tree_from_json_rejects_bad_entries():
         )
     with pytest.raises(ValueError, match="不是 JSON 对象"):
         tree_from_json(["不是字典"], lines)
+    with pytest.raises(ValueError, match="不应有 children"):
+        tree_from_json(
+            [{"raw_title": "x", "level": 2, "lines": [1, 1], "children": []}], lines
+        )

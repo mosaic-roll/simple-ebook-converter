@@ -335,8 +335,9 @@ def test_toc_json(tmp_path):
     result = CliRunner().invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data[0]["raw_title"] == "第一卷 起源"
-    assert data[0]["children"][0]["raw_title"] == "第一章 开端"
+    # Flat list in document order: volume first, then its chapter.
+    assert [e["raw_title"] for e in data] == ["第一卷 起源", "第一章 开端"]
+    assert data[0]["level"] == 2 and data[1]["level"] == 3
 
 
 def test_toc_replace_applies_to_text(tmp_path):

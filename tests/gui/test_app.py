@@ -201,12 +201,16 @@ def test_preview_data_tree_and_replacement(tmp_path):
     tree, shown = preview_data(
         _fields(tmp_path, title="测试集", replacements=[("第一章", "CHAPTER 1", _SCOPE)])
     )
-    assert [n["raw_title"] for n in tree] == ["前言", "第一卷 开门见山", "第二卷 渐入佳境"]
-    volume = next(n for n in tree if n["class_name"] == "volume")
-    children = volume["children"]
-    assert children[0]["raw_title"] == "第一章 出门"
-    assert shown(children[0]["raw_title"]) == "CHAPTER 1 出门"
-    assert children[0]["class_name"] == "chapter"
+    assert [n["raw_title"] for n in tree] == [
+        "前言",
+        "第一卷 开门见山",
+        "第一章 出门",
+        "第二章 遇见",
+        "第二卷 渐入佳境",
+        "第三章 出发",
+    ]
+    chapter = next(n for n in tree if n["class_name"] == "chapter")
+    assert shown(chapter["raw_title"]) == "CHAPTER 1 出门"
 
 
 # ---------- 生成：三种模式和 CLI 一致 ----------
@@ -252,7 +256,14 @@ def test_generate_output_toc_only_json(tmp_path):
     fields = _fields(tmp_path, out=str(tmp_path / "toc.json"), toc_only=True, toc_format="json")
     out = generate_output(fields)
     tree = json.loads(out.read_text(encoding="utf-8"))
-    assert [n["raw_title"] for n in tree] == ["前言", "第一卷 开门见山", "第二卷 渐入佳境"]
+    assert [n["raw_title"] for n in tree] == [
+        "前言",
+        "第一卷 开门见山",
+        "第一章 出门",
+        "第二章 遇见",
+        "第二卷 渐入佳境",
+        "第三章 出发",
+    ]
 
 
 def test_generate_output_dump_css_writes_only_css(tmp_path):
