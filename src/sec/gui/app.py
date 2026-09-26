@@ -10,7 +10,13 @@ from sec.core.encoding import ENCODING_CHOICES, read_lines
 from sec.core.levels import build_levels
 from sec.core.meta import resolve_metadata
 from sec.core.pipeline import process
-from sec.core.replace import Rule, rules_from_json
+from sec.core.replace import (
+    DEFAULT_SCOPE,
+    SCOPE_CHOICES,
+    SCOPE_LABELS,
+    Rule,
+    rules_from_json,
+)
 from sec.core.toc import to_json
 
 #: 编码下拉框直接用 core 的候选链，core 加编码这里自动跟着变
@@ -19,10 +25,32 @@ _ENCODINGS = list(ENCODING_CHOICES)
 #: 字段缺省值取自 sec.core 的 Config，界面不再另写一份字面量
 _DEFAULTS = config_defaults()
 
+#: 作用范围下拉框用 core 的中文标签，两个方向都齐全
+_SCOPE_BY_LABEL = {label: scope for scope, label in SCOPE_LABELS.items()}
+_SCOPE_LABELS_TUPLE = tuple(SCOPE_LABELS[s] for s in SCOPE_CHOICES)
+_DEFAULT_SCOPE_LABEL = SCOPE_LABELS[DEFAULT_SCOPE]
+
 
 def split_extra(text: str) -> tuple[str, ...]:
     """把「每行一条 级别:正则[:类名]」拆成规则元组。"""
     return tuple(line.strip() for line in text.splitlines() if line.strip())
+
+
+def _parse_replacements(rows: list) -> list[Rule]:
+    """把替换表格的行元组 `(查找, 替换为, 作用范围)` 变成 Rule；留空查找的行忽略。"""
+    rules: list[Rule] = []
+    for pattern, replace, scope in rows:
+        if not pattern:
+            continue
+        try:
+            resolved = _SCOPE_BY_LABEL[scope]
+        except KeyError:
+            raise ValueError(
+                f"替换规则「{pattern}」的作用范围只能是 {'/'.join(_SCOPE_LABELS_TUPLE)}，"
+                f"收到：{scope!r}"
+            ) from None
+        rules.append(Rule(pattern, replace, resolved))
+    return rules
 
 
 def make_config(fields: dict) -> Config:
@@ -44,9 +72,7 @@ def make_config(fields: dict) -> Config:
         fields.get("section") or None,
         split_extra(fields.get("extra_levels", "")),
     )
-    replacements = [
-        Rule(p, r) for p, r in fields.get("replacements", []) if p
-    ]
+    replacements = _parse_replacements(fields.get("replacements", []))
 
     cover = (fields.get("cover") or "").strip()
     if cover and not Path(cover).is_file():
@@ -150,7 +176,7 @@ class SecGui:
     def _fields(self) -> dict:
         extra = "\n".join(self.extra_text.get("1.0", "end").splitlines())
         rows = [
-            tuple(self.replace_tree.item(iid, "values")) or ("", "")
+            tuple(self.replace_tree.item(iid, "values")) or ("", "", _DEFAULT_SCOPE_LABEL)
             for iid in self.replace_tree.get_children()
         ]
         return {
@@ -259,23 +285,39 @@ class SecGui:
     def _build_tab_replace(self, nb: ttk.Notebook) -> None:
         f = ttk.Frame(nb, padding=8)
         nb.add(f, text="替换规则")
-        ttk.Label(f, text="按顺序对标题与正文生效；留空 pattern 的行被忽略").pack(anchor="w")
+        ttk.Label(
+            f,
+            text="按顺序生效；作用范围默认「标题」，留空 pattern 的行被忽略",
+        ).pack(anchor="w")
 
-        self.replace_tree = ttk.Treeview(f, columns=("pattern", "replace"), show="headings", height=8)
+        self.replace_tree = ttk.Treeview(
+            f, columns=("pattern", "replace", "scope"), show="headings", height=8
+        )
         self.replace_tree.heading("pattern", text="正则查找")
         self.replace_tree.heading("replace", text="替换为")
-        self.replace_tree.column("pattern", width=220)
-        self.replace_tree.column("replace", width=220)
+        self.replace_tree.heading("scope", text="作用范围")
+        self.replace_tree.column("pattern", width=200)
+        self.replace_tree.column("replace", width=200)
+        self.replace_tree.column("scope", width=80)
         self.replace_tree.pack(fill="both", expand=True, pady=4)
 
         self.v_rp = tk.StringVar()
         self.v_rr = tk.StringVar()
+        self.v_rs = tk.StringVar(value=_DEFAULT_SCOPE_LABEL)
         edit = ttk.Frame(f)
         edit.pack(fill="x")
         ttk.Label(edit, text="查找").pack(side="left")
         ttk.Entry(edit, textvariable=self.v_rp).pack(side="left", fill="x", expand=True, padx=4)
         ttk.Label(edit, text="替换为").pack(side="left")
         ttk.Entry(edit, textvariable=self.v_rr).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Label(edit, text="范围").pack(side="left", padx=(8, 0))
+        ttk.Combobox(
+            edit,
+            textvariable=self.v_rs,
+            values=list(_SCOPE_LABELS_TUPLE),
+            state="readonly",
+            width=6,
+        ).pack(side="left", padx=4)
 
         btns = ttk.Frame(f)
         btns.pack(fill="x", pady=(4, 0))
@@ -329,20 +371,24 @@ class SecGui:
         iid = self._selected_replace()
         if not iid:
             return
-        pattern, replace = self.replace_tree.item(iid, "values")
+        pattern, replace, scope = self.replace_tree.item(iid, "values")
         self.v_rp.set(pattern)
         self.v_rr.set(replace)
+        self.v_rs.set(scope)
+
+    def _replace_values(self) -> tuple[str, str, str]:
+        return (self.v_rp.get().strip(), self.v_rr.get(), self.v_rs.get())
 
     def _replace_add(self) -> None:
         if not self.v_rp.get().strip():
             messagebox.showwarning("添加规则", "正则查找不能为空")
             return
-        self.replace_tree.insert("", "end", values=(self.v_rp.get().strip(), self.v_rr.get()))
+        self.replace_tree.insert("", "end", values=self._replace_values())
 
     def _replace_update(self) -> None:
         iid = self._selected_replace()
         if iid:
-            self.replace_tree.item(iid, values=(self.v_rp.get().strip(), self.v_rr.get()))
+            self.replace_tree.item(iid, values=self._replace_values())
 
     def _replace_delete(self) -> None:
         iid = self._selected_replace()
@@ -359,7 +405,9 @@ class SecGui:
             messagebox.showerror("导入替换规则", str(e))
             return
         for rule in rules:
-            self.replace_tree.insert("", "end", values=(rule.pattern, rule.replace))
+            self.replace_tree.insert(
+                "", "end", values=(rule.pattern, rule.replace, SCOPE_LABELS[rule.scope])
+            )
 
     def _browse_input(self) -> None:
         path = filedialog.askopenfilename(filetypes=[("TXT 文本", "*.txt"), ("所有文件", "*.*")])

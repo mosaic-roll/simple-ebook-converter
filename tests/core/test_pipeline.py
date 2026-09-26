@@ -5,7 +5,7 @@ import pytest
 from sec.core.config import Config, LevelRule, default_levels
 from sec.core.parser import NoEnabledRulesError
 from sec.core.pipeline import fallback_title, process
-from sec.core.replace import Rule
+from sec.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_TITLE, Rule
 
 SAMPLE = [
     "封面文案",
@@ -98,6 +98,92 @@ def test_process_replaces_titles_and_bodies_keeping_raw(tmp_path):
     assert volume.raw_title == "第一卷 风起"
     assert volume.children[0].title == "第X一章 初遇"
     assert volume.children[0].raw_title == "第一章 初遇"
+
+
+# ---------- 替换的作用范围 ----------
+
+
+def test_default_scope_touches_titles_only(tmp_path):
+    """默认只改标题：GUI 里只能看到目录，默认动正文反而不符合直觉。"""
+    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了")])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].children[0].paragraphs == ["正文一字"]
+    assert tree[1].title == "第一卷 风起"
+
+
+def test_body_scope_touches_paragraphs_only(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了", SCOPE_BODY)])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].children[0].paragraphs == ["改了字"]
+    assert tree[1].title == "第一卷 风起"
+
+
+def test_all_scope_touches_both(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("一", "壹", SCOPE_ALL)])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].title == "第壹卷 风起"
+    assert tree[1].children[0].paragraphs == ["正文壹字"]
+
+
+def test_scopes_apply_independently_in_one_pass(tmp_path):
+    """标题规则与正文规则混在一份列表里，各走各的，互不干扰。"""
+    cfg = _cfg(
+        tmp_path,
+        replacements=[
+            Rule("风起", "起风", SCOPE_TITLE),
+            Rule("正文一", "P1", SCOPE_BODY),
+            Rule("离别", "别离", SCOPE_ALL),
+        ],
+    )
+    tree, _ = process(SAMPLE, cfg)
+    volume = tree[1]
+    assert volume.title == "第一卷 起风"
+    assert volume.children[0].paragraphs == ["P1字"]
+    # scope=all 的规则两边都进
+    assert volume.children[1].title == "第二章 别离"
+    assert volume.children[1].paragraphs == ["正文二字"]
+
+
+def test_body_only_rules_leave_titles_untouched(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("第", "X", SCOPE_BODY)])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].title == "第一卷 风起"
+    assert tree[1].raw_title == "第一卷 风起"
+
+
+# ---------- 封面自动发现 ----------
+
+
+def test_process_discovers_cover_next_to_input(tmp_path):
+    cover = tmp_path / "cover.png"
+    cover.write_bytes(b"\x89PNG")
+    cfg = _cfg(tmp_path)
+    assert cfg.cover is None
+    process(SAMPLE, cfg)
+    assert cfg.cover == cover
+
+
+def test_process_keeps_explicit_cover(tmp_path):
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    explicit = tmp_path / "mine.jpg"
+    explicit.write_bytes(b"\xff\xd8")
+    cfg = _cfg(tmp_path, cover=explicit)
+    process(SAMPLE, cfg)
+    assert cfg.cover == explicit
+
+
+def test_process_leaves_cover_none_when_absent(tmp_path):
+    cfg = _cfg(tmp_path)
+    process(SAMPLE, cfg)
+    assert cfg.cover is None
+
+
+def test_discovered_cover_passes_validation(tmp_path):
+    """自动发现的封面也必须过得了 Config.validate()。"""
+    (tmp_path / "cover.webp").write_bytes(b"RIFF")
+    cfg = _cfg(tmp_path)
+    process(SAMPLE, cfg)
+    cfg.validate()
 
 
 def test_process_returns_stats(tmp_path):

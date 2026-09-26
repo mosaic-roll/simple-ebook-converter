@@ -38,7 +38,7 @@ def font_media_type(path: Path) -> str:
 def cover_media_type(path: Path) -> str:
     """封面图格式不认识就抛 ValueError。
 
-    过去这里是 `_MEDIA_TYPES.get(suffix, "image/jpeg")`，也就是把 .txt 之类的
+    过去这里是 `COVER_TYPES.get(suffix, "image/jpeg")`，也就是把 .txt 之类的
     未知后缀悄悄当 jpeg 塞进 EPUB；现在与字体一样显式报错。
     """
     mt = COVER_TYPES.get(path.suffix.lower())
@@ -46,3 +46,23 @@ def cover_media_type(path: Path) -> str:
         supported = "/".join(s.lstrip(".") for s in COVER_TYPES)
         raise ValueError(f"不支持的封面图格式：{path.name}（仅支持 {supported}）")
     return mt
+
+
+def find_cover(input_path: Path) -> Path | None:
+    """在输入文件同目录找一张名为 `cover` 的图片，找不到或不唯一就返回 None。
+
+    不指定 `--cover` 时的便利行为：只认扩展名在 `COVER_TYPES` 里的 `cover.*`
+    （大小写不敏感），并且**恰好一个**才采用——命中多个说明作者没拿准，
+    静默挑一张反而会咬人。
+    """
+    try:
+        entries = sorted(input_path.parent.iterdir())
+    except OSError:
+        return None
+    hits = [
+        p
+        for p in entries
+        if p.is_file() and p.stem.lower() == "cover" and p.suffix.lower() in COVER_TYPES
+    ]
+    return hits[0] if len(hits) == 1 else None
+

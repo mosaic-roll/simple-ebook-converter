@@ -1,6 +1,7 @@
 import json
 import re
 import zipfile
+from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
@@ -101,6 +102,119 @@ def test_replace_applies_to_title_and_toc(tmp_path):
         page = next(n for n in z.namelist() if n.endswith("text/p0001.xhtml"))
         content = z.read(page).decode("utf-8")
         assert "章节 1章 开头" in content
+
+
+def _nav_and_page(tmp_path: Path) -> tuple[str, str]:
+    """读出生成结果里的目录页与正文页文本。"""
+    out = tmp_path / "novel.epub"
+    with zipfile.ZipFile(out) as z:
+        nav = z.read(next(n for n in z.namelist() if n.endswith("nav.xhtml"))).decode("utf-8")
+        page = z.read(next(n for n in z.namelist() if n.endswith("text/p0001.xhtml"))).decode(
+            "utf-8"
+        )
+    return nav, page
+
+
+def test_replace_scope_title_leaves_body_alone(tmp_path):
+    """不写 scope 就是「标题」，正文一个字都不动。"""
+    src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
+    result = CliRunner().invoke(
+        convert,
+        [
+            "--chapter",
+            r"^#.*",
+            "--replace-json",
+            json.dumps([{"pattern": "第1章", "replace": "首章"}]),
+            str(src),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    nav, page = _nav_and_page(tmp_path)
+    assert "首章 开头" in nav
+    assert "正文里有第1章" in page
+
+
+def test_replace_scope_body_leaves_title_alone(tmp_path):
+    src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
+    result = CliRunner().invoke(
+        convert,
+        [
+            "--chapter",
+            r"^#.*",
+            "--replace-json",
+            json.dumps([{"pattern": "第1章", "replace": "首章", "scope": "body"}]),
+            str(src),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    nav, page = _nav_and_page(tmp_path)
+    assert "第1章 开头" in nav
+    assert "正文里有首章" in page
+
+
+def test_replace_scope_all_hits_both(tmp_path):
+    src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
+    result = CliRunner().invoke(
+        convert,
+        [
+            "--chapter",
+            r"^#.*",
+            "--replace-json",
+            json.dumps([{"pattern": "第1章", "replace": "首章", "scope": "all"}]),
+            str(src),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    nav, page = _nav_and_page(tmp_path)
+    assert "首章 开头" in nav
+    assert "正文里有首章" in page
+
+
+def test_replace_rejects_unknown_scope(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(
+        convert,
+        [str(src), "--replace-json", json.dumps([{"pattern": "a", "scope": "chapter"}])],
+    )
+    assert result.exit_code != 0
+    assert "scope 只能是" in result.output
+
+
+def test_cover_is_discovered_next_to_input(tmp_path):
+    """不给 --cover 时，同目录唯一的 cover.* 自动生效。"""
+    src = _write_sample(tmp_path)
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    result = CliRunner().invoke(convert, [str(src)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(tmp_path / "novel.epub") as z:
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+    assert "cover.png" in opf
+
+
+def test_ambiguous_covers_are_ignored(tmp_path):
+    """两个候选就不猜了，宁可没有封面。"""
+    src = _write_sample(tmp_path)
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    (tmp_path / "cover.jpg").write_bytes(b"\xff\xd8")
+    result = CliRunner().invoke(convert, [str(src)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(tmp_path / "novel.epub") as z:
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+    assert "cover.png" not in opf
+    assert "cover.jpg" not in opf
+
+
+def test_explicit_cover_wins_over_discovery(tmp_path):
+    src = _write_sample(tmp_path)
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    mine = tmp_path / "mine.jpg"
+    mine.write_bytes(b"\xff\xd8")
+    result = CliRunner().invoke(convert, [str(src), "--cover", str(mine)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(tmp_path / "novel.epub") as z:
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+    assert "mine.jpg" in opf
+    assert "cover.png" not in opf
 
 
 def test_convert_date(tmp_path):

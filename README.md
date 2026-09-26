@@ -54,16 +54,45 @@ tree, stats = process(lines, Config(input=src, title="书名"))
 书名与作者未显式指定时，`process()` 会先从文件名猜（`《书名》作者：作者`，
 见 `sec.core.meta.resolve_metadata`），并写回 `cfg`。
 
+## 替换规则的作用范围
+
+`--replace-json` / `--replace-file` 收一个 JSON 列表，每条规则可带可选的 `scope`：
+
+```json
+[
+  { "pattern": "^#+\\s*", "replace": "" },
+  { "pattern": "正文里的\\s+", "replace": " ", "scope": "body" },
+  { "pattern": "括号",     "replace": "【】", "scope": "all" }
+]
+```
+
+| `scope` | 作用位置 |
+|---------|----------|
+| `title` | 只改标题（含目录页与书页标题）——**默认值** |
+| `body`  | 只改正文段落 |
+| `all`   | 标题与正文都改 |
+
+默认只改标题，是因为 GUI 里只能看到目录预览，「默认也动正文」反而不符合直觉。
+原始标题始终保留在 `node.raw_title`。
+
+## 封面自动发现
+
+不给 `--cover` 时，会在**输入文件同目录**找一张名为 `cover` 的图片
+（大小写不敏感，扩展名取 `COVER_TYPES` 全集：jpg/jpeg/png/gif/svg/webp/avif）。
+**恰好命中一张**才采用；命中零张或多张都不加封面——多张说明作者没拿准，
+静默挑一张反而会咬人。显式给的 `--cover` 永远优先。
+
 ## 处理流程
 
-`sec.core.pipeline.process()` 是唯一入口，按顺序做完这五步：
+`sec.core.pipeline.process()` 是唯一入口，按顺序做完这六步：
 
-1. `Config.validate()` —— 校验取值范围、日期格式、字体/封面格式
-2. 读取与编码识别（BOM → chardet → 逐个尝试，`--encoding` 可手动指定）
-3. 按标题正则切分为章节（在原始行上进行，保留空行/空格信息）
-4. 逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）并应用替换规则
-   （`--replace-json` / `--replace-file`，同时作用于标题与正文）
-5. 组装 EPUB3（zip 最高压缩等级 `compresslevel=9`）
+1. 封面自动发现（没给 `--cover` 时找同目录的 `cover.*`），结果写回 `cfg`
+2. `Config.validate()` —— 校验取值范围、日期格式、字体/封面格式
+3. 读取与编码识别（BOM → chardet → 逐个尝试，`--encoding` 可手动指定）
+4. 按标题正则切分为章节（在原始行上进行，保留空行/空格信息）
+5. 逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）
+6. 按 `scope` 分流应用替换规则（标题规则只进 `node.title`，正文规则只进
+   `node.paragraphs`），然后组装 EPUB3（zip 最高压缩等级 `compresslevel=9`）
 
 两个前端都只做「收集参数 → 调 `process()` → 展示结果」，不再各自实现其中任何一步。
 

@@ -6,7 +6,14 @@ import pytest
 
 from sec.core.config import DEFAULT_VOLUME_RE, config_defaults
 from sec.core.encoding import ENCODING_CHOICES, FALLBACK_ENCODINGS, decode
-from sec.gui.app import build_book, make_config, preview_data, split_extra
+from sec.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_LABELS, SCOPE_TITLE
+from sec.gui.app import (
+    _SCOPE_LABELS_TUPLE,
+    build_book,
+    make_config,
+    preview_data,
+    split_extra,
+)
 
 SAMPLE = """前言。
 
@@ -147,7 +154,7 @@ def test_preview_data_tree_and_replacement(tmp_path):
     fields = _fields(
         tmp_path,
         title="测试集",
-        replacements=[("第一章", "CHAPTER 1")],
+        replacements=[("第一章", "CHAPTER 1", "标题")],
     )
     tree = preview_data(fields)
     assert [n["title"] for n in tree] == ["前言", "第一卷 开门见山", "第二卷 渐入佳境"]
@@ -229,3 +236,46 @@ def test_every_advertised_encoding_is_a_known_codec():
     # 自动探测确实按这个顺序尝试
     sample = "第一章 起\n正文".encode("gb18030")
     assert decode(sample)[1] in ENCODING_CHOICES
+
+
+# ---------- 替换规则的作用范围 ----------
+
+_SCOPE = SCOPE_LABELS[SCOPE_TITLE]
+
+
+def test_replacement_scope_defaults_to_title(tmp_path):
+    fields = _fields(tmp_path, replacements=[("正文第一段", "改了", _SCOPE)])
+    cfg = make_config(fields)
+    assert [r.scope for r in cfg.replacements] == [SCOPE_TITLE]
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [("标题", SCOPE_TITLE), ("正文", SCOPE_BODY), ("全文", SCOPE_ALL)],
+)
+def test_replacement_scope_labels_map_to_core_values(tmp_path, label, expected):
+    cfg = make_config(_fields(tmp_path, replacements=[("a", "b", label)]))
+    assert [r.scope for r in cfg.replacements] == [expected]
+
+
+def test_replacement_scope_labels_come_from_core():
+    """下拉框选项直接来自 core 的 SCOPE_LABELS，不另写一份。"""
+    assert set(_SCOPE_LABELS_TUPLE) == set(SCOPE_LABELS.values())
+
+
+def test_replacement_rejects_unknown_scope_label(tmp_path):
+    with pytest.raises(ValueError, match="作用范围只能是 标题/正文/全文"):
+        make_config(_fields(tmp_path, replacements=[("a", "b", "第1章")]))
+
+
+def test_blank_pattern_rows_are_skipped(tmp_path):
+    cfg = make_config(_fields(tmp_path, replacements=[("", "x", _SCOPE), ("a", "b", _SCOPE)]))
+    assert [r.pattern for r in cfg.replacements] == ["a"]
+
+
+def test_gui_scope_column_reaches_the_parser(tmp_path):
+    """表格第 3 列（中文标签）要一路传到 Rule.scope。"""
+    fields = _fields(tmp_path, replacements=[("出门", "出门了", SCOPE_LABELS[SCOPE_ALL])])
+    cfg = make_config(fields)
+    assert cfg.replacements[0].scope == SCOPE_ALL
+    assert cfg.replacements[0].scope_label == "全文"

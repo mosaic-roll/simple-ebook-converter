@@ -28,11 +28,32 @@ from .encoding import (
     read_lines,
 )
 from .levels import build_levels, compile_pattern, parse_level_spec
-from .mediatypes import COVER_TYPES, FONT_TYPES, cover_media_type, font_media_type
+from .mediatypes import (
+    COVER_TYPES,
+    FONT_TYPES,
+    cover_media_type,
+    find_cover,
+    font_media_type,
+)
 from .meta import guess_metadata, resolve_metadata
 from .parser import NoEnabledRulesError, ParseStats, parse, walk
 from .pipeline import fallback_title, process
-from .replace import Rule, apply, apply_lines, compile_rules, rules_from_json
+from .replace import (
+    DEFAULT_SCOPE,
+    SCOPE_ALL,
+    SCOPE_BODY,
+    SCOPE_CHOICES,
+    SCOPE_LABELS,
+    SCOPE_TITLE,
+    Rule,
+    apply,
+    apply_lines,
+    check_scope,
+    compile_rules,
+    rules_from_json,
+    rules_to_json,
+    split_by_scope,
+)
 from .toc import to_json, to_text
 
 #: 版本号以 pyproject.toml 为唯一真源
@@ -43,11 +64,17 @@ __all__ = [
     "AUTO_ENCODING",
     "COVER_TYPES",
     "DEFAULT_CHAPTER_RE",
+    "DEFAULT_SCOPE",
     "DEFAULT_VOLUME_RE",
     "ENCODING_CHOICES",
     "FALLBACK_ENCODINGS",
     "FONT_TYPES",
     "LEVEL_FIELDS",
+    "SCOPE_ALL",
+    "SCOPE_BODY",
+    "SCOPE_CHOICES",
+    "SCOPE_LABELS",
+    "SCOPE_TITLE",
     "Config",
     "EncodingError",
     "LevelRule",
@@ -60,6 +87,7 @@ __all__ = [
     "build_css",
     "build_epub",
     "build_levels",
+    "check_scope",
     "clean_line",
     "clean_lines",
     "compile_pattern",
@@ -69,6 +97,7 @@ __all__ = [
     "decode",
     "default_levels",
     "fallback_title",
+    "find_cover",
     "font_media_type",
     "guess_metadata",
     "parse",
@@ -77,6 +106,8 @@ __all__ = [
     "read_lines",
     "resolve_metadata",
     "rules_from_json",
+    "rules_to_json",
+    "split_by_scope",
     "to_json",
     "to_text",
     "walk",

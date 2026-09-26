@@ -1,9 +1,6 @@
 import posixpath
 import re
 import zipfile
-from pathlib import Path
-
-import pytest
 
 from sec.core.builder import build_css, build_epub
 from sec.core.config import Config
