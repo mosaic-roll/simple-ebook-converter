@@ -101,7 +101,7 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 输出 ----
     Option("out", "输出文件", "输出文件，缺 .epub 后缀自动补，默认取输入名", "输出", short="o", output=True),
     Option("overwrite", "覆盖已有文件", "输出文件已存在时是否覆盖（默认覆盖）", "输出", negative=True),
-    Option("dump_css", "导出 CSS", "把当前生效的 CSS 写到这个文件（不必读输入）", "输出", output=True),
+    Option("dump_css", "导出 CSS", "把内置 CSS 模板写到这个文件（不必读输入，不受 --css-file 影响）", "输出", output=True),
     # ---- 书籍信息 ----
     Option("title", "书名", "留空则从文件名「《书名》作者：作者」提取", "书籍信息"),
     Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
@@ -140,7 +140,11 @@ OPTIONS: tuple[Option, ...] = (
     Option("chapter_align", "章对齐", "章标题对齐方式", "排版", choices=ALIGN_CHOICES),
     Option("volume_align", "卷对齐", "卷标题对齐方式", "排版", choices=ALIGN_CHOICES),
     Option("font", "正文字体", "嵌入到书里的正文字体（ttf/otf/woff/woff2）", "排版"),
-    Option("css_file", "外部 CSS 文件", "追加到内置样式之后，可以覆盖内置规则", "排版"),
+    Option(
+        "css_file", "外部 CSS 文件",
+        "替代内置样式：给了它就用这一份（先用 --dump-css 导一份内置模板作起点）",
+        "排版",
+    ),
     # ---- 目录 ----
     Option(
         "toc_in_spine", "书页含目录",

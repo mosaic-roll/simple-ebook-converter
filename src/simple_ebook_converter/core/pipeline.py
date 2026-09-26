@@ -14,7 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .builder import build_css, build_epub, escape
+from .builder import build_css, build_epub, builtin_css, escape
 from .cleaner import clean_lines
 from .config import Config
 from .encoding import EncodingError, read_lines
@@ -149,14 +149,15 @@ def write_epub(book: Book) -> Path:
 
 
 def write_css(cfg: Config) -> Path:
-    """把当前生效的 CSS 写到 `cfg.dump_css`。只用排版参数，不必读输入。
+    """把内置 CSS 模板写到 `cfg.dump_css`。只用排版参数，不必读输入。
 
+    导出的是 `builtin_css()`（不受 `--css-file` 影响，方便当自定义样式表的起点）。
     格式校验（字体、封面）照样走 `Config.validate()`：参数错在哪，哪种产出方式都该报。
     """
     if not cfg.dump_css:
         raise ValueError("缺少 CSS 输出路径")
     cfg.validate()
-    return write_text(_target(cfg.dump_css), build_css(cfg), cfg.overwrite)
+    return write_text(_target(cfg.dump_css), builtin_css(cfg), cfg.overwrite)
 
 
 def write_text(path: Path, text: str, overwrite: bool = True) -> Path:

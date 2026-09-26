@@ -524,6 +524,32 @@ def test_convert_dump_css(tmp_path):
     assert not list(tmp_path.glob("*.epub"))
 
 
+def test_css_file_replaces_builtin_in_epub(tmp_path):
+    """`--css-file` 是完整样式表：EPUB 里的 style.css 就是它，不掺内置。"""
+    src = _write_sample(tmp_path)
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
+    out = tmp_path / "novel.epub"
+    result = CliRunner().invoke(convert, [str(src), "--css-file", str(extra), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(out) as z:
+        assert z.read("EPUB/style.css").decode("utf-8") == "body { color: red; }"
+
+
+def test_dump_css_exports_builtin_template_not_css_file(tmp_path):
+    src = _write_sample(tmp_path)
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
+    css_out = tmp_path / "style.css"
+    result = CliRunner().invoke(
+        convert, [str(src), "--dump-css", str(css_out), "--css-file", str(extra)]
+    )
+    assert result.exit_code == 0, result.output
+    dumped = css_out.read_text(encoding="utf-8")
+    assert "line-height" in dumped  # 内置模板
+    assert "color: red" not in dumped
+
+
 def test_convert_reports_book_summary(tmp_path):
     """编码/各级标题数/前言这一行是终端文案，core 不再提供，由 CLI 自己拼。"""
     src = _write_sample(tmp_path)

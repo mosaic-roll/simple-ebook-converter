@@ -8,6 +8,7 @@ from simple_ebook_converter.core.builder import (
     COVER_SECTION_TYPE,
     build_css,
     build_epub,
+    builtin_css,
     image_cover_body,
     text_cover_body,
 )
@@ -367,13 +368,22 @@ def test_cover_css_rules_present():
     assert "body > section p" in css
 
 
-def test_cover_css_comes_before_user_css(tmp_path):
-    """--css-file 追加在最后，用户才可能覆盖内置封面样式。"""
+def test_css_file_replaces_builtin(tmp_path):
+    """`--css-file` 是完整样式表，替代内置（不是追加）。"""
     extra = tmp_path / "extra.css"
-    extra.write_text("body > section h1 { color: red; }", encoding="utf-8")
+    extra.write_text("body { color: red; }", encoding="utf-8")
+    css = build_css(Config(input=tmp_path / "novel.txt", css_file=extra))
+    assert css == "body { color: red; }"
+    assert "text-indent" not in css  # 内置正文样式没有混进来
+    assert "body > section" not in css  # 内置封面样式也没了
+
+
+def test_builtin_css_is_unaffected_by_css_file(tmp_path):
+    """`--dump-css` 要的是内置模板，给了 `--css-file` 也不该拿它当模板。"""
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
     cfg = Config(input=tmp_path / "novel.txt", css_file=extra)
-    css = build_css(cfg)
-    assert css.index("body > section h1 {") > css.index("body > section {")
+    assert builtin_css(cfg) == build_css(Config(input=tmp_path / "novel.txt"))
 
 
 def test_build_css_reports_unreadable_css_file(tmp_path):

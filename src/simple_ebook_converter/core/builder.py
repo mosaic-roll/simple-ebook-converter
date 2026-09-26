@@ -28,7 +28,17 @@ PAGE_MAX_LEVEL = 3
 
 
 def build_css(cfg: Config) -> str:
-    """当前设置下的完整 CSS：@font-face → 正文样式 → 封面页样式 → 外部 CSS。"""
+    """产出用的 CSS：给了 `--css-file` 就以它为全部样式（**替代**内置），否则用内置模板。
+
+    想在内置基础上改，先用 `--dump-css` 导一份 `builtin_css()`，改完再当 `--css-file` 传回来。
+    """
+    if cfg.css_file:
+        return _read_css(cfg.css_file)
+    return builtin_css(cfg)
+
+
+def builtin_css(cfg: Config) -> str:
+    """内置 CSS 模板：@font-face → 正文样式 → 封面页样式。`--dump-css` 导出的就是这一份。"""
     css: list[str] = []
     if cfg.font:
         name = Path(cfg.font).name
@@ -80,12 +90,14 @@ body > section img {
   max-height: 100vh;
 }"""
     )
-    if cfg.css_file:
-        try:
-            css.append(Path(cfg.css_file).read_text(encoding="utf-8"))
-        except OSError as e:
-            raise ValueError(f"无法读取外部 CSS：{e}") from e
     return "\n".join(css)
+
+
+def _read_css(path: Path) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        raise ValueError(f"无法读取外部 CSS：{e}") from e
 
 
 def image_cover_body(image_name: str, alt: str = "封面") -> str:
