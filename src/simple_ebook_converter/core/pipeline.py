@@ -16,11 +16,11 @@ from pathlib import Path
 
 from .builder import build_css, build_epub
 from .cleaner import clean_lines
-from .config import Config, Node
+from .config import Config
 from .encoding import EncodingError, read_lines
 from .mediatypes import find_cover
 from .meta import resolve_metadata
-from .parser import ParseStats, parse, walk
+from .parser import Node, ParseStats, parse, walk
 from .replace import replacers_by_scope
 from .toc import load_toc, render, tree_from_json
 

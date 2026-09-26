@@ -13,9 +13,9 @@ from pathlib import Path
 
 from ebooklib import epub
 
-from .config import Config, Node
+from .config import Config
 from .mediatypes import cover_media_type, font_media_type
-from .parser import walk
+from .parser import Node, walk
 
 #: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
 COVER_SECTION_TYPE = "cover"

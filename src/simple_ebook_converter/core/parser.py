@@ -10,7 +10,52 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
-from .config import DEFAULTS, LevelRule, Node
+from .config import DEFAULTS, LevelRule
+
+
+@dataclass
+class Node:
+    """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。
+
+    `lines` 是节点在输入里的完整覆盖范围：1-based 闭区间 [标题行, 本章最后一行]，
+    含全部子孙节点的行（子节点的范围落在父节点范围内）；直属正文不含子节点，
+    组装时按「标题行之后、第一个子标题之前」切出。前言（level 0）的标题不在
+    原文中，范围即正文。供目录树往返（`toc.to_json` / `toc.tree_from_json`）
+    与预览定位用。
+    """
+
+    title: str
+    level: int
+    class_name: str = ""
+    paragraphs: list[str] = field(default_factory=list)
+    children: list["Node"] = field(default_factory=list)
+    anchor: str = ""
+    raw_title: str = ""
+    lines: tuple[int, int] = (0, 0)
+    #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
+    #: dissolves such nodes into their neighbors. Never set by parse().
+    deleted: bool = False
+
+
+class TreeBuilder:
+    """文档序逐个 `add()` 节点，按 level 栈式挂成树。
+
+    `parse()`（正则扫描）与 `toc.tree_from_json()`（扁平条目回喂）共用这一套挂树
+    逻辑；`last` 是文档序上最近挂入的节点，扫描时收正文、溶解删除线时并正文都用它。
+    """
+
+    def __init__(self) -> None:
+        self.tree: list[Node] = []
+        self._stack: list[Node] = []
+        self.last: Node | None = None
+
+    def add(self, node: Node) -> None:
+        while self._stack and self._stack[-1].level >= node.level:
+            self._stack.pop()
+        (self._stack[-1].children if self._stack else self.tree).append(node)
+        if node.level > 0:  # the preface (level 0) holds only its own paragraphs
+            self._stack.append(node)
+        self.last = node
 
 
 @dataclass
@@ -45,40 +90,36 @@ def parse(
     compiled = [(r, re.compile(r.pattern)) for r in rules]
 
     stats = ParseStats(total_lines=len(lines))
-    tree: list[Node] = []
-    stack: list[Node] = []
+    builder = TreeBuilder()
     preface: list[tuple[int, str]] = []
 
     for lineno, line in enumerate(lines, start=1):
         title = line.strip()
         rule = _match(title, compiled, max_title_len) if title else None
         if rule is None:
-            if stack:
-                node = stack[-1]
+            if builder.last is not None:
+                node = builder.last
                 node.paragraphs.append(line)
                 node.lines = (node.lines[0], lineno)
             else:
                 preface.append((lineno, line))
             continue
-        while stack and stack[-1].level >= rule.level:
-            stack.pop()
-        parent = stack[-1] if stack else None
-        node = Node(
-            title,
-            rule.level,
-            rule.class_name or f"level{rule.level}",
-            raw_title=title,
-            lines=(lineno, lineno),
+        builder.add(
+            Node(
+                title,
+                rule.level,
+                rule.class_name or f"level{rule.level}",
+                raw_title=title,
+                lines=(lineno, lineno),
+            )
         )
-        (parent.children if parent else tree).append(node)
-        stack.append(node)
         stats.level_counts[rule.level] = stats.level_counts.get(rule.level, 0) + 1
         stats.max_level = max(stats.max_level, rule.level)
 
-    _wrap_preface(tree, preface, preface_title, fallback_title, stats)
-    _full_spans(tree)
-    assign_anchors(tree)
-    return tree, stats
+    _wrap_preface(builder.tree, preface, preface_title, fallback_title, stats)
+    _full_spans(builder.tree)
+    assign_anchors(builder.tree)
+    return builder.tree, stats
 
 
 def _full_spans(nodes: list[Node]) -> None:

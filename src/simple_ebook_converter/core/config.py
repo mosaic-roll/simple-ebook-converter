@@ -62,30 +62,6 @@ class LevelRule:
         return bool(self.pattern)
 
 
-@dataclass
-class Node:
-    """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。
-
-    `lines` 是节点在输入里的完整覆盖范围：1-based 闭区间 [标题行, 本章最后一行]，
-    含全部子孙节点的行（子节点的范围落在父节点范围内）；直属正文不含子节点，
-    组装时按「标题行之后、第一个子标题之前」切出。前言（level 0）的标题不在
-    原文中，范围即正文。供目录树往返（`toc.to_json` / `toc.tree_from_json`）
-    与预览定位用。
-    """
-
-    title: str
-    level: int
-    class_name: str = ""
-    paragraphs: list[str] = field(default_factory=list)
-    children: list["Node"] = field(default_factory=list)
-    anchor: str = ""
-    raw_title: str = ""
-    lines: tuple[int, int] = (0, 0)
-    #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
-    #: dissolves such nodes into their neighbors. Never set by parse().
-    deleted: bool = False
-
-
 def default_levels() -> list[LevelRule]:
     """内置的卷/章/节三条层级。调用方拿到的是新列表，可随意改。"""
     return [LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS]

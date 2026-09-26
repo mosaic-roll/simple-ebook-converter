@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from simple_ebook_converter.core.config import Node
+from simple_ebook_converter.core.parser import Node
 from simple_ebook_converter.core.toc import load_toc, to_json, tree_from_json
 
 

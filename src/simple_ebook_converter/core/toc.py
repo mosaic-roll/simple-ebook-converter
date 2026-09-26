@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from .config import DEFAULTS, Node
-from .parser import assign_anchors, walk
+from .config import DEFAULTS
+from .parser import Node, TreeBuilder, assign_anchors, walk
 
 #: `--toc-format` 的取值
 FORMATS = ("text", "json")
@@ -68,22 +68,17 @@ def tree_from_json(data: list, lines: list[str]) -> list[Node]:
 
 
 def _rebuild(nodes: list[Node]) -> list[Node]:
-    """栈式重建层级并溶解 deleted 条目：文档序单遍。"""
-    tree: list[Node] = []
-    stack: list[Node] = []
-    last: Node | None = None  # closest kept entry in document order
+    """重建层级并溶解 deleted 条目：文档序单遍。"""
+    builder = TreeBuilder()
     for node in nodes:
         if node.deleted:
-            if last is not None:
-                last.paragraphs.extend(node.paragraphs)
+            # Body of a struck-out entry joins the closest kept one before it;
+            # at the very front there is no such entry, so it is dropped.
+            if builder.last is not None:
+                builder.last.paragraphs.extend(node.paragraphs)
             continue
-        while stack and stack[-1].level >= node.level:
-            stack.pop()
-        (stack[-1].children if stack else tree).append(node)
-        if node.level > 0:  # the preface (level 0) holds only its own paragraphs
-            stack.append(node)
-        last = node
-    return tree
+        builder.add(node)
+    return builder.tree
 
 
 def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:
