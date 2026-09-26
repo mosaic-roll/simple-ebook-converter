@@ -51,8 +51,8 @@ def _usage_errors() -> Generator[None, None, None]:
 
 
 def _param_name(opt: Option) -> str:
-    """click 参数名：反面选项的旗标是 `--no-xxx`，参数名也跟着带 `no_`。"""
-    return f"no_{opt.name}" if opt.negative else opt.name
+    """click 参数名：由长旗标推出（`--no-volume` → `no_volume`），与 click 自己的规则一致。"""
+    return opt.flags[-1].lstrip("-").replace("-", "_")
 
 
 def _click_type(opt: Option):

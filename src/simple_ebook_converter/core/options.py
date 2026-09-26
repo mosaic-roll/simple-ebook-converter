@@ -46,6 +46,9 @@ class Option:
     help: str
     group: str
     short: str = ""
+    #: 长旗标词干（不含 `--`）。留空按 `name` 推；个别旗标名与字段名不同时显式写，
+    #: 例如 `volume_titles` → `--no-volume`、`toc_in_spine` → `--no-toc`（沿用既有 CLI 表面）。
+    flag: str = ""
     #: 只对 `in_config=False` 的选项有意义：它们的类型不在 `Config` 里
     value_type: type = str
     negative: bool = False
@@ -64,9 +67,14 @@ class Option:
         return CONFIG_KINDS.get(self.name) or self.value_type
 
     @property
+    def long_flag(self) -> str:
+        """长旗标的词干（不含 `--`）：显式 `flag` 优先，否则按 `name` 推。"""
+        return self.flag or ("no-" if self.negative else "") + self.name.replace("_", "-")
+
+    @property
     def flags(self) -> tuple[str, ...]:
-        stem = ("no-" if self.negative else "") + self.name.replace("_", "-")
-        return (f"-{self.short}", f"--{stem}") if self.short else (f"--{stem}",)
+        long_flag = f"--{self.long_flag}"
+        return (f"-{self.short}", long_flag) if self.short else (long_flag,)
 
 
 OPTIONS: tuple[Option, ...] = (
@@ -93,7 +101,10 @@ OPTIONS: tuple[Option, ...] = (
     Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别", in_config=False, level=2),
     Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别", in_config=False, level=3),
     Option("section", "节标题正则", "h4 + class=section；默认留空（不启用）", "章节识别", in_config=False, level=4),
-    Option("volume_titles", "无卷模式", "卷行是否作为标题（卷正则仍会覆盖内置规则）", "章节识别", negative=True),
+    Option(
+        "volume_titles", "无卷模式", "卷行是否作为标题（卷正则仍会覆盖内置规则）",
+        "章节识别", negative=True, flag="no-volume",
+    ),
     Option(
         "level", "额外层级", "额外层级规则，可重复；格式 级别:正则[:类名]，级别 1~6",
         "章节识别", in_config=False, multiple=True,
@@ -119,7 +130,11 @@ OPTIONS: tuple[Option, ...] = (
     Option("font", "正文字体", "嵌入到书里的正文字体（ttf/otf/woff/woff2）", "排版"),
     Option("css_file", "外部 CSS 文件", "追加到内置样式之后，可以覆盖内置规则", "排版"),
     # ---- 目录 ----
-    Option("toc_in_spine", "书页含目录", "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）", "目录", negative=True),
+    Option(
+        "toc_in_spine", "书页含目录",
+        "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）",
+        "目录", negative=True, flag="no-toc",
+    ),
     Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
     Option("toc_only", "只输出目录", "只输出目录，不生成 EPUB", "目录"),
     Option("toc_format", "目录格式", "只输出目录时的格式：text | json", "目录", choices=FORMATS),

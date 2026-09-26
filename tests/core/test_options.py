@@ -281,11 +281,17 @@ def test_option_names_are_unique():
     assert len(set(names)) == len(names)
 
 
-def test_every_flag_is_a_prefix_of_its_name():
-    """旗标从名字推出来：正面写 `--xxx`，反面写 `--no-xxx`。"""
+def test_long_flag_comes_from_name_or_explicit_override():
+    """长旗标默认按名字推：正面 `--xxx`，反面 `--no-xxx`；个别显式 `flag` 覆盖。"""
     for opt in OPTIONS:
-        stem = ("no-" if opt.negative else "") + opt.name.replace("_", "-")
-        assert opt.flags[-1] == f"--{stem}", opt.name
+        expected = opt.flag or ("no-" if opt.negative else "") + opt.name.replace("_", "-")
+        assert opt.flags[-1] == f"--{expected}", opt.name
+
+
+def test_documented_flag_names_stay_compatible():
+    """`--no-volume` / `--no-toc` 是设计文档写死的旗标，名字与字段不同，不能漂移。"""
+    assert _option("volume_titles").flags == ("--no-volume",)
+    assert _option("toc_in_spine").flags == ("--no-toc",)
 
 
 def test_option_kinds_come_from_config_annotations():
