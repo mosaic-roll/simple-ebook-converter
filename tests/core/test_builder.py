@@ -185,3 +185,146 @@ def test_toc_nav_in_spine_by_default(tmp_path):
     opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
     spine = opf.split("<spine", 1)[1].split("</spine>", 1)[0]
     assert '"nav"' in spine or "nav\"" in spine
+
+
+# ---------- 封面页 ----------
+
+COVER_XHTML = "EPUB/cover.xhtml"
+
+
+def _cover_xhtml(tmp_path, cfg=None):
+    entries = _entries(_build(tmp_path, cfg=cfg))
+    return entries[COVER_XHTML].decode("utf-8") if COVER_XHTML in entries else ""
+
+
+def _spine_of(tmp_path, cfg=None):
+    entries = _entries(_build(tmp_path, cfg=cfg))
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    return opf.split("<spine", 1)[1].split("</spine>", 1)[0]
+
+
+def _spine_items(tmp_path, cfg=None):
+    """spine 里的 itemref 解析成 [(idref, linear)]，linear 默认 yes。"""
+    spine = _spine_of(tmp_path, cfg=cfg)
+    out = []
+    for tag in re.findall(r"<itemref\b[^>]*/>", spine):
+        idref = re.search(r'idref="([^"]+)"', tag)
+        out.append((idref.group(1) if idref else None, 'linear="no"' not in tag))
+    return out
+
+
+def test_text_cover_page_is_default(tmp_path):
+    """没有封面图时默认生成文字封面页，且页里有书名和作者。"""
+    cfg = Config(input=tmp_path / "novel.txt", title="书名", author="作者")
+    page = _cover_xhtml(tmp_path, cfg=cfg)
+    assert 'epub:type="cover"' in page
+    assert "<h1>书名</h1>" in page
+    assert "<p>作者</p>" in page
+    assert "<img" not in page
+
+
+def test_text_cover_page_is_linear(tmp_path):
+    """文字封面是书的第一页，进正文流（linear 不是 no）。"""
+    cfg = Config(input=tmp_path / "novel.txt", title="书名")
+    items = _spine_items(tmp_path, cfg=cfg)
+    assert ("cover", True) in items
+    # nav 之后立刻就是封面页，也就是正文的第一页
+    assert [i for i, _ in items].index("cover") == 1
+
+
+def test_text_cover_page_has_no_cover_image_property(tmp_path):
+    """文字封面不是图片，不能带 cover-image / meta name=cover。"""
+    entries = _entries(_build(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名")))
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    assert "cover-image" not in opf
+    assert 'name="cover"' not in opf
+    assert not [n for n in entries if n.startswith("EPUB/images/")]
+
+
+def test_no_text_cover_has_no_cover_page(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", title="书名", text_cover=False)
+    entries = _entries(_build(tmp_path, cfg=cfg))
+    assert COVER_XHTML not in entries
+    assert "cover" not in _spine_of(tmp_path, cfg=cfg)
+
+
+def test_text_cover_escapes_markup(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", title='<A & "B">', author="x&y")
+    page = _cover_xhtml(tmp_path, cfg=cfg)
+    assert "&lt;A &amp; &quot;B&quot;&gt;" in page or "&lt;A &amp;" in page
+    assert "<A &" not in page
+    assert "x&amp;y" in page
+
+
+def test_text_cover_omits_author_when_empty(tmp_path):
+    page = _cover_xhtml(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名"))
+    assert "<p>" not in page
+
+
+def test_cover_page_links_stylesheet(tmp_path):
+    """封面页必须链到 style.css，否则内置封面样式和 --css-file 都对它无效。"""
+    for cfg in (
+        Config(input=tmp_path / "novel.txt", title="书名"),
+        Config(input=tmp_path / "novel.txt", cover=_png(tmp_path)),
+    ):
+        assert 'href="style.css"' in _cover_xhtml(tmp_path, cfg=cfg)
+
+
+def test_image_cover_declares_cover_meta(tmp_path):
+    """有封面图时补 <meta name="cover">，兼容 EPUB2 时代的阅读器。"""
+    cfg = Config(input=tmp_path / "novel.txt", cover=_png(tmp_path))
+    entries = _entries(_build(tmp_path, cfg=cfg))
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    assert 'properties="cover-image"' in opf
+    assert '<meta name="cover" content="cover-img">' in opf
+
+
+def test_image_cover_page_is_not_linear(tmp_path):
+    """图片封面页 linear=no，不打断正文流。"""
+    cfg = Config(input=tmp_path / "novel.txt", cover=_png(tmp_path))
+    assert ("cover", False) in _spine_items(tmp_path, cfg=cfg)
+
+
+def test_image_cover_alt_is_book_title(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", title="书名", cover=_png(tmp_path))
+    assert 'alt="书名"' in _cover_xhtml(tmp_path, cfg=cfg)
+
+
+def test_image_cover_webp_media_type(tmp_path):
+    """.webp 不在标准 mimetypes 里，manifest 的 media-type 不能写空。"""
+    cover = tmp_path / "c.webp"
+    cover.write_bytes(b"RIFF____WEBPVP8 fake")
+    cfg = Config(input=tmp_path / "novel.txt", cover=cover)
+    entries = _entries(_build(tmp_path, cfg=cfg))
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    assert 'media-type="image/webp"' in opf
+
+
+def test_image_cover_wins_over_text_cover(tmp_path):
+    """给了封面图就不再生成文字封面，两者互斥。"""
+    cfg = Config(input=tmp_path / "novel.txt", title="书名", cover=_png(tmp_path))
+    page = _cover_xhtml(tmp_path, cfg=cfg)
+    assert "<h1>" not in page
+    assert "<img" in page
+
+
+def test_cover_css_rules_present():
+    css = build_css(Config())
+    assert "body > section" in css
+    assert "body > section img" in css
+    assert "body > section p" in css
+
+
+def test_cover_css_comes_before_user_css(tmp_path):
+    """--css-file 追加在最后，用户才可能覆盖内置封面样式。"""
+    extra = tmp_path / "extra.css"
+    extra.write_text("body > section h1 { color: red; }", encoding="utf-8")
+    cfg = Config(input=tmp_path / "novel.txt", css_file=extra)
+    css = build_css(cfg)
+    assert css.index("body > section h1 {") > css.index("body > section {")
+
+
+def _png(tmp_path):
+    cover = tmp_path / "c.png"
+    cover.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    return cover

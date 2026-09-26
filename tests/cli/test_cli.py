@@ -217,6 +217,60 @@ def test_explicit_cover_wins_over_discovery(tmp_path):
     assert "cover.png" not in opf
 
 
+def _cover_page(tmp_path, name="novel.epub"):
+    with zipfile.ZipFile(tmp_path / name) as z:
+        if "EPUB/cover.xhtml" not in z.namelist():
+            return ""
+        return z.read("EPUB/cover.xhtml").decode("utf-8")
+
+
+def test_text_cover_page_generated_by_default(tmp_path):
+    """没有封面图时默认生成文字封面页，内容是书名和作者。"""
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "--title", "书名", "--author", "作者"])
+    assert result.exit_code == 0, result.output
+    page = _cover_page(tmp_path)
+    assert 'epub:type="cover"' in page
+    assert "<h1>书名</h1>" in page
+    assert "<p>作者</p>" in page
+
+
+def test_no_text_cover_skips_page(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "--title", "书名", "--no-text-cover"])
+    assert result.exit_code == 0, result.output
+    assert _cover_page(tmp_path) == ""
+    with zipfile.ZipFile(tmp_path / "novel.epub") as z:
+        assert "EPUB/cover.xhtml" not in z.namelist()
+
+
+def test_text_cover_not_used_when_cover_found(tmp_path):
+    """同目录有 cover.* 时用图，不再生成文字页。"""
+    src = _write_sample(tmp_path)
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    result = CliRunner().invoke(convert, [str(src), "--title", "书名"])
+    assert result.exit_code == 0, result.output
+    page = _cover_page(tmp_path)
+    assert "<img" in page
+    assert "<h1>" not in page
+
+
+def test_text_cover_uses_guessed_metadata(tmp_path):
+    """没给 --title/--author 时用从文件名猜出来的值填封面页。"""
+    src = _write_sample(tmp_path, name="《希灵帝国》作者：远瞳.txt")
+    result = CliRunner().invoke(convert, [str(src)])
+    assert result.exit_code == 0, result.output
+    page = _cover_page(tmp_path, name="《希灵帝国》作者：远瞳.epub")
+    assert "希灵帝国" in page
+    assert "远瞳" in page
+
+
+def test_no_text_cover_in_help():
+    result = CliRunner().invoke(convert, ["--help"])
+    assert result.exit_code == 0
+    assert "--no-text-cover" in result.output
+
+
 def test_convert_date(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "--date", "2024-05-13"])

@@ -77,6 +77,9 @@ class Config:
     date: str | None = None
     language: str = "zh"
     cover: Path | None = None
+    #: 没有封面图时是否生成「文字封面页」（只含书名/作者）。默认开启；
+    #: 关掉后既没有封面图也没有封面页，书直接从第一章开始。
+    text_cover: bool = True
 
     levels: list[LevelRule] = field(default_factory=default_levels)
     max_title_len: int = 35

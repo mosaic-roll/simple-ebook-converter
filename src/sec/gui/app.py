@@ -87,6 +87,7 @@ def make_config(fields: dict) -> Config:
         date=(fields.get("date") or "").strip() or None,
         language=fields.get("language") or _DEFAULTS["language"],
         cover=Path(cover) if cover else None,
+        text_cover=bool(fields.get("text_cover", True)),
         levels=levels,
         max_title_len=max_title_len,
         preface_title=fields.get("preface_title") or _DEFAULTS["preface_title"],
@@ -156,6 +157,7 @@ class SecGui:
         self.v_date = tk.StringVar(value=d["date"])
         self.v_language = tk.StringVar(value=d["language"])
         self.v_cover = tk.StringVar()
+        self.v_text_cover = tk.BooleanVar(value=d["text_cover"])
         self.v_volume = tk.StringVar(value=d["volume"])
         self.v_chapter = tk.StringVar(value=d["chapter"])
         self.v_section = tk.StringVar(value=d["section"])
@@ -189,6 +191,7 @@ class SecGui:
             "date": self.v_date.get(),
             "language": self.v_language.get(),
             "cover": self.v_cover.get(),
+            "text_cover": self.v_text_cover.get(),
             "volume": self.v_volume.get(),
             "chapter": self.v_chapter.get(),
             "section": self.v_section.get(),
@@ -260,6 +263,9 @@ class SecGui:
         ttk.Label(f, text="封面").grid(row=row, column=0, sticky="w", pady=2)
         ttk.Entry(f, textvariable=self.v_cover).grid(row=row, column=1, sticky="ew", padx=4, pady=2)
         ttk.Button(f, text="浏览", command=self._browse_cover).grid(row=row, column=2, sticky="w")
+        ttk.Checkbutton(
+            f, text="没有封面图时生成文字封面页（只含书名/作者）", variable=self.v_text_cover
+        ).grid(row=row + 1, column=0, columnspan=3, sticky="w", pady=(4, 0))
 
     def _build_tab_chapter(self, nb: ttk.Notebook) -> None:
         f = ttk.Frame(nb, padding=8)

@@ -75,12 +75,29 @@ tree, stats = process(lines, Config(input=src, title="书名"))
 默认只改标题，是因为 GUI 里只能看到目录预览，「默认也动正文」反而不符合直觉。
 原始标题始终保留在 `node.raw_title`。
 
-## 封面自动发现
+## 封面
 
-不给 `--cover` 时，会在**输入文件同目录**找一张名为 `cover` 的图片
-（大小写不敏感，扩展名取 `COVER_TYPES` 全集：jpg/jpeg/png/gif/svg/webp/avif）。
-**恰好命中一张**才采用；命中零张或多张都不加封面——多张说明作者没拿准，
-静默挑一张反而会咬人。显式给的 `--cover` 永远优先。
+封面有三种结果，优先级从高到低：
+
+1. **显式 `--cover PATH`** —— 用这张图。
+2. **自动发现** —— 不给 `--cover` 时，在**输入文件同目录**找一张名为 `cover` 的图片
+   （大小写不敏感，扩展名取 `COVER_TYPES` 全集：jpg/jpeg/png/gif/svg/webp/avif）。
+   **恰好命中一张**才采用；命中零张或多张都不算——多张说明作者没拿准，
+   静默挑一张反而会咬人。
+3. **文字封面页** —— 仍然没有图时（默认开启），在书的最前面插一个只含**书名和作者**
+   的封面页。用 `--no-text-cover` 关掉，关掉后整本书就没有封面。
+
+封面页走 EPUB 标准，不自造 CSS class：内容放在 `<section epub:type="cover">` 里，
+阅读器认这个语义角色。有图时图片在 OPF manifest 里带 `properties="cover-image"`，
+并额外补一条 `<meta name="cover">` 兼容 EPUB2 时代的阅读器。封面页会链到 `style.css`，
+内置样式用 `body > section` 这组结构选择器排版，`--css-file` 追加在最后因而可以覆盖
+（各家阅读器对 CSS 里带命名空间的 `epub|type` 属性选择器支持不一致，所以没拿它来选）。
+
+```bash
+sec-cli novel.txt                          # 同目录没 cover.* → 生成文字封面页
+sec-cli novel.txt --no-text-cover          # 不要文字封面页
+sec-cli novel.txt --cover cover.png        # 显式给图
+```
 
 ## 处理流程
 
@@ -94,6 +111,7 @@ tree, stats = process(lines, Config(input=src, title="书名"))
 6. 按 `scope` 分流应用替换规则（标题规则只进 `node.title`，正文规则只进
    `node.paragraphs`），然后组装 EPUB3（zip 最高压缩等级 `compresslevel=9`）
 
+封面页是在第 6 步组装时定的，所以「文字封面」拿得到第 1、3 步猜出来的书名/作者。
 两个前端都只做「收集参数 → 调 `process()` → 展示结果」，不再各自实现其中任何一步。
 
 ## 测试

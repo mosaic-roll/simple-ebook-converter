@@ -19,6 +19,11 @@ from .config import (
     config_defaults,
     default_levels,
 )
+from .coverpage import (
+    COVER_SECTION_TYPE,
+    image_cover_body,
+    text_cover_body,
+)
 from .encoding import (
     AUTO_ENCODING,
     ENCODING_CHOICES,
@@ -62,6 +67,7 @@ __version__ = version("sec")
 __all__ = [
     "ALIGN_CHOICES",
     "AUTO_ENCODING",
+    "COVER_SECTION_TYPE",
     "COVER_TYPES",
     "DEFAULT_CHAPTER_RE",
     "DEFAULT_SCOPE",
@@ -93,13 +99,13 @@ __all__ = [
     "compile_pattern",
     "compile_rules",
     "config_defaults",
-    "cover_media_type",
-    "decode",
+    "cover_media_type",    "decode",
     "default_levels",
     "fallback_title",
     "find_cover",
     "font_media_type",
     "guess_metadata",
+    "image_cover_body",
     "parse",
     "parse_level_spec",
     "process",
@@ -108,6 +114,7 @@ __all__ = [
     "rules_from_json",
     "rules_to_json",
     "split_by_scope",
+    "text_cover_body",
     "to_json",
     "to_text",
     "walk",

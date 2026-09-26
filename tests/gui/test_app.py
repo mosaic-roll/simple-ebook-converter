@@ -48,6 +48,7 @@ def _fields(tmp_path: Path, **overrides) -> dict:
         "date": "",
         "language": "zh",
         "cover": "",
+        "text_cover": True,
         "volume": "",
         "chapter": "",
         "section": "",
@@ -148,6 +149,23 @@ def test_bad_date_is_rejected(tmp_path):
 def test_make_config_rejects_missing_cover(tmp_path):
     with pytest.raises(ValueError, match="封面文件不存在"):
         make_config(_fields(tmp_path, cover=str(tmp_path / "没有.png")))
+
+
+def test_text_cover_default_on(tmp_path):
+    assert config_defaults()["text_cover"] is True
+    assert make_config(_fields(tmp_path)).text_cover is True
+
+
+def test_text_cover_checkbox_turns_it_off(tmp_path):
+    cfg = make_config(_fields(tmp_path, text_cover=False))
+    assert cfg.text_cover is False
+
+
+def test_text_cover_missing_field_defaults_on(tmp_path):
+    """老调用方没传这个字段时按默认开启处理，不当成关掉。"""
+    fields = _fields(tmp_path)
+    del fields["text_cover"]
+    assert make_config(fields).text_cover is True
 
 
 def test_preview_data_tree_and_replacement(tmp_path):

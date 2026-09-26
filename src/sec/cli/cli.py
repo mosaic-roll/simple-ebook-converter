@@ -151,7 +151,8 @@ def _emit_epub(
 @click.option("--author", help="作者（留空则从文件名猜，仍留空不写入元数据）")
 @click.option("--date", default=None, help="出版日期，如 2024-05-13；留空则 dc:date 省略（规范可选）")
 @click.option("--language", default=_DEFAULTS["language"], show_default=True)
-@click.option("--cover", type=_PATH, help="封面图片路径")
+@click.option("--cover", type=_PATH, help="封面图片路径；省略时先找同目录 cover.*，再退回文字封面页")
+@click.option("--no-text-cover", is_flag=True, help="没有封面图时也不生成文字封面页（默认生成）")
 @click.option("--no-clean", is_flag=True, help="不清理文本（保留空行/段首段尾空格）")
 @click.option("--indent", default=_DEFAULTS["indent"], show_default=True, help="段落缩进字数，0 为不缩进")
 @click.option("--line-height", default=_DEFAULTS["line_height"], show_default=True)
@@ -177,6 +178,7 @@ def convert(
     date: str | None,
     language: str,
     cover: Path | None,
+    no_text_cover: bool,
     volume: str | None,
     chapter: str | None,
     section: str | None,
@@ -213,6 +215,7 @@ def convert(
         date=(date or "").strip() or None,
         language=language,
         cover=cover,
+        text_cover=not no_text_cover,
         levels=_build_levels(volume, chapter, section, extra_levels),
         max_title_len=max_title_len,
         preface_title=preface_title,
