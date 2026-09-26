@@ -1,13 +1,15 @@
 """选项表：命令行参数与 GUI 表单的唯一真源。
 
-表里只写「前端要什么」——选项名、中文标签、说明、分组、旗标形态；**取值类型和缺省值
-一律从 `Config` 取**，所以新增一个转换参数不必在这里再抄一遍类型与默认值：
+表里只写「前端要什么」——选项名、中文标签、说明、分组、旗标形态；其余一律从真源推出：
 
-- `name` 就是 `Config` 的字段名，取值类型按字段注解（`str`/`int`/`bool`/`Path`）推出；
+- `name` 就是 `Config` 的字段名，取值类型与缺省值按字段注解取；名字不是 `Config`
+  字段的选项不进 `Config`，值在前端收集后合成（`--volume/--chapter/--section/--level`
+  合成 `levels`，`--replace-json/--replace-file` 合成 `replacements`，`--no-volume`
+  表示无卷模式）；
 - `negative` 的选项命令行写 `--no-<name>`，界面按正面说法显示，两个前端收上来的值
   都已经是 `Config` 的正面语义，`build_config()` 因此不必认识 `--no-xxx`；
-- 不进 `Config` 的只有三类（`in_config=False`）：`--volume/--chapter/--section/--level`
-  决定 `levels`，`--replace-json/--replace-file` 决定 `replacements`。
+- 卷/章/节本质是三条预设的 `--level` 规格（class 名 = 选项名），`--no-volume` 等同
+  清空卷正则。
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, DEFAULTS, Config
+from .config import ALIGN_CHOICES, DEFAULTS, Config, LEVEL_PRESETS
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
 from .replace import rules_from_source
@@ -36,6 +38,9 @@ def _config_kinds() -> dict[str, type]:
 
 CONFIG_KINDS = _config_kinds()
 
+#: 预设层级：class 名（= 选项名）→ 级别。卷/章/节是三条预设的 `--level` 规格。
+_LEVEL_BY_NAME = {name: level for level, name, _, _ in LEVEL_PRESETS}
+
 
 @dataclass(frozen=True)
 class Option:
@@ -47,24 +52,31 @@ class Option:
     group: str
     short: str = ""
     #: 长旗标词干（不含 `--`）。留空按 `name` 推；个别旗标名与字段名不同时显式写，
-    #: 例如 `volume_titles` → `--no-volume`、`toc_in_spine` → `--no-toc`（沿用既有 CLI 表面）。
+    #: 例如 `toc_in_spine` → `--no-toc`（沿用既有 CLI 表面）。
     flag: str = ""
-    #: 只对 `in_config=False` 的选项有意义：它们的类型不在 `Config` 里
+    #: 只对不进 `Config` 的选项有意义：它们的类型不在 `Config` 注解里
     value_type: type = str
     negative: bool = False
-    in_config: bool = True
     #: 输出路径：不要求已存在
     output: bool = False
     #: 可重复（`--level`）
     multiple: bool = False
-    #: 预设层级 2/3/4（非 0 表示这条选项只决定 `levels`）
-    level: int = 0
     choices: tuple[str, ...] = ()
 
     @property
     def kind(self) -> type:
         """取值类型：`Config` 字段按注解，其余看 `value_type`。"""
         return CONFIG_KINDS.get(self.name) or self.value_type
+
+    @property
+    def in_config(self) -> bool:
+        """值是否直接进 `Config`：名字是 `Config` 字段即是，否则由 `build_config()` 合成。"""
+        return self.name in CONFIG_KINDS
+
+    @property
+    def level(self) -> int:
+        """预设层级 1~6（卷/章/节）；0 表示不是预设层级。"""
+        return _LEVEL_BY_NAME.get(self.name, 0)
 
     @property
     def long_flag(self) -> str:
@@ -98,16 +110,16 @@ OPTIONS: tuple[Option, ...] = (
     Option("cover", "封面图", "留空则先找输入同目录的 cover.*，再退回文字封面页", "书籍信息"),
     Option("text_cover", "文字封面页", "没有封面图时是否生成只含书名/作者的封面页（默认生成）", "书籍信息", negative=True),
     # ---- 章节识别 ----
-    Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别", in_config=False, level=2),
-    Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别", in_config=False, level=3),
-    Option("section", "节标题正则", "h4 + class=section；默认留空（不启用）", "章节识别", in_config=False, level=4),
+    Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别"),
+    Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别"),
+    Option("section", "节标题正则", "h4 + class=section；默认留空（不启用）", "章节识别"),
     Option(
-        "volume_titles", "无卷模式", "卷行是否作为标题（卷正则仍会覆盖内置规则）",
-        "章节识别", negative=True, flag="no-volume",
+        "no_volume", "无卷模式", "卷行不当标题，等同清空卷标题正则；显式给 --volume 时以正则为准",
+        "章节识别", value_type=bool,
     ),
     Option(
         "level", "额外层级", "额外层级规则，可重复；格式 级别:正则[:类名]，级别 1~6",
-        "章节识别", in_config=False, multiple=True,
+        "章节识别", multiple=True,
     ),
     Option("max_title_len", "标题最长字数", "超过这个字数的行即使命中正则也当正文", "章节识别"),
     Option("preface_title", "前言标题", "首个标题之前那些无标题段落归到这一节", "章节识别"),
@@ -115,11 +127,11 @@ OPTIONS: tuple[Option, ...] = (
     Option("clean", "清理文本", "去掉段首段尾空格并删除空行（默认清理）", "清理与替换", negative=True),
     Option(
         "replace_json", "替换规则", "一段 JSON 替换规则（有序列表），与 --replace-file 二选一",
-        "清理与替换", in_config=False,
+        "清理与替换",
     ),
     Option(
         "replace_file", "替换规则文件", "从 JSON 文件读取替换规则，与 --replace-json 二选一",
-        "清理与替换", in_config=False, value_type=Path,
+        "清理与替换", value_type=Path,
     ),
     # ---- 排版 ----
     Option("indent", "段落缩进", "段落缩进字数，0 为不缩进", "排版"),
@@ -155,7 +167,7 @@ def option_default(opt: Option) -> Any:
         return next(rule.pattern for rule in DEFAULTS.levels if rule.level == opt.level)
     if opt.in_config:
         return getattr(DEFAULTS, opt.name)
-    return () if opt.multiple else ""
+    return () if opt.multiple else (False if opt.kind is bool else "")
 
 
 # ---------- 原始值 → Config ----------
@@ -167,16 +179,34 @@ def build_config(values: Mapping[str, Any]) -> Config:
     值的语义与 `Config` 字段一致：反面选项（`--no-clean`）收上来时已经是 `False`。
     留空一律表示「用缺省值」，取值范围由 `Config.validate()` 负责。
     """
+    values = dict(values)
+    if values.get("no_volume") and values.get("volume") is None:
+        values["volume"] = ""  # --no-volume only wins when --volume is not given
     raw = {opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS}
     return Config(
-        levels=build_levels(_presets(values), raw["level"]),
+        levels=build_levels(_level_specs(values)),
         replacements=rules_from_source(_text(raw["replace_json"]), raw["replace_file"]),
         **{opt.name: raw[opt.name] for opt in OPTIONS if opt.in_config},
     )
 
 
+def _level_specs(values: Mapping[str, Any]) -> list[str]:
+    """层级规格：卷/章/节三条预设与 `--level` 统一成 `级别:正则[:类名]`。
+
+    预设未给用内置正则，显式空串表示不识别该层级；class 名就是选项名。
+    """
+    specs: list[str] = []
+    for opt in OPTIONS:
+        if not opt.level:
+            continue
+        value = values.get(opt.name)
+        pattern = option_default(opt) if value is None else value
+        specs.append(f"{opt.level}:{pattern}:{opt.name}")
+    return specs + list(_lines(values.get("level") or ()))
+
+
 def _convert(opt: Option, value: Any) -> Any:
-    """一个选项的原始值 → 收进 `Config`（或 `levels` / `replacements`）的值。"""
+    """一个选项的原始值 → 收进 `Config`（或 `replacements`）的值。"""
     if value is None:
         return option_default(opt)
     if opt.multiple:
@@ -222,12 +252,3 @@ def _path(opt: Option, value: Any) -> Path | None:
     if not opt.output and not path.is_file():
         raise ValueError(f"{opt.label}不存在：{path}")
     return path
-
-
-def _presets(values: Mapping[str, Any]) -> dict[str, str]:
-    """卷/章/节三条预设正则：未给用内置值，给了空串表示不识别该层级。"""
-    return {
-        opt.name: option_default(opt) if values.get(opt.name) is None else str(values[opt.name])
-        for opt in OPTIONS
-        if opt.level
-    }

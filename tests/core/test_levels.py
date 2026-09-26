@@ -25,15 +25,15 @@ def test_check_pattern_reports_the_label():
         check_pattern("(", "章标题")
 
 
-def test_build_levels_keeps_builtin_when_preset_missing():
-    levels = build_levels({})
+def test_build_levels_keeps_builtin_when_spec_missing():
+    levels = build_levels()
     assert [(r.level, r.class_name) for r in levels] == [(2, "volume"), (3, "chapter"), (4, "section")]
     assert next(r for r in levels if r.level == 2).pattern != ""
     assert next(r for r in levels if r.level == 4).pattern == ""
 
 
-def test_build_levels_preset_overrides_builtin():
-    levels = build_levels({"volume": "^第[0-9]+[卷]", "chapter": "^第[0-9]+[章]"})
+def test_build_levels_spec_overrides_builtin():
+    levels = build_levels(["2:^第[0-9]+[卷]:volume", "3:^第[0-9]+[章]:chapter"])
     assert len(levels) == len(default_levels())
     assert next(r for r in levels if r.level == 2).pattern == "^第[0-9]+[卷]"
     assert next(r for r in levels if r.level == 3).pattern == "^第[0-9]+[章]"
@@ -41,14 +41,14 @@ def test_build_levels_preset_overrides_builtin():
     assert section.active is False
 
 
-def test_build_levels_blank_preset_disables_that_level():
-    """三个预设留空 = 不识别该层级（与 GUI 清空输入框一致）。"""
-    levels = build_levels({"volume": "", "chapter": "^第.章", "section": ""})
+def test_build_levels_blank_pattern_disables_that_level():
+    """空正则 = 不识别该层级（`--no-volume` 与 GUI 清空输入框都走这条路）。"""
+    levels = build_levels(["2::volume", "3:^第.章:chapter", "4::section"])
     assert [r.active for r in levels] == [False, True, False]
 
 
 def test_build_levels_extra_specs_append_and_override():
-    levels = build_levels({}, ["5:^注解:note", "2:^第[0-9]+卷"])
+    levels = build_levels(["5:^注解:note", "2:^第[0-9]+卷"])
     by_level = {r.level: r for r in levels}
     assert set(by_level) == {2, 3, 4, 5}
     assert (by_level[5].pattern, by_level[5].class_name) == ("^注解", "note")
@@ -56,22 +56,22 @@ def test_build_levels_extra_specs_append_and_override():
 
 
 def test_build_levels_does_not_share_default_rules():
-    build_levels({"volume": "^改了"})[0].pattern = "^又改了"
+    build_levels(["2:^改了:volume"])[0].pattern = "^又改了"
     assert default_levels()[0].pattern != "^又改了"
 
 
 @pytest.mark.parametrize(
-    ("presets", "extra", "label"),
+    ("specs", "label"),
     [
-        ({"volume": "("}, [], "卷标题"),
-        ({"chapter": "["}, [], "章标题"),
-        ({"section": "(?"}, [], "节标题"),
-        ({}, ["5:^ok", "2:("], "额外层级 2"),
+        (["2:(:volume"], "卷标题"),
+        (["3:[:chapter"], "章标题"),
+        (["4:(?:section"], "节标题"),
+        (["5:^ok", "2:("], "额外层级 2"),
     ],
 )
-def test_build_levels_rejects_invalid_pattern(presets, extra, label):
+def test_build_levels_rejects_invalid_pattern(specs, label):
     with pytest.raises(ValueError, match=re.escape(label)):
-        build_levels(presets, extra)
+        build_levels(specs)
 
 
 def test_rules_from_json():

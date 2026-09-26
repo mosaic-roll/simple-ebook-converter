@@ -56,7 +56,6 @@ def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
         max_title_len=cfg.max_title_len,
         preface_title=cfg.preface_title,
         fallback_title=cfg.book_title,
-        volume_titles=cfg.volume_titles,
     )
     titles, bodies = replacers_by_scope(cfg.replacements)
     for node in walk(tree):

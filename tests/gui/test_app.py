@@ -113,7 +113,6 @@ def test_make_config_empty_fields_fall_back_to_config(tmp_path):
 
 def test_make_config_defaults(tmp_path):
     cfg = make_config(_fields(tmp_path))
-    assert cfg.volume_titles is True
     assert cfg.overwrite is True
     assert cfg.title is None
     assert len(cfg.levels) >= 2

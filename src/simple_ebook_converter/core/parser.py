@@ -32,17 +32,13 @@ def parse(
     fallback_title: str,
     max_title_len: int = DEFAULTS.max_title_len,
     preface_title: str = DEFAULTS.preface_title,
-    volume_titles: bool = True,
 ) -> tuple[list[Node], ParseStats]:
     """把行切分为章节树，返回 (顶层节点列表, 统计信息)。
 
     正文段落跟随最近的标题；首个标题之前的段落归到 `preface_title`；一条标题都没
-    命中时整篇作为一章，标题用 `fallback_title`。
+    命中时整篇作为一章，标题用 `fallback_title`。不启用某层级就是把它的正则留空。
     """
-    rules = sorted(
-        (r for r in levels if r.active and (volume_titles or r.class_name != "volume")),
-        key=lambda r: r.level,
-    )
+    rules = sorted((r for r in levels if r.active), key=lambda r: r.level)
     if not rules:
         raise NoEnabledRulesError("没有启用的标题规则：卷/章/节至少要有一个非空正则")
     compiled = [(r, re.compile(r.pattern)) for r in rules]

@@ -71,8 +71,8 @@ def _click_default(opt: Option):
     不给默认值，`--help` 里印一条几百字的正则没人看得下去。
     """
     if opt.kind is bool:
-        # 勾上旗标 = 关掉功能，所以旗标值与缺省值相反（`--no-clean` → 缺省 True）
-        return not option_default(opt) if opt.negative else False
+        # 旗标未给 = 功能维持缺省；「给旗标」的语义转换（含 negative 取反）在 _convert
+        return False
     if opt.multiple:
         return ()
     if opt.level:

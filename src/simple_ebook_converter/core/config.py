@@ -104,8 +104,6 @@ class Config:
 
     # 章节识别
     levels: list[LevelRule] = field(default_factory=default_levels)
-    #: 卷行是否算标题；False 时 `第X卷` 这类行当正文
-    volume_titles: bool = True
     max_title_len: int = 35
     preface_title: str = "前言"
 

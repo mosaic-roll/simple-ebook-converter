@@ -111,25 +111,17 @@ def test_bad_number_names_the_option(tmp_path):
 
 def test_switches_take_positive_values(tmp_path):
     """前端收上来的已经是 `Config` 的正面语义，`build_config()` 不做取反。"""
-    cfg = _config(
-        tmp_path,
-        overwrite=False,
-        toc_in_spine=False,
-        clean=False,
-        text_cover=False,
-        volume_titles=False,
-    )
+    cfg = _config(tmp_path, overwrite=False, toc_in_spine=False, clean=False, text_cover=False)
     assert cfg.overwrite is False
     assert cfg.toc_in_spine is False
     assert cfg.clean is False
     assert cfg.text_cover is False
-    assert cfg.volume_titles is False
 
 
 def test_switches_default_to_on(tmp_path):
     """`--no-xxx` 关掉的是默认开启的功能，所以缺省都是 True。"""
     cfg = _config(tmp_path)
-    for name in ("overwrite", "toc_in_spine", "clean", "text_cover", "volume_titles"):
+    for name in ("overwrite", "toc_in_spine", "clean", "text_cover"):
         assert getattr(cfg, name) is True, name
 
 
@@ -290,8 +282,16 @@ def test_long_flag_comes_from_name_or_explicit_override():
 
 def test_documented_flag_names_stay_compatible():
     """`--no-volume` / `--no-toc` 是设计文档写死的旗标，名字与字段不同，不能漂移。"""
-    assert _option("volume_titles").flags == ("--no-volume",)
+    assert _option("no_volume").flags == ("--no-volume",)
     assert _option("toc_in_spine").flags == ("--no-toc",)
+
+
+def test_no_volume_disables_volume_level(tmp_path):
+    """`--no-volume` = 清空卷正则；显式给了 `--volume` 时以正则为准。"""
+    cfg = _config(tmp_path, no_volume=True)
+    assert next(r for r in cfg.levels if r.level == 2).active is False
+    cfg = _config(tmp_path, no_volume=True, volume="^甲")
+    assert next(r for r in cfg.levels if r.level == 2).pattern == "^甲"
 
 
 def test_option_kinds_come_from_config_annotations():
@@ -315,6 +315,7 @@ def test_option_defaults_come_from_config():
 def test_empty_defaults_for_options_outside_config():
     for name in ("replace_json", "replace_file"):
         assert option_default(_option(name)) == ""
+    assert option_default(_option("no_volume")) is False
     assert option_default(_option("level")) == ()
 
 

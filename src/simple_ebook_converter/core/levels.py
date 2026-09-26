@@ -1,14 +1,17 @@
-"""标题层级：把卷/章/节三条预设与额外层级规格合成 `Config.levels`。"""
+"""标题层级：把 `级别:正则[:类名]` 规格合成 `Config.levels`。"""
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 
 from .config import LEVEL_PRESETS, LevelRule, default_levels
 
 #: 额外层级的统称，用于错误消息
 _EXTRA = "额外层级"
+
+#: 预设层级的 class 名 → 中文名，错误消息里指名道姓用
+_PRESET_LABELS = {name: label for _level, name, label, _pattern in LEVEL_PRESETS}
 
 
 def check_pattern(pattern: str, label: str) -> None:
@@ -34,29 +37,17 @@ def parse_level_spec(spec: str) -> tuple[int, str, str]:
     return level, pattern, class_name or f"level{level}"
 
 
-def build_levels(patterns: Mapping[str, str], extra: Iterable[str] = ()) -> list[LevelRule]:
-    """生成层级规则。`patterns` 的键是预设层级名（volume/chapter/section，同 `LEVEL_PRESETS`）。
+def build_levels(specs: Iterable[str] = ()) -> list[LevelRule]:
+    """`级别:正则[:类名]` 规格列表 → 层级规则，按级别排序。
 
-    - 键缺失：用内置正则
-    - 值为空串：不启用该层级
-    - 其他值：作为该层级的正则
-
-    `extra` 是 `级别:正则[:类名]`，与预设层级同级同语法。
+    未提及的层级保持内置值；空正则不启用该层级；同一级别后面的规格覆盖前面的。
     """
     by_level = {rule.level: rule for rule in default_levels()}
-    for level, name, label, _pattern in LEVEL_PRESETS:
-        if name in patterns:
-            pattern = patterns[name] or ""
-            check_pattern(pattern, label)
-            by_level[level].pattern = pattern
-            by_level[level].class_name = name
-
-    for spec in extra:
+    for spec in specs:
         level, pattern, class_name = parse_level_spec(spec)
-        check_pattern(pattern, f"{_EXTRA} {level}")
-        rule = by_level.get(level)
-        if rule is None:
-            by_level[level] = LevelRule(level, pattern, class_name)
-        else:
+        check_pattern(pattern, _PRESET_LABELS.get(class_name) or f"{_EXTRA} {level}")
+        if rule := by_level.get(level):
             rule.pattern, rule.class_name = pattern, class_name
+        else:
+            by_level[level] = LevelRule(level, pattern, class_name)
     return sorted(by_level.values(), key=lambda rule: rule.level)

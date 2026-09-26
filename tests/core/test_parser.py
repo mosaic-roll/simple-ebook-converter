@@ -1,6 +1,7 @@
 import pytest
 
 from simple_ebook_converter.core.config import LevelRule, default_levels
+from simple_ebook_converter.core.levels import build_levels
 from simple_ebook_converter.core.parser import NoEnabledRulesError, parse, walk
 
 
@@ -114,7 +115,7 @@ def test_custom_level_hierarchy():
 
 def test_no_volume_flag_ignores_volume():
     lines = ["第一卷 甲", "第一章 a", "正文"]
-    tree, _ = parse(lines, default_levels(), volume_titles=False, fallback_title="书名")
+    tree, _ = parse(lines, build_levels(["2::volume"]), fallback_title="书名")
     assert [n.title for n in tree] == ["前言", "第一章 a"]
     assert tree[0].paragraphs == ["第一卷 甲"]
     assert tree[1].paragraphs == ["正文"]
