@@ -125,7 +125,8 @@ simple-ebook-converter-cli novel.txt --cover cover.png        # 显式给图
    （见「替换规则的阶段」）
 6. 按开关产出：`cfg.toc_only` → `write_toc()` / `toc_text()`；`cfg.dump_css` →
    `write_css()`（只导出 CSS，不读输入）；否则 `write_epub()` 组装 EPUB3
-   （zip 最高压缩等级 `compresslevel=9`）
+   （只给 h1~h3 各建一个内容文档，h4+ 并入上级页并以片段进目录；zip 最高压缩等级
+   `compresslevel=9`）
 
 封面页是在第 6 步组装时定的，所以「文字封面」拿得到第 1、2 步猜出来的书名/作者。
 

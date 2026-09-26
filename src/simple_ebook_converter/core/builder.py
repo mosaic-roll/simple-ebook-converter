@@ -15,13 +15,16 @@ from ebooklib import epub
 
 from .config import Config
 from .mediatypes import cover_media_type, font_media_type
-from .parser import Node, walk
+from .parser import Node
 
 #: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
 COVER_SECTION_TYPE = "cover"
 
 #: 内置字体的 CSS 家族名：@font-face 声明与正文引用共用这一份
 _FONT_FAMILY = "sec-font"
+
+#: 只给 h1~h3 单独建内容文档；更深的层级并入最近的上级页，作为页内锚点
+PAGE_MAX_LEVEL = 3
 
 
 def build_css(cfg: Config) -> str:
@@ -139,49 +142,115 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
     page_map: dict[str, epub.EpubHtml] = {}
     _add_cover(book, cfg, pages)
 
-    for node in walk(nodes):
+    roots = _page_roots(nodes)
+    owner = _page_owner_by_anchor(roots)
+    for root in roots:
         page = epub.EpubHtml(
-            title=node.title,
-            file_name=f"text/{node.anchor}.xhtml",
-            content=_page_html(node).encode("utf-8"),
+            title=root.title,
+            file_name=f"text/{root.anchor}.xhtml",
+            content=_render_page(root).encode("utf-8"),
         )
         page.add_meta(charset="utf-8")
         page.add_link(href="../style.css", rel="stylesheet", type="text/css")
         book.add_item(page)
-        page_map[node.anchor] = page
+        page_map[root.anchor] = page
         pages.append(page)
 
     if nodes:
-        book.toc = _toc_entries(nodes, page_map, cfg.toc_depth)
+        book.toc = _toc_entries(nodes, page_map, owner, cfg.toc_depth)
     book.add_item(epub.EpubNav())
     book.add_item(epub.EpubNcx())
     book.spine = (["nav"] if cfg.toc_in_spine else []) + pages
     epub.write_epub(output, book, options={"compresslevel": 9})
 
 
-def _page_html(node: Node) -> str:
+def _is_page_root(node: Node, has_page_ancestor: bool) -> bool:
+    """是否单独成页：h1~h3 一律成页；更深的层级若没有成页的祖先也成页
+    （例如只启用 h4 当章），否则并入祖先页，避免正文无家可归。
+    """
+    return node.level <= PAGE_MAX_LEVEL or not has_page_ancestor
+
+
+def _page_roots(nodes: list[Node]) -> list[Node]:
+    """文档序返回所有需要单独成页的节点。"""
+    roots: list[Node] = []
+
+    def visit(items: list[Node], has_page_ancestor: bool) -> None:
+        for node in items:
+            is_root = _is_page_root(node, has_page_ancestor)
+            if is_root:
+                roots.append(node)
+            visit(node.children, has_page_ancestor or is_root)
+
+    visit(nodes, False)
+    return roots
+
+
+def _page_owner_by_anchor(roots: list[Node]) -> dict[str, str]:
+    """每个节点 anchor → 它所在页面的 anchor（页内节点的片段链接要用）。"""
+    owner: dict[str, str] = {}
+
+    def collect(node: Node, root_anchor: str) -> None:
+        owner[node.anchor] = root_anchor
+        for child in node.children:
+            if not _is_page_root(child, has_page_ancestor=True):
+                collect(child, root_anchor)
+
+    for root in roots:
+        collect(root, root.anchor)
+    return owner
+
+
+def _render_page(root: Node) -> str:
+    """一页的正文：根标题与段落，再递归并入所有不成页的后代（带 `id` 供片段链接）。"""
+    blocks: list[str] = []
+
+    def render(node: Node, is_root: bool) -> None:
+        blocks.append(_heading(node, with_id=not is_root))
+        blocks.extend(f"<p>{escape(p)}</p>" for p in node.paragraphs)
+        for child in node.children:
+            if not _is_page_root(child, has_page_ancestor=True):
+                render(child, False)
+
+    render(root, True)
+    return "\n".join(blocks)
+
+
+def _heading(node: Node, *, with_id: bool) -> str:
     level = max(1, node.level)
     # `title_html` 是 `process()` 转义并跑完 html 阶段替换的结果；没有时按原文转义。
     title = node.title_html or escape(node.title)
     # class 省略的层级（`--level h2:…`）不加 class，直接落到 `hN` 标签选择器上。
     class_attr = f' class="{escape(node.class_name)}"' if node.class_name else ""
-    heading = f"<h{level}{class_attr}>{title}</h{level}>"
-    paragraphs = "".join(f"<p>{escape(p)}</p>" for p in node.paragraphs)
-    return f"{heading}\n{paragraphs}"
+    id_attr = f' id="{node.anchor}"' if with_id else ""
+    return f"<h{level}{class_attr}{id_attr}>{title}</h{level}>"
 
 
 def _toc_entries(
-    nodes: list[Node], page_map: dict[str, epub.EpubHtml], depth: int
+    nodes: list[Node], page_map: dict[str, epub.EpubHtml], owner: dict[str, str], depth: int
 ) -> list:
-    """章节树转 ebooklib 的 toc 结构；`depth` 之外的层级不写进目录。"""
+    """章节树转 ebooklib 的 toc 结构；超过 `depth` 的层级不写进目录。
+
+    成页的节点直接引用其页面；并入上级页的节点（h4+）用页内片段链接。
+    """
     out = []
     for node in nodes:
-        page = page_map[node.anchor]
-        if node.children and node.level < depth:
-            out.append((page, _toc_entries(node.children, page_map, depth)))
-        elif node.level <= depth:
-            out.append(page)
+        if node.level > depth:
+            continue
+        entry = _toc_entry(node, page_map, owner)
+        children = (
+            _toc_entries(node.children, page_map, owner, depth) if node.level < depth else []
+        )
+        out.append((entry, children) if children else entry)
     return out
+
+
+def _toc_entry(node: Node, page_map: dict[str, epub.EpubHtml], owner: dict[str, str]) -> object:
+    root_anchor = owner[node.anchor]
+    page = page_map[root_anchor]
+    if node.anchor == root_anchor:
+        return page
+    return epub.Link(f"{page.file_name}#{node.anchor}", node.title, node.anchor)
 
 
 def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> None:
