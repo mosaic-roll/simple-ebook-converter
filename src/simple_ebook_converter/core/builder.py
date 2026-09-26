@@ -156,10 +156,9 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
 
 
 def _page_html(node: Node) -> str:
-    esc = html.escape
     level = max(1, node.level)
-    heading = f'<h{level} class="{esc(node.class_name)}">{esc(node.title)}</h{level}>'
-    paragraphs = "".join(f"<p>{esc(p)}</p>" for p in node.paragraphs)
+    heading = f'<h{level} class="{_esc(node.class_name)}">{_esc(node.title)}</h{level}>'
+    paragraphs = "".join(f"<p>{_esc(p)}</p>" for p in node.paragraphs)
     return f"{heading}\n{paragraphs}"
 
 

@@ -22,8 +22,8 @@ from ..core.options import (
     option_groups,
 )
 from ..core.pipeline import (
-    decode,
     read_book,
+    read_input,
     resolve as resolve_config,
     scan_toc,
     write_css,
@@ -92,7 +92,7 @@ def preview_data(fields: dict) -> tuple[list[dict], object]:
     只走两阶段里的阶段一，不读正文内容之外的任何重活。
     """
     cfg = resolve_config(make_config(fields))
-    lines, _ = decode(cfg)
+    lines, _ = read_input(cfg)
     tree, _ = scan_toc(lines, cfg)
     titles, _ = replacers_by_scope(cfg.replacements)
     return to_json(tree, cfg.toc_depth), titles.text

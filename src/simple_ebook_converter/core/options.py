@@ -219,11 +219,13 @@ def _level_specs(values: Mapping[str, Any]) -> list[str]:
 
 
 def _convert(opt: Option, value: Any) -> Any:
-    """一个选项的原始值 → 收进 `Config`（或 `replacements`）的值。"""
+    """一个选项的原始值 → 收进 `Config` 的值。
+
+    只服务于进 `Config` 的选项；多值项（`--level`）不进 `Config`，在 `_level_specs()`
+    里合成。
+    """
     if value is None:
         return option_default(opt)
-    if opt.multiple:
-        return _lines(value)
     if opt.kind is bool:
         return bool(value)
     if opt.kind is int:
