@@ -76,8 +76,20 @@ def parse(
         stats.max_level = max(stats.max_level, rule.level)
 
     _wrap_preface(tree, preface, preface_title, fallback_title, stats)
+    _full_spans(tree)
     assign_anchors(tree)
     return tree, stats
+
+
+def _full_spans(nodes: list[Node]) -> None:
+    """Widen each node's span to cover all its descendants, so `Node.lines` is the
+    full extent of the section it stands for (children live inside their parent).
+    """
+    for node in nodes:
+        _full_spans(node.children)
+        if node.children:
+            end = max(node.lines[1], *(c.lines[1] for c in node.children))
+            node.lines = (node.lines[0], end)
 
 
 def _match(

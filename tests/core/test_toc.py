@@ -20,12 +20,14 @@ def test_to_json_and_tree_from_json_round_trip():
     lines = ["第一卷", "第一章 一", "正文甲"]
     data = to_json(_sample_tree())
     assert set(data[0]) == {"raw_title", "level", "class_name", "lines", "children"}
+    # Full-span semantics: the volume covers its chapter's lines too.
     assert data[0]["lines"] == [1, 3]
+    assert data[0]["children"][0]["lines"] == [2, 3]
 
     restored = tree_from_json(data, lines)
     volume, body = restored[0], restored[0].children[0]
     assert (volume.raw_title, volume.level, volume.class_name) == ("第一卷", 2, "volume")
-    assert volume.paragraphs == []  # 直属正文止于第一个子标题之前
+    assert volume.paragraphs == []  # direct body stops before the first child title
     assert body.paragraphs == ["正文甲"]  # 标题行本身不进正文
 
 
@@ -45,7 +47,7 @@ def test_tree_from_json_allows_gaps():
             "raw_title": "第一卷",
             "level": 2,
             "class_name": "volume",
-            "lines": [1, 1],  # 卷的范围收窄：行 2 成为空洞
+            "lines": [1, 1],  # narrowed below the first child: line 2 becomes a gap
             "children": [
                 {
                     "raw_title": "第一章 一",

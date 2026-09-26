@@ -1,8 +1,9 @@
 """目录的渲染与往返：缩进文本、JSON 树，按格式选一种的 `render()`。
 
 JSON 树是 GUI 预览与 `--toc-file` 共用的中间产物：只存原始标题（`raw_title`）与
-直属行号范围（`lines`），标题的清理替换推迟到组装阶段。`to_json` / `tree_from_json`
-互为逆操作，中间可以插一步人工编辑（改标题、删除线标记、合并章节）。
+完整行号范围（`lines`，含全部子孙），标题的清理替换推迟到组装阶段。
+`to_json` / `tree_from_json` 互为逆操作，中间可以插一步人工编辑（改标题、
+删除线标记、合并章节）。
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ def render(tree: list[Node], depth: int, fmt: str) -> str:
 
 def to_json(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> list[dict]:
     """转 JSON 列表供 GUI 预览或 `--toc-format json`。每节点含 `raw_title`（原始标题行）、
-    `level`、`class_name`、`lines`（[起, 止]，1-based 闭区间，含标题行）、`children`，
-    超过 `depth` 的层级不带回来。
+    `level`、`class_name`、`lines`（[起, 止]，1-based 闭区间，完整覆盖含全部子孙）、
+    `children`，超过 `depth` 的层级不带回来。
     """
     return [_entry(node, depth) for node in tree]
 
@@ -136,8 +137,9 @@ def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
 
 
 def _direct_body(node: Node, lines: list[str]) -> list[str]:
-    """直属正文：标题节点从标题行之后取到范围尽头；前言（level 0）的标题不在
-    原文中，整段都是正文。有子节点时止于第一个子标题之前（与 parse() 一致）。
+    """直属正文（不含子节点的部分）：标题行之后取到第一个子标题之前（与 parse()
+    一致），范围尽头 `end` 给无子节点的章节兜底；前言（level 0）的标题不在原文中，
+    从范围开头就是正文。
     """
     start, end = node.lines
     body_start = start if node.level == 0 else start + 1
