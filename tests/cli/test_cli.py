@@ -640,13 +640,18 @@ def test_option_defaults_come_from_config():
 
 
 def test_help_shows_config_defaults():
-    """--help 里印出来的默认值就是 Config 的默认值（click 折行不影响 [default: X] 这个整体）。"""
-    result = CliRunner().invoke(convert, ["--help"])
-    assert result.exit_code == 0, result.output
+    """--help 里印出来的默认值就是 Config 的默认值。
+
+    比对 click 的 help record 而不是渲染后的文本：`[default: X]` 靠空格分词，
+    终端宽度不巧时会被从中间折开（如 `[default:` / `auto]`），断言不能依赖
+    文案长度碰运气。
+    """
+    ctx = click.Context(convert)
+    records = {param.opts[-1]: param.get_help_record(ctx) for param in convert.params}
     for name in _SCALAR_OPTIONS:
-        default = option_default(next(o for o in OPTIONS if o.name == name))
-        token = f"[default: {default}]"
-        assert token in result.output, f"--{name} 未显示默认值 {token}"
+        opt = next(o for o in OPTIONS if o.name == name)
+        token = f"[default: {option_default(opt)}]"
+        assert token in records[opt.flags[-1]][1], f"--{name} 未显示默认值 {token}"
 
 
 def test_cli_flags_come_from_the_option_table():
