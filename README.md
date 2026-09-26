@@ -71,7 +71,7 @@ tree, stats = process(lines, cfg)
 ```json
 [
   { "pattern": "^#+\\s*", "replace": "" },
-  { "pattern": "第(\\d+)章", "replace": "第<span class=\"num\">\\1</span>章", "stage": "html" }
+  { "pattern": "(第.{1,10}章)\\s*", "replace": "<span class=\"chapter-number\">\\1</span>", "stage": "html" }
 ]
 ```
 
@@ -82,8 +82,8 @@ tree, stats = process(lines, cfg)
 
 `raw` 先于 `html`：先改原文标题（写进 `node.title`，目录页/NCX/元数据都用它），
 再转义，然后 `html` 规则在转义结果上再改一次，结果写进书页标题的 HTML 片段。
-所以 `html` 阶段适合给章节序号套 `<span>`，再用 `--css-file` 上样式；它不会影响
-纯文本的目录与元数据。原始标题始终保留在 `node.raw_title`。
+所以 `html` 阶段适合给标题里的片段（如整段「第…章」）套 `<span>`，再用 `--css-file`
+上样式；它不会影响纯文本的目录与元数据。原始标题始终保留在 `node.raw_title`。
 
 ## 封面
 
