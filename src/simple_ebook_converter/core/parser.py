@@ -31,6 +31,9 @@ class Node:
     children: list["Node"] = field(default_factory=list)
     anchor: str = ""
     raw_title: str = ""
+    #: 书页标题的 HTML 片段（转义 + html 阶段替换后的结果），由 `pipeline.process()` 填；
+    #: 目录/元数据仍用纯文本的 `title`。
+    title_html: str = ""
     lines: tuple[int, int] = (0, 0)
     #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
     #: dissolves such nodes into their neighbors. Never set by parse().

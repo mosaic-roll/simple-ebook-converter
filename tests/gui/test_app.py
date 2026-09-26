@@ -7,7 +7,7 @@ import pytest
 
 from simple_ebook_converter.core.config import Config
 from simple_ebook_converter.core.options import OPTIONS, option_default, option_groups
-from simple_ebook_converter.core.replace import SCOPE_LABELS
+from simple_ebook_converter.core.replace import STAGE_LABELS
 from simple_ebook_converter.gui.app import (
     form_default,
     generate_output,
@@ -30,7 +30,7 @@ SAMPLE = """前言。
 正文第三段。
 """
 
-_SCOPE = SCOPE_LABELS["title"]
+_STAGE = STAGE_LABELS["raw"]
 
 
 def _opf(epub_path: Path) -> str:
@@ -144,12 +144,12 @@ def test_text_cover_checkbox_turns_it_off(tmp_path):
 
 
 def test_replacement_json_is_plain_json(tmp_path):
-    text = replacement_json([("甲", "乙", _SCOPE)])
-    assert json.loads(text) == [{"pattern": "甲", "replace": "乙", "scope": "title"}]
+    text = replacement_json([("甲", "乙", _STAGE)])
+    assert json.loads(text) == [{"pattern": "甲", "replace": "乙", "stage": "raw"}]
 
 
 def test_table_rows_reach_config_as_json(tmp_path):
-    fields = _fields(tmp_path, replacements=[("第一章", "CHAPTER 1", _SCOPE)])
+    fields = _fields(tmp_path, replacements=[("第一章", "CHAPTER 1", _STAGE)])
     values = option_values(fields)
     assert values["replace_json"] == replacement_json(fields["replacements"])
     assert [r.replace for r in make_config(fields).replacements] == ["CHAPTER 1"]
@@ -163,27 +163,27 @@ def test_empty_table_keeps_typed_json(tmp_path):
     assert [r.pattern for r in make_config(fields).replacements] == ["甲"]
 
 
-def test_replacement_scope_defaults_to_title(tmp_path):
-    cfg = make_config(_fields(tmp_path, replacements=[("正文第一段", "改了", _SCOPE)]))
-    assert [r.scope for r in cfg.replacements] == ["title"]
+def test_replacement_stage_defaults_to_raw(tmp_path):
+    cfg = make_config(_fields(tmp_path, replacements=[("正文第一段", "改了", _STAGE)]))
+    assert [r.stage for r in cfg.replacements] == ["raw"]
 
 
 @pytest.mark.parametrize(
     ("label", "expected"),
-    [("标题", "title"), ("正文", "body"), ("全文", "all")],
+    [("原文", "raw"), ("HTML", "html")],
 )
-def test_replacement_scope_labels_map_to_core_values(tmp_path, label, expected):
+def test_replacement_stage_labels_map_to_core_values(tmp_path, label, expected):
     cfg = make_config(_fields(tmp_path, replacements=[("a", "b", label)]))
-    assert [r.scope for r in cfg.replacements] == [expected]
+    assert [r.stage for r in cfg.replacements] == [expected]
 
 
-def test_replacement_rejects_unknown_scope_label(tmp_path):
-    with pytest.raises(ValueError, match="作用范围只能是 标题/正文/全文"):
+def test_replacement_rejects_unknown_stage_label(tmp_path):
+    with pytest.raises(ValueError, match="阶段只能是 原文/HTML"):
         make_config(_fields(tmp_path, replacements=[("a", "b", "第1章")]))
 
 
 def test_blank_pattern_rows_are_skipped(tmp_path):
-    cfg = make_config(_fields(tmp_path, replacements=[("", "x", _SCOPE), ("a", "b", _SCOPE)]))
+    cfg = make_config(_fields(tmp_path, replacements=[("", "x", _STAGE), ("a", "b", _STAGE)]))
     assert [r.pattern for r in cfg.replacements] == ["a"]
 
 
@@ -199,7 +199,7 @@ def test_replace_file_option_reaches_the_parser(tmp_path):
 
 def test_preview_data_tree_and_replacement(tmp_path):
     tree, shown = preview_data(
-        _fields(tmp_path, title="测试集", replacements=[("第一章", "CHAPTER 1", _SCOPE)])
+        _fields(tmp_path, title="测试集", replacements=[("第一章", "CHAPTER 1", _STAGE)])
     )
     assert [n["raw_title"] for n in tree] == [
         "前言",

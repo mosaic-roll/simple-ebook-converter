@@ -1,7 +1,15 @@
-"""替换规则：解析、校验、按作用范围分流、执行。
+"""替换规则：解析、校验、按阶段分流、执行。
 
 规则本身是一段 JSON 里的有序列表，因此「先按哪条后按哪条」由列表顺序决定。
-`Replacer` 把一批规则和它们的预编译正则绑在一起，避免在每行、每个标题上重复编译。
+替换只作用于标题：改正文直接改源文件更直接。
+
+`stage` 决定匹配发生在 HTML 转义的前后：
+
+- `raw`（默认）：匹配原始标题，替换结果写出时照常转义；
+- `html`：匹配已转义的标题，替换结果按 HTML 原样注入，因此可以塞
+  `<span class="num">` 之类的标签，再用 `--css-file` 上样式。
+
+`Replacer` 把一批规则和它们的预编译正则绑在一起，避免在每个标题上重复编译。
 """
 
 from __future__ import annotations
@@ -12,40 +20,38 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-#: 替换规则的作用范围：取值 → (中文标签, 是否改标题, 是否改正文)
-SCOPES = {
-    "title": ("标题", True, False),
-    "body": ("正文", False, True),
-    "all": ("全文", True, True),
+#: 替换阶段：取值 → 中文标签
+STAGES = {
+    "raw": "原文",
+    "html": "HTML",
 }
 
-#: 界面上「不选作用范围」时的取值。默认只改标题：界面只看得到目录，
-#: 「默认也动正文」反而不符合直觉，要改正文时显式写出来。
-DEFAULT_SCOPE = next(iter(SCOPES))
+#: 省略 `stage` 时的默认值：匹配原文、结果照常转义，最安全也最接近旧行为
+DEFAULT_STAGE = "raw"
 
 #: 文本标签 → 取值，界面下拉框直接用这份中文标签
-SCOPE_BY_LABEL = {label: scope for scope, (label, _, _) in SCOPES.items()}
-SCOPE_LABELS = {scope: label for scope, (label, _, _) in SCOPES.items()}
+STAGE_BY_LABEL = {label: stage for stage, label in STAGES.items()}
+STAGE_LABELS = {stage: label for stage, label in STAGES.items()}
 
 
 @dataclass
 class Rule:
     pattern: str
     replace: str
-    scope: str = DEFAULT_SCOPE
+    stage: str = DEFAULT_STAGE
 
     @property
-    def scope_label(self) -> str:
-        return SCOPE_LABELS.get(self.scope, self.scope)
+    def stage_label(self) -> str:
+        return STAGE_LABELS.get(self.stage, self.stage)
 
 
-def check_scope(scope: str, where: str = "") -> str:
-    """校验作用范围，界面上的中文标签也认，返回真正的取值；不合法抛 `ValueError`。"""
-    resolved = SCOPE_BY_LABEL.get(scope, scope)
-    if resolved not in SCOPES:
+def check_stage(stage: str, where: str = "") -> str:
+    """校验替换阶段，界面上的中文标签也认，返回真正的取值；不合法抛 `ValueError`。"""
+    resolved = STAGE_BY_LABEL.get(stage, stage)
+    if resolved not in STAGES:
         prefix = f"{where}的 " if where else ""
-        choices = "/".join(SCOPE_LABELS.values())
-        raise ValueError(f"{prefix}作用范围只能是 {choices}（{'/'.join(SCOPES)}），收到：{scope!r}")
+        choices = "/".join(STAGE_LABELS.values())
+        raise ValueError(f"{prefix}阶段只能是 {choices}（{'/'.join(STAGES)}），收到：{stage!r}")
     return resolved
 
 
@@ -53,8 +59,8 @@ def check_scope(scope: str, where: str = "") -> str:
 def rules_from_json(text: str) -> list[Rule]:
     """解析一段 JSON 替换规则（有序列表），出错抛 ValueError。
 
-    每条规则形如 `{"pattern": "...", "replace": "...", "scope": "title"}`：
-    `replace` 省略即删除匹配内容，`scope` 省略即只作用于标题。
+    每条规则形如 `{"pattern": "...", "replace": "...", "stage": "raw"}`：
+    `replace` 省略即删除匹配内容，`stage` 省略即匹配原文（`raw`）。
     """
     try:
         data = json.loads(text)
@@ -75,26 +81,26 @@ def rules_from_json(text: str) -> list[Rule]:
             Rule(
                 pattern,
                 str(item.get("replace", "")),
-                check_scope(item.get("scope", DEFAULT_SCOPE), f"第 {index} 条替换规则"),
+                check_stage(item.get("stage", DEFAULT_STAGE), f"第 {index} 条替换规则"),
             )
         )
     return rules
 
 
 def rules_from_rows(rows: Iterable[Sequence[str] | Rule]) -> list[Rule]:
-    """`(查找, 替换为, 作用范围)` 三元组 → 规则；`Rule` 原样收下。
+    """`(查找, 替换为, 阶段)` 三元组 → 规则；`Rule` 原样收下。
 
-    作用范围可给中文标签；查找为空的行忽略（表格里的空行）。
+    阶段可给中文标签；查找为空的行忽略（表格里的空行）。
     """
     rules: list[Rule] = []
     for row in rows:
         if isinstance(row, Rule):
             rules.append(row)
             continue
-        pattern, replace, scope = (list(row) + ["", ""])[:3]
+        pattern, replace, stage = (list(row) + ["", ""])[:3]
         if not pattern:
             continue
-        rules.append(Rule(pattern, replace, check_scope(scope or DEFAULT_SCOPE, f"规则「{pattern}」")))
+        rules.append(Rule(pattern, replace, check_stage(stage or DEFAULT_STAGE, f"规则「{pattern}」")))
     return rules
 
 
@@ -114,9 +120,9 @@ def rules_from_source(
 
 
 def rules_to_json(rules: Iterable[Rule]) -> str:
-    """序列化成 JSON 文本（`scope` 总是显式写出）。"""
+    """序列化成 JSON 文本（`stage` 总是显式写出）。"""
     return json.dumps(
-        [{"pattern": r.pattern, "replace": r.replace, "scope": r.scope} for r in rules],
+        [{"pattern": r.pattern, "replace": r.replace, "stage": r.stage} for r in rules],
         ensure_ascii=False,
         indent=2,
     )
@@ -139,15 +145,12 @@ class Replacer:
             value = pattern.sub(rule.replace, value)
         return value
 
-    def lines(self, lines: Iterable[str]) -> list[str]:
-        return [self.text(line) for line in lines]
 
-
-def replacers_by_scope(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
-    """按作用范围拆成 (标题替换器, 正文替换器)，`scope=all` 两边都进。"""
+def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
+    """按阶段拆成 (raw 替换器, html 替换器)；两个阶段一前一后作用在标题上。"""
     rules = list(rules)
     return (
-        Replacer.of(r for r in rules if SCOPES[r.scope][1]),
-        Replacer.of(r for r in rules if SCOPES[r.scope][2]),
+        Replacer.of(r for r in rules if r.stage == "raw"),
+        Replacer.of(r for r in rules if r.stage == "html"),
     )
 

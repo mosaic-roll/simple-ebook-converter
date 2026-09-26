@@ -117,8 +117,8 @@ def _nav_and_page(tmp_path: Path) -> tuple[str, str]:
     return nav, page
 
 
-def test_replace_scope_title_leaves_body_alone(tmp_path):
-    """不写 scope 就是「标题」，正文一个字都不动。"""
+def test_replace_only_touches_the_title(tmp_path):
+    """替换只作用于标题；正文里的同一串不受影响。"""
     src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
     result = CliRunner().invoke(
         convert,
@@ -136,50 +136,42 @@ def test_replace_scope_title_leaves_body_alone(tmp_path):
     assert "正文里有第1章" in page
 
 
-def test_replace_scope_body_leaves_title_alone(tmp_path):
-    src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
+def test_replace_html_stage_injects_markup(tmp_path):
+    """`stage=html` 在转义后匹配，替换结果原样进书页标题；目录仍是纯文本。"""
+    src = _write_sample(tmp_path, text="#第1章 开头\n正文\n")
     result = CliRunner().invoke(
         convert,
         [
             "--chapter",
             r"^#.*",
             "--replace-json",
-            json.dumps([{"pattern": "第1章", "replace": "首章", "scope": "body"}]),
+            json.dumps(
+                [
+                    {
+                        "pattern": r"第(\d+)章",
+                        "replace": r'第<span class="num">\1</span>章',
+                        "stage": "html",
+                    }
+                ]
+            ),
             str(src),
         ],
     )
     assert result.exit_code == 0, result.output
     nav, page = _nav_and_page(tmp_path)
+    assert '第<span class="num">1</span>章' in page
+    assert 'class="num"' not in nav
     assert "第1章 开头" in nav
-    assert "正文里有首章" in page
 
 
-def test_replace_scope_all_hits_both(tmp_path):
-    src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
-    result = CliRunner().invoke(
-        convert,
-        [
-            "--chapter",
-            r"^#.*",
-            "--replace-json",
-            json.dumps([{"pattern": "第1章", "replace": "首章", "scope": "all"}]),
-            str(src),
-        ],
-    )
-    assert result.exit_code == 0, result.output
-    nav, page = _nav_and_page(tmp_path)
-    assert "首章 开头" in nav
-    assert "正文里有首章" in page
-
-
-def test_replace_rejects_unknown_scope(tmp_path):
+def test_replace_rejects_unknown_stage(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
         convert,
-        [str(src), "--replace-json", json.dumps([{"pattern": "a", "scope": "chapter"}])],
+        [str(src), "--replace-json", json.dumps([{"pattern": "a", "stage": "chapter"}])],
     )
     assert result.exit_code != 0
-    assert "作用范围只能是" in result.output
+    assert "阶段只能是" in result.output
 
 
 def test_cover_is_discovered_next_to_input(tmp_path):

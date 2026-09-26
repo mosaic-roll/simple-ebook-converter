@@ -29,7 +29,9 @@ def build_css(cfg: Config) -> str:
     css: list[str] = []
     if cfg.font:
         name = Path(cfg.font).name
-        css.append(f'@font-face {{\n  font-family: "{_FONT_FAMILY}";\n  src: url("fonts/{name}");\n}}')
+        css.append(
+            f'@font-face {{\n  font-family: "{_FONT_FAMILY}";\n  src: url("fonts/{name}");\n}}'
+        )
     family = f'"{_FONT_FAMILY}", ' if cfg.font else ""
     css.append(
         f"""body {{
@@ -87,7 +89,7 @@ def image_cover_body(image_name: str, alt: str = "封面") -> str:
     """图片封面页的 body 片段：一个指向封面图的 cover section。"""
     return (
         f'<section epub:type="{COVER_SECTION_TYPE}">\n'
-        f'  <img src="{_esc(image_name)}" alt="{_esc(alt)}"/>\n'
+        f'  <img src="{escape(image_name)}" alt="{escape(alt)}"/>\n'
         "</section>"
     )
 
@@ -99,9 +101,9 @@ def text_cover_body(title: str, author: str = "") -> str:
     """
     parts = [f'<section epub:type="{COVER_SECTION_TYPE}">']
     if title:
-        parts.append(f"  <h1>{_esc(title)}</h1>")
+        parts.append(f"  <h1>{escape(title)}</h1>")
     if author:
-        parts.append(f"  <p>{_esc(author)}</p>")
+        parts.append(f"  <p>{escape(author)}</p>")
     parts.append("</section>")
     return "\n".join(parts)
 
@@ -118,7 +120,9 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
         book.add_metadata("DC", "date", cfg.date)
 
     book.add_item(
-        epub.EpubItem(uid="style", file_name="style.css", media_type="text/css", content=css.encode("utf-8"))
+        epub.EpubItem(
+            uid="style", file_name="style.css", media_type="text/css", content=css.encode("utf-8")
+        )
     )
     if cfg.font:
         path = Path(cfg.font)
@@ -157,8 +161,10 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
 
 def _page_html(node: Node) -> str:
     level = max(1, node.level)
-    heading = f'<h{level} class="{_esc(node.class_name)}">{_esc(node.title)}</h{level}>'
-    paragraphs = "".join(f"<p>{_esc(p)}</p>" for p in node.paragraphs)
+    # `title_html` 是 `process()` 转义并跑完 html 阶段替换的结果；没有时按原文转义。
+    title = node.title_html or escape(node.title)
+    heading = f'<h{level} class="{escape(node.class_name)}">{title}</h{level}>'
+    paragraphs = "".join(f"<p>{escape(p)}</p>" for p in node.paragraphs)
     return f"{heading}\n{paragraphs}"
 
 
@@ -205,5 +211,5 @@ def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> 
     pages.append(page)
 
 
-def _esc(text: str) -> str:
+def escape(text: str) -> str:
     return html.escape(text or "", quote=True)

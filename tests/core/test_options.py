@@ -231,8 +231,8 @@ def test_no_replacement_by_default(tmp_path):
 
 
 def test_replacements_from_json_text(tmp_path):
-    cfg = _config(tmp_path, replace_json=json.dumps([{"pattern": "甲", "scope": "body"}]))
-    assert [(r.pattern, r.scope) for r in cfg.replacements] == [("甲", "body")]
+    cfg = _config(tmp_path, replace_json=json.dumps([{"pattern": "甲", "stage": "html"}]))
+    assert [(r.pattern, r.stage) for r in cfg.replacements] == [("甲", "html")]
 
 
 def test_replacements_from_file(tmp_path):

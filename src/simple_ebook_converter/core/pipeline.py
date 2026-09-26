@@ -14,14 +14,14 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from .builder import build_css, build_epub
+from .builder import build_css, build_epub, escape
 from .cleaner import clean_lines
 from .config import Config
 from .encoding import EncodingError, read_lines
 from .mediatypes import find_cover
 from .meta import resolve_metadata
 from .parser import Node, ParseStats, parse, walk
-from .replace import replacers_by_scope
+from .replace import replacers_by_stage
 from .toc import load_toc, render, tree_from_json
 
 
@@ -83,17 +83,19 @@ def _stats_from_tree(tree: list[Node], total_lines: int) -> ParseStats:
 
 
 def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
-    """把原始行变成章节树：扫目录（阶段一）→ 清理 → 按作用范围替换（阶段二）。
+    """把原始行变成章节树：扫目录（阶段一）→ 清理 → 替换标题（阶段二）。
 
-    只动 `lines` 与新节点。
+    替换只作用于标题：`raw` 规则改原始标题，结果写进 `node.title`（目录/元数据/正文页
+    都用它）；随后转义，`html` 规则在转义结果上再替换一次，写进 `node.title_html`
+    供书页标题原样输出。只动 `lines` 与新节点。
     """
     tree, stats = scan_toc(lines, cfg)
-    titles, bodies = replacers_by_scope(cfg.replacements)
+    raw_replacer, html_replacer = replacers_by_stage(cfg.replacements)
     for node in walk(tree):
         if cfg.clean:
             node.paragraphs = clean_lines(node.paragraphs)
-        node.title = titles.text(node.title)
-        node.paragraphs = bodies.lines(node.paragraphs)
+        node.title = raw_replacer.text(node.title)
+        node.title_html = html_replacer.text(escape(node.title))
     return tree, stats
 
 

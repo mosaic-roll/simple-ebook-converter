@@ -62,26 +62,28 @@ tree, stats = process(lines, cfg)
 见 `simple_ebook_converter.core.meta.resolve_metadata()`）并自动发现封面，
 补全后返回**新**的 `Config`，不改传入的那一个。
 
-## 替换规则的作用范围
+## 替换规则的阶段
 
-`--replace-json` / `--replace-file` 收一个 JSON 列表，每条规则可带可选的 `scope`：
+替换规则**只作用于标题**（要改正文，直接改源文件更直接）。`--replace-json` /
+`--replace-file` 收一个 JSON 列表，每条规则可带可选的 `stage`，决定在 HTML 转义之前
+还是之后匹配：
 
 ```json
 [
   { "pattern": "^#+\\s*", "replace": "" },
-  { "pattern": "正文里的\\s+", "replace": " ", "scope": "body" },
-  { "pattern": "括号",     "replace": "【】", "scope": "all" }
+  { "pattern": "第(\\d+)章", "replace": "第<span class=\"num\">\\1</span>章", "stage": "html" }
 ]
 ```
 
-| `scope` | 作用位置 |
-|---------|----------|
-| `title` | 只改标题（含目录页与书页标题）——**默认值** |
-| `body`  | 只改正文段落 |
-| `all`   | 标题与正文都改 |
+| `stage` | 匹配对象 | 替换结果 |
+|---------|----------|----------|
+| `raw`   | 原始标题（转义前） | 照常在写出时转义——**默认值** |
+| `html`  | 已转义的标题（转义后） | 按 HTML 原样注入，可含标签 |
 
-默认只改标题，是因为 GUI 里只能看到目录预览，「默认也动正文」反而不符合直觉。
-原始标题始终保留在 `node.raw_title`。
+`raw` 先于 `html`：先改原文标题（写进 `node.title`，目录页/NCX/元数据都用它），
+再转义，然后 `html` 规则在转义结果上再改一次，结果写进书页标题的 HTML 片段。
+所以 `html` 阶段适合给章节序号套 `<span>`，再用 `--css-file` 上样式；它不会影响
+纯文本的目录与元数据。原始标题始终保留在 `node.raw_title`。
 
 ## 封面
 
@@ -117,10 +119,10 @@ simple-ebook-converter-cli novel.txt --cover cover.png        # 显式给图
 1. `resolve()`：封面自动发现（没给 `--cover` 时找同目录的 `cover.*`）→ `Config.validate()`
    （校验取值范围、日期格式、字体/封面格式）→ 从文件名猜书名/作者
 2. 读取与编码识别（BOM → chardet → 逐个尝试，`--encoding` 可手动指定）
-3. 按标题正则切分为章节（在原始行上进行，保留空行/空格信息）
-4. 逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）
-5. 按 `scope` 分流应用替换规则（标题规则只进 `node.title`，正文规则只进
-   `node.paragraphs`）
+3. 阶段一 `scan_toc()`：按标题正则切分为章节，或按 `--toc-file` 读回编辑过的目录树
+4. 阶段二 `process()`：逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）
+5. 替换标题：`raw` 规则改纯文本标题（目录/元数据都用它），`html` 规则在转义后改书页标题
+   （见「替换规则的阶段」）
 6. 按开关产出：`cfg.toc_only` → `write_toc()` / `toc_text()`；`cfg.dump_css` →
    `write_css()`（只导出 CSS，不读输入）；否则 `write_epub()` 组装 EPUB3
    （zip 最高压缩等级 `compresslevel=9`）

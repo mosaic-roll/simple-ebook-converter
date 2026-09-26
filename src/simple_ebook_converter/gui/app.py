@@ -32,9 +32,9 @@ from ..core.pipeline import (
     write_toc,
 )
 from ..core.replace import (
-    DEFAULT_SCOPE,
-    SCOPE_LABELS,
-    replacers_by_scope,
+    DEFAULT_STAGE,
+    STAGE_LABELS,
+    replacers_by_stage,
     rules_from_json,
     rules_from_rows,
     rules_to_json,
@@ -42,7 +42,7 @@ from ..core.replace import (
 from ..core.toc import to_json
 
 #: 替换规则下拉框用 core 的中文标签，两个方向都齐全
-_DEFAULT_SCOPE_LABEL = SCOPE_LABELS[DEFAULT_SCOPE]
+_DEFAULT_STAGE_LABEL = STAGE_LABELS[DEFAULT_STAGE]
 
 #: 替换规则的表格挂在「清理与替换」这一组下面
 _REPLACE_GROUP = "清理与替换"
@@ -89,13 +89,14 @@ def make_config(fields: dict) -> Config:
 def preview_data(fields: dict) -> tuple[list[dict], object]:
     """扫出目录树（JSON 列表）与标题替换函数；树里只存原始标题，展示时现算。
 
-    只走两阶段里的阶段一，不读正文内容之外的任何重活。
+    只走两阶段里的阶段一，不读正文内容之外的任何重活。预览只体现 `raw` 阶段：
+    `html` 阶段是要塞标签给阅读器渲染的，在纯文本预览里没有意义。
     """
     cfg = resolve_config(make_config(fields))
     lines, _ = read_input(cfg)
     tree, _ = scan_toc(lines, cfg)
-    titles, _ = replacers_by_scope(cfg.replacements)
-    return to_json(tree, cfg.toc_depth), titles.text
+    raw_replacer, _ = replacers_by_stage(cfg.replacements)
+    return to_json(tree, cfg.toc_depth), raw_replacer.text
 
 
 def generate_output(fields: dict) -> Path:
@@ -146,7 +147,7 @@ class App:
         for name, text in self.texts.items():
             fields[name] = text.get("1.0", "end")
         fields["replacements"] = [
-            tuple(self.replace_tree.item(iid, "values")) or ("", "", _DEFAULT_SCOPE_LABEL)
+            tuple(self.replace_tree.item(iid, "values")) or ("", "", _DEFAULT_STAGE_LABEL)
             for iid in self.replace_tree.get_children()
         ]
         return fields
@@ -257,19 +258,19 @@ class App:
     def _build_replace_table(self, parent: ttk.Frame, row: int) -> None:
         ttk.Label(
             parent,
-            text="逐条编辑（优先于上面的 JSON 入口）；按顺序生效，作用范围默认「标题」，"
+            text="逐条编辑（优先于上面的 JSON 入口）；按顺序生效，阶段默认「原文」，"
             "留空正则的行被忽略",
             wraplength=520,
         ).grid(row=row, column=0, columnspan=3, sticky="w", pady=(8, 0))
         row += 1
 
         self.replace_tree = ttk.Treeview(
-            parent, columns=("pattern", "replace", "scope"), show="headings", height=6
+            parent, columns=("pattern", "replace", "stage"), show="headings", height=6
         )
         for column, heading, width in (
             ("pattern", "正则查找", 200),
             ("replace", "替换为", 200),
-            ("scope", "作用范围", 80),
+            ("stage", "阶段", 80),
         ):
             self.replace_tree.heading(column, text=heading)
             self.replace_tree.column(column, width=width)
@@ -278,18 +279,18 @@ class App:
 
         self.v_rp = tk.StringVar()
         self.v_rr = tk.StringVar()
-        self.v_rs = tk.StringVar(value=_DEFAULT_SCOPE_LABEL)
+        self.v_rs = tk.StringVar(value=_DEFAULT_STAGE_LABEL)
         edit = ttk.Frame(parent)
         edit.grid(row=row, column=0, columnspan=3, sticky="ew")
         ttk.Label(edit, text="查找").pack(side="left")
         ttk.Entry(edit, textvariable=self.v_rp).pack(side="left", fill="x", expand=True, padx=4)
         ttk.Label(edit, text="替换为").pack(side="left")
         ttk.Entry(edit, textvariable=self.v_rr).pack(side="left", fill="x", expand=True, padx=4)
-        ttk.Label(edit, text="范围").pack(side="left", padx=(8, 0))
+        ttk.Label(edit, text="阶段").pack(side="left", padx=(8, 0))
         ttk.Combobox(
             edit,
             textvariable=self.v_rs,
-            values=list(SCOPE_LABELS.values()),
+            values=list(STAGE_LABELS.values()),
             state="readonly",
             width=6,
         ).pack(side="left", padx=4)
@@ -315,10 +316,10 @@ class App:
         iid = self._selected_replace()
         if not iid:
             return
-        pattern, replace, scope = self.replace_tree.item(iid, "values")
+        pattern, replace, stage = self.replace_tree.item(iid, "values")
         self.v_rp.set(pattern)
         self.v_rr.set(replace)
-        self.v_rs.set(scope)
+        self.v_rs.set(stage)
 
     def _replace_values(self) -> tuple[str, str, str]:
         return (self.v_rp.get().strip(), self.v_rr.get(), self.v_rs.get())
@@ -350,7 +351,7 @@ class App:
             return
         for rule in rules:
             self.replace_tree.insert(
-                "", "end", values=(rule.pattern, rule.replace, SCOPE_LABELS[rule.scope])
+                "", "end", values=(rule.pattern, rule.replace, STAGE_LABELS[rule.stage])
             )
 
     def _replace_export(self) -> None:
@@ -360,8 +361,8 @@ class App:
         if not path:
             return
         rows = [
-            (pattern, replace, scope)
-            for pattern, replace, scope in (
+            (pattern, replace, stage)
+            for pattern, replace, stage in (
                 self.replace_tree.item(iid, "values") for iid in self.replace_tree.get_children()
             )
             if pattern

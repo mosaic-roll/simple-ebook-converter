@@ -187,8 +187,8 @@ def test_process_keeps_blank_lines_when_not_cleaning(tmp_path):
     assert tree[0].paragraphs == ["正文一", "", "正文二"]
 
 
-def test_process_replaces_titles_and_bodies_keeping_raw(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X", "all")])
+def test_process_replaces_titles_keeping_raw(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X")])
     tree, _ = process(SAMPLE, cfg)
     volume = tree[1]
     assert volume.title == "第X一卷 风起"
@@ -214,55 +214,64 @@ def test_levels_are_not_shared_between_configs(tmp_path):
     assert [r.level for r in b.levels] == [r.level for r in default_levels()]
 
 
-# ---------- 替换的作用范围 ----------
+# ---------- 替换：只作用于标题，raw / html 两个阶段 ----------
 
 
-def test_default_scope_touches_titles_only(tmp_path):
-    """默认只改标题：GUI 里只能看到目录，默认动正文反而不符合直觉。"""
+def test_replacement_never_touches_paragraphs(tmp_path):
+    """替换只作用于标题；改正文请直接改源文件。"""
     cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了")])
     tree, _ = process(SAMPLE, cfg)
     assert tree[1].children[0].paragraphs == ["正文一字"]
     assert tree[1].title == "第一卷 风起"
 
 
-def test_body_scope_touches_paragraphs_only(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了", "body")])
+def test_raw_stage_replaces_the_plain_title(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("风起", "起风")])
     tree, _ = process(SAMPLE, cfg)
-    assert tree[1].children[0].paragraphs == ["改了字"]
-    assert tree[1].title == "第一卷 风起"
+    assert tree[1].title == "第一卷 起风"
+    assert tree[1].raw_title == "第一卷 风起"
 
 
-def test_all_scope_touches_both(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("一", "壹", "all")])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].title == "第壹卷 风起"
-    assert tree[1].children[0].paragraphs == ["正文壹字"]
+def test_raw_stage_result_is_escaped_for_the_page(tmp_path):
+    """raw 阶段塞进来的 `<` 当文本转义，不会变成标签。"""
+    node = process(SAMPLE, _cfg(tmp_path, replacements=[Rule("第一卷", "<b>")]))[0][1]
+    assert node.title == "<b> 风起"
+    assert node.title_html == "&lt;b&gt; 风起"
 
 
-def test_scopes_apply_independently_in_one_pass(tmp_path):
-    """标题规则与正文规则混在一份列表里，各走各的，互不干扰。"""
+def test_html_stage_injects_markup_into_the_heading(tmp_path):
+    """html 阶段在转义之后匹配，替换结果原样进书页标题（纯文本标题不受影响）。"""
     cfg = _cfg(
         tmp_path,
-        replacements=[
-            Rule("风起", "起风", "title"),
-            Rule("正文一", "P1", "body"),
-            Rule("离别", "别离", "all"),
-        ],
+        replacements=[Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")],
     )
-    tree, _ = process(SAMPLE, cfg)
-    volume = tree[1]
+    node = process(SAMPLE, cfg)[0][1].children[0]
+    assert node.title == "第一章 初遇"
+    assert node.title_html == '第<span class="num">一</span>章 初遇'
+
+
+def test_raw_runs_before_html(tmp_path):
+    """两个阶段一前一后：raw 改完再转义，html 在转义结果上接着改。"""
+    cfg = _cfg(
+        tmp_path,
+        replacements=[Rule("初遇", "重逢"), Rule("重逢", "<i>重逢</i>", "html")],
+    )
+    node = process(SAMPLE, cfg)[0][1].children[0]
+    assert node.title == "第一章 重逢"
+    assert node.title_html == "第一章 <i>重逢</i>"
+
+
+def test_stages_apply_independently_in_one_pass(tmp_path):
+    cfg = _cfg(
+        tmp_path,
+        replacements=[Rule("风起", "起风", "raw"), Rule("离别", "别离", "html")],
+    )
+    volume = process(SAMPLE, cfg)[0][1]
     assert volume.title == "第一卷 起风"
-    assert volume.children[0].paragraphs == ["P1字"]
-    # scope=all 的规则两边都进
-    assert volume.children[1].title == "第二章 别离"
-    assert volume.children[1].paragraphs == ["正文二字"]
-
-
-def test_body_only_rules_leave_titles_untouched(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("第", "X", "body")])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].title == "第一卷 风起"
-    assert tree[1].raw_title == "第一卷 风起"
+    assert volume.title_html == "第一卷 起风"
+    # html 阶段不改纯文本标题，只改书页标题
+    assert volume.children[1].title == "第二章 离别"
+    assert volume.children[1].title_html == "第二章 别离"
 
 
 # ---------- 目录 ----------
