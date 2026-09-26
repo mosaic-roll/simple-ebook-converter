@@ -88,6 +88,33 @@ def test_config_defaults_is_the_core_one():
     assert app.config_defaults is config_defaults
 
 
+#: 界面上留空时应回落到 Config 默认值的字段
+_FALLBACK_FIELDS = (
+    "encoding",
+    "language",
+    "preface_title",
+    "line_height",
+    "para_spacing",
+    "chapter_align",
+    "volume_align",
+)
+
+
+def test_make_config_empty_fields_fall_back_to_config(tmp_path):
+    """字段留空/缺失时回落到 Config 的默认值，不靠 app.py 里另写的字面量。"""
+    fields = _fields(tmp_path)
+    for name in _FALLBACK_FIELDS:
+        fields[name] = ""
+    for name in ("toc_depth", "indent"):
+        del fields[name]
+    cfg = make_config(fields)
+    defaults = config_defaults()
+    for name in _FALLBACK_FIELDS:
+        assert getattr(cfg, name) == defaults[name], f"{name} 没有回落到 Config 默认值"
+    assert cfg.toc_depth == defaults["toc_depth"]
+    assert cfg.indent == defaults["indent"]
+
+
 def test_make_config_defaults(tmp_path):
     cfg = make_config(_fields(tmp_path))
     assert cfg.no_volume is False

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import tkinter as tk
-from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -15,6 +14,9 @@ from sec_core.replace import Rule, rules_from_json
 from sec_core.toc import to_json
 
 _ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "cp932", "euc_jp"]
+
+#: 字段缺省值取自 sec-core 的 Config，界面不再另写一份字面量
+_DEFAULTS = config_defaults()
 
 
 def split_extra(text: str) -> tuple[str, ...]:
@@ -30,8 +32,8 @@ def make_config(fields: dict) -> Config:
 
     try:
         max_title_len = int(fields["max_title_len"])
-        toc_depth = int(fields.get("toc_depth", 6))
-        indent = int(fields.get("indent", 2))
+        toc_depth = int(fields.get("toc_depth", _DEFAULTS["toc_depth"]))
+        indent = int(fields.get("indent", _DEFAULTS["indent"]))
     except (TypeError, ValueError) as e:
         raise ValueError("数字字段格式错误（标题最长/目录深度/段落缩进）") from e
 
@@ -51,26 +53,26 @@ def make_config(fields: dict) -> Config:
 
     return Config(
         input=src,
-        encoding=fields.get("encoding") or "auto",
+        encoding=fields.get("encoding") or _DEFAULTS["encoding"],
         overwrite=not bool(fields.get("no_overwrite")),
         title=fields.get("title") or None,
         author=fields.get("author") or "",
         date=(fields.get("date") or "").strip() or None,
-        language=fields.get("language") or "zh",
+        language=fields.get("language") or _DEFAULTS["language"],
         cover=Path(cover) if cover else None,
         levels=levels,
         max_title_len=max_title_len,
-        preface_title=fields.get("preface_title") or "前言",
+        preface_title=fields.get("preface_title") or _DEFAULTS["preface_title"],
         no_volume=bool(fields.get("no_volume")),
         replacements=replacements,
         no_clean=bool(fields.get("no_clean")),
         no_toc=bool(fields.get("no_toc")),
         toc_depth=toc_depth,
         indent=indent,
-        line_height=fields.get("line_height") or "1.5",
-        para_spacing=fields.get("para_spacing") or "1em",
-        chapter_align=fields.get("chapter_align") or "center",
-        volume_align=fields.get("volume_align") or "right",
+        line_height=fields.get("line_height") or _DEFAULTS["line_height"],
+        para_spacing=fields.get("para_spacing") or _DEFAULTS["para_spacing"],
+        chapter_align=fields.get("chapter_align") or _DEFAULTS["chapter_align"],
+        volume_align=fields.get("volume_align") or _DEFAULTS["volume_align"],
         font=None,
         css_file=None,
     )
