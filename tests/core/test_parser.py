@@ -115,7 +115,7 @@ def test_custom_level_hierarchy():
 
 def test_no_volume_flag_ignores_volume():
     lines = ["第一卷 甲", "第一章 a", "正文"]
-    tree, _ = parse(lines, build_levels(["2::volume"]), fallback_title="书名")
+    tree, _ = parse(lines, build_levels(["h2.volume:"]), fallback_title="书名")
     assert [n.title for n in tree] == ["前言", "第一章 a"]
     assert tree[0].paragraphs == ["第一卷 甲"]
     assert tree[1].paragraphs == ["正文"]
@@ -158,4 +158,11 @@ def test_paragraphs_follow_the_nearest_heading():
     assert volume.paragraphs == ["卷内正文"]
     assert first.paragraphs == ["正文一"]
     assert second.paragraphs == ["正文二", "结尾"]
+
+
+def test_classless_level_has_empty_class_name():
+    """`--level h1:…` 不带 class，节点就不带 class（落到 hN 标签选择器）。"""
+    tree, _ = parse(["Part 1", "正文"], build_levels(["h1:^Part"]), fallback_title="书名")
+    assert tree[0].level == 1
+    assert tree[0].class_name == ""
 

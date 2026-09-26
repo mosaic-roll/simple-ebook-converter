@@ -72,7 +72,7 @@ def test_form_default_comes_from_config():
 
 def test_multi_line_option_takes_one_item_per_line(tmp_path):
     """额外层级是多行文本框：一行一条规则，和 CLI 重复写 --level 等价。"""
-    fields = _fields(tmp_path, level="1:^第[0-9]+部:part\n5:^尾声")
+    fields = _fields(tmp_path, level="h1.part:^第[0-9]+部\nh5:^尾声")
     levels = {rule.level: rule for rule in make_config(fields).levels}
     assert levels[1].class_name == "part"
     assert levels[5].pattern == "^尾声"

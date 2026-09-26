@@ -1,8 +1,5 @@
 """`core.toc`：扁平目录 JSON 的渲染与往返（`--toc-file` 的数据契约）。"""
 
-import json
-from pathlib import Path
-
 import pytest
 
 from simple_ebook_converter.core.parser import Node
@@ -158,3 +155,10 @@ def test_tree_from_json_rejects_bad_entries():
         )
     with pytest.raises(ValueError, match="不是 JSON 对象"):
         tree_from_json(["不是字典"], lines)
+
+
+def test_tree_from_json_keeps_an_empty_class_name():
+    """classless 层级（`--level h1:…`）的 class 是空串，回喂后原样保留，不能补成 levelN。"""
+    data = [{"raw_title": "Part 1", "level": 1, "class_name": "", "lines": [1, 2]}]
+    restored = tree_from_json(data, ["Part 1", "正文"])
+    assert restored[0].class_name == ""

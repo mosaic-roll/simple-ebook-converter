@@ -159,7 +159,8 @@ def test_blank_preset_disables_level(tmp_path):
 
 
 def test_extra_levels_from_one_line_per_spec(tmp_path):
-    cfg = _config(tmp_path, level="1:^Part\\s+\\d+:part\n5:^\\*\\*\\*:scene\n\n  \n6:^>>\\s:note")
+    specs = "h1.part:^Part\\s+\\d+\nh5.scene:^\\*\\*\\*\n\n  \nh6.note:^>>\\s"
+    cfg = _config(tmp_path, level=specs)
     assert [(r.level, r.class_name) for r in cfg.levels] == [
         (1, "part"),
         (2, "volume"),
@@ -172,12 +173,17 @@ def test_extra_levels_from_one_line_per_spec(tmp_path):
 
 def test_extra_levels_accept_a_tuple(tmp_path):
     """CLI 那边 --level 重复给 click 的就是元组。"""
-    cfg = _config(tmp_path, level=("5:^注解:note",))
+    cfg = _config(tmp_path, level=("h5.note:^注解",))
     assert next(r for r in cfg.levels if r.level == 5).class_name == "note"
 
 
+def test_extra_level_without_class_has_no_class(tmp_path):
+    cfg = _config(tmp_path, level="h1:^第[0-9]+部")
+    assert next(r for r in cfg.levels if r.level == 1).class_name == ""
+
+
 def test_extra_level_overrides_preset(tmp_path):
-    cfg = _config(tmp_path, volume="^甲", level="2:^乙")
+    cfg = _config(tmp_path, volume="^甲", level="h2:^乙")
     assert next(r for r in cfg.levels if r.level == 2).pattern == "^乙"
 
 
@@ -188,7 +194,7 @@ def test_bad_preset_regex_is_rejected(tmp_path):
 
 def test_bad_extra_level_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="额外层级"):
-        _config(tmp_path, level="9:^x")
+        _config(tmp_path, level="h9:^x")
 
 
 def test_levels_default_to_level_rules():

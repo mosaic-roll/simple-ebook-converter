@@ -163,7 +163,9 @@ def _page_html(node: Node) -> str:
     level = max(1, node.level)
     # `title_html` 是 `process()` 转义并跑完 html 阶段替换的结果；没有时按原文转义。
     title = node.title_html or escape(node.title)
-    heading = f'<h{level} class="{escape(node.class_name)}">{title}</h{level}>'
+    # class 省略的层级（`--level h2:…`）不加 class，直接落到 `hN` 标签选择器上。
+    class_attr = f' class="{escape(node.class_name)}"' if node.class_name else ""
+    heading = f"<h{level}{class_attr}>{title}</h{level}>"
     paragraphs = "".join(f"<p>{escape(p)}</p>" for p in node.paragraphs)
     return f"{heading}\n{paragraphs}"
 

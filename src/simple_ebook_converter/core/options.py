@@ -118,7 +118,7 @@ OPTIONS: tuple[Option, ...] = (
         "章节识别", value_type=bool,
     ),
     Option(
-        "level", "额外层级", "额外层级规则，可重复；格式 级别:正则[:类名]，级别 1~6",
+        "level", "额外层级", "额外层级规则，可重复；格式 hN[.class]:正则（如 h1.part:^Part），与 CSS 选择器一致",
         "章节识别", multiple=True,
     ),
     Option("max_title_len", "标题最长字数", "超过这个字数的行即使命中正则也当正文", "章节识别"),
@@ -204,7 +204,7 @@ def build_config(values: Mapping[str, Any]) -> Config:
 
 
 def _level_specs(values: Mapping[str, Any]) -> list[str]:
-    """层级规格：卷/章/节三条预设与 `--level` 统一成 `级别:正则[:类名]`。
+    """层级规格：卷/章/节三条预设与 `--level` 统一成 `hN[.class]:正则`。
 
     预设未给用内置正则，显式空串表示不识别该层级；class 名就是选项名。
     """
@@ -214,7 +214,7 @@ def _level_specs(values: Mapping[str, Any]) -> list[str]:
             continue
         value = values.get(opt.name)
         pattern = option_default(opt) if value is None else value
-        specs.append(f"{opt.level}:{pattern}:{opt.name}")
+        specs.append(f"h{opt.level}.{opt.name}:{pattern}")
     return specs + list(_lines(values.get("level") or ()))
 
 

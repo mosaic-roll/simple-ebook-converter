@@ -129,10 +129,13 @@ def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
     deleted = entry.get("deleted", False)
     if not isinstance(deleted, bool):
         raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")
+    class_name = entry.get("class_name", "")
+    if not isinstance(class_name, str):
+        raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")
     return Node(
         title.strip(),
         level,
-        str(entry.get("class_name") or f"level{level}"),
+        class_name,
         raw_title=title.strip(),
         lines=(start, end),
         deleted=deleted,

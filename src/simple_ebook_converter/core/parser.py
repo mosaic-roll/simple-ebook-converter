@@ -111,7 +111,7 @@ def parse(
             Node(
                 title,
                 rule.level,
-                rule.class_name or f"level{rule.level}",
+                rule.class_name,
                 raw_title=title,
                 lines=(lineno, lineno),
             )

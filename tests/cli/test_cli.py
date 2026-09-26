@@ -453,13 +453,13 @@ def test_toc_json_depth_pruning(tmp_path):
     p.write_text("第一卷\n第一章\n§1\n正文\n", encoding="utf-8")
     deep = CliRunner().invoke(
         convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "4:^§", "--toc-depth", "6"],
+        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "6"],
     )
     assert deep.exit_code == 0, deep.output
     assert "§1" in deep.output
     shallow = CliRunner().invoke(
         convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "4:^§", "--toc-depth", "3"],
+        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "3"],
     )
     assert shallow.exit_code == 0, shallow.output
     assert "第一章" in shallow.output
@@ -553,7 +553,7 @@ def test_convert_missing_input():
         ["--chapter", "("],
         ["--volume", "["],
         ["--section", "(?"],
-        ["--level", "2:("],
+        ["--level", "h2:("],
     ],
 )
 def test_invalid_level_regex_reports_clean_error(tmp_path, args):

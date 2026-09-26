@@ -8,12 +8,13 @@ from simple_ebook_converter.core.replace import Rule, rules_from_json
 
 
 def test_parse_level_spec():
-    assert parse_level_spec("5:^注解") == (5, "^注解", "level5")
-    assert parse_level_spec("1:^卷:volume") == (1, "^卷", "volume")
-    assert parse_level_spec("2:^甲:带:冒号") == (2, "^甲", "带:冒号")
+    assert parse_level_spec("h5:^注解") == (5, "^注解", "")
+    assert parse_level_spec("h1.volume:^卷") == (1, "^卷", "volume")
+    # 冒号后整段都是正则，所以正则里可以有冒号
+    assert parse_level_spec("h2:^甲:带:冒号") == (2, "^甲:带:冒号", "")
 
 
-@pytest.mark.parametrize("spec", ["^没有级别号", "abc:^x", "7:^x", "0:^x", "1:"])
+@pytest.mark.parametrize("spec", ["^没有级别号", "h7:^x", "h0:^x", "x2:^x", "h2", "h2.类名:^x"])
 def test_parse_level_spec_rejects_bad_input(spec):
     with pytest.raises(ValueError):
         parse_level_spec(spec)
@@ -27,13 +28,17 @@ def test_check_pattern_reports_the_label():
 
 def test_build_levels_keeps_builtin_when_spec_missing():
     levels = build_levels()
-    assert [(r.level, r.class_name) for r in levels] == [(2, "volume"), (3, "chapter"), (4, "section")]
+    assert [(r.level, r.class_name) for r in levels] == [
+        (2, "volume"),
+        (3, "chapter"),
+        (4, "section"),
+    ]
     assert next(r for r in levels if r.level == 2).pattern != ""
     assert next(r for r in levels if r.level == 4).pattern == ""
 
 
 def test_build_levels_spec_overrides_builtin():
-    levels = build_levels(["2:^第[0-9]+[卷]:volume", "3:^第[0-9]+[章]:chapter"])
+    levels = build_levels(["h2.volume:^第[0-9]+[卷]", "h3.chapter:^第[0-9]+[章]"])
     assert len(levels) == len(default_levels())
     assert next(r for r in levels if r.level == 2).pattern == "^第[0-9]+[卷]"
     assert next(r for r in levels if r.level == 3).pattern == "^第[0-9]+[章]"
@@ -43,30 +48,31 @@ def test_build_levels_spec_overrides_builtin():
 
 def test_build_levels_blank_pattern_disables_that_level():
     """空正则 = 不识别该层级（`--no-volume` 与 GUI 清空输入框都走这条路）。"""
-    levels = build_levels(["2::volume", "3:^第.章:chapter", "4::section"])
+    levels = build_levels(["h2.volume:", "h3.chapter:^第.章", "h4.section:"])
     assert [r.active for r in levels] == [False, True, False]
 
 
 def test_build_levels_extra_specs_append_and_override():
-    levels = build_levels(["5:^注解:note", "2:^第[0-9]+卷"])
+    levels = build_levels(["h5.note:^注解", "h2:^第[0-9]+卷"])
     by_level = {r.level: r for r in levels}
     assert set(by_level) == {2, 3, 4, 5}
     assert (by_level[5].pattern, by_level[5].class_name) == ("^注解", "note")
-    assert (by_level[2].pattern, by_level[2].class_name) == ("^第[0-9]+卷", "level2")
+    # class 省略 = 不给该标题加 class
+    assert (by_level[2].pattern, by_level[2].class_name) == ("^第[0-9]+卷", "")
 
 
 def test_build_levels_does_not_share_default_rules():
-    build_levels(["2:^改了:volume"])[0].pattern = "^又改了"
+    build_levels(["h2.volume:^改了"])[0].pattern = "^又改了"
     assert default_levels()[0].pattern != "^又改了"
 
 
 @pytest.mark.parametrize(
     ("specs", "label"),
     [
-        (["2:(:volume"], "卷标题"),
-        (["3:[:chapter"], "章标题"),
-        (["4:(?:section"], "节标题"),
-        (["5:^ok", "2:("], "额外层级 2"),
+        (["h2.volume:("], "卷标题"),
+        (["h3.chapter:["], "章标题"),
+        (["h4.section:(?:"], "节标题"),
+        (["h5.note:^ok", "h2:("], "额外层级 h2"),
     ],
 )
 def test_build_levels_rejects_invalid_pattern(specs, label):
