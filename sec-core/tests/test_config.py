@@ -1,3 +1,5 @@
+import inspect
+
 import pytest
 
 from sec_core.config import (
@@ -110,3 +112,15 @@ def test_align_choices_are_the_only_allowed():
     for value in ALIGN_CHOICES:
         Config(chapter_align=value, volume_align=value).validate()
     assert set(ALIGN_CHOICES) == {"left", "center", "right"}
+
+
+def test_library_function_defaults_come_from_config():
+    """parse()/to_json()/to_text() 的缺省值也必须跟着 Config 走，不能另写一份。"""
+    from sec_core import parser, toc
+
+    defaults = config_defaults()
+    parse_params = inspect.signature(parser.parse).parameters
+    assert parse_params["max_title_len"].default == defaults["max_title_len"]
+    assert parse_params["preface_title"].default == defaults["preface_title"]
+    for fn in (toc.to_json, toc.to_text):
+        assert inspect.signature(fn).parameters["depth"].default == defaults["toc_depth"]

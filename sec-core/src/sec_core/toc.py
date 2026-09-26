@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from .config import Node
+from .config import Node, config_defaults
+
+#: 直接调用时不传 depth 就取 Config.toc_depth，避免另写一份字面量
+_DEFAULT_DEPTH = config_defaults()["toc_depth"]
 
 
 def _to_dict(node: Node, depth: int) -> dict:
@@ -17,12 +20,12 @@ def _to_dict(node: Node, depth: int) -> dict:
     return entry
 
 
-def to_json(tree: list[Node], depth: int = 6) -> list[dict]:
+def to_json(tree: list[Node], depth: int = _DEFAULT_DEPTH) -> list[dict]:
     """章节树转 JSON，逐层按 depth 裁剪（与 to_text 语义一致）。"""
     return [_to_dict(node, depth) for node in tree]
 
 
-def to_text(tree: list[Node], depth: int = 6) -> str:
+def to_text(tree: list[Node], depth: int = _DEFAULT_DEPTH) -> str:
     lines: list[str] = []
 
     def emit(nodes: list[Node]) -> None:

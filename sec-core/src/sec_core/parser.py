@@ -3,7 +3,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .config import LevelRule, Node
+from .config import LevelRule, Node, config_defaults
+
+#: 直接调用 parse() 时不传这些参数就取 Config 的默认值，避免第三份字面量
+_DEFAULTS = config_defaults()
 
 
 @dataclass
@@ -30,8 +33,8 @@ def _append(stack: list[Node], preface: list[str], line: str) -> None:
 def parse(
     lines: list[str],
     levels: list[LevelRule],
-    max_title_len: int = 35,
-    preface_title: str = "前言",
+    max_title_len: int = _DEFAULTS["max_title_len"],
+    preface_title: str = _DEFAULTS["preface_title"],
     fallback_title: str = "未命名",
     no_volume: bool = False,
 ) -> tuple[list[Node], ParseStats]:
