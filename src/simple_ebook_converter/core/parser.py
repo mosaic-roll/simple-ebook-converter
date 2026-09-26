@@ -10,13 +10,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 
-from .config import (
-    DEFAULT_MAX_TITLE_LEN,
-    DEFAULT_PREFACE_TITLE,
-    FALLBACK_TITLE,
-    LevelRule,
-    Node,
-)
+from .config import DEFAULTS, LevelRule, Node
 
 
 @dataclass
@@ -35,9 +29,9 @@ def parse(
     lines: list[str],
     levels: list[LevelRule],
     *,
-    max_title_len: int = DEFAULT_MAX_TITLE_LEN,
-    preface_title: str = DEFAULT_PREFACE_TITLE,
-    fallback_title: str = FALLBACK_TITLE,
+    fallback_title: str,
+    max_title_len: int = DEFAULTS.max_title_len,
+    preface_title: str = DEFAULTS.preface_title,
     volume_titles: bool = True,
 ) -> tuple[list[Node], ParseStats]:
     """把行切分为章节树，返回 (顶层节点列表, 统计信息)。
@@ -101,9 +95,13 @@ def _wrap_preface(
         return
     if tree:
         stats.has_preface = True
-        tree.insert(0, Node(preface_title, 0, "preface", paragraphs=preface, raw_title=preface_title))
+        tree.insert(
+            0, Node(preface_title, 0, "preface", paragraphs=preface, raw_title=preface_title)
+        )
     else:
-        tree.append(Node(fallback_title, 2, "chapter", paragraphs=preface, raw_title=fallback_title))
+        tree.append(
+            Node(fallback_title, 2, "chapter", paragraphs=preface, raw_title=fallback_title)
+        )
 
 
 def walk(nodes: list[Node]) -> Iterator[Node]:

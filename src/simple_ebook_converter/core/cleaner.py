@@ -1,19 +1,17 @@
-"""默认清理：去掉段首段尾空白（含全角空格）并删掉空行。"""
+"""默认清理：去掉段首段尾空格、删除空行。`--no-clean` 整体关掉。"""
 
 from __future__ import annotations
 
-import re
-
-_LEADING = re.compile(r"^[ \t\u3000]+")
-_TRAILING = re.compile(r"[ \t\u3000]+$")
+#: 算「行首段尾空格」的字符：半角空格、制表符、全角空格
+_BLANKS = " \t\u3000"
 
 
 def clean_line(line: str) -> str:
-    return _TRAILING.sub("", _LEADING.sub("", line))
+    return line.strip(_BLANKS)
 
 
 def clean_lines(lines: list[str]) -> list[str]:
-    """逐行清理，清理后为空的行直接丢掉。"""
+    """清理一个节点的段落，清空后为空的行直接不要。"""
     out: list[str] = []
     for line in lines:
         cleaned = clean_line(line)

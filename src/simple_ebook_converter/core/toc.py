@@ -1,20 +1,33 @@
-"""章节树的目录输出：缩进文本给人看，JSON 给 GUI 预览与机器读。"""
+"""渲染目录：缩进文本、JSON 树（给 GUI 预览），以及按格式选一种的 `render()`。"""
 
 from __future__ import annotations
 
-from .config import DEFAULT_TOC_DEPTH, Node
+import json
+
+from .config import DEFAULTS, Node
+
+#: `--toc-format` 的取值
+FORMATS = ("text", "json")
 
 
-def to_json(tree: list[Node], depth: int = DEFAULT_TOC_DEPTH) -> list[dict]:
-    """章节树转 JSON 列表，逐层按 depth 裁剪（语义与 `to_text` 一致）。
+def render(tree: list[Node], depth: int, fmt: str) -> str:
+    """按格式渲染目录正文，供 `--toc-only` 输出。"""
+    if fmt == "json":
+        return json.dumps(to_json(tree, depth), ensure_ascii=False, indent=2)
+    if fmt == "text":
+        return to_text(tree, depth)
+    raise ValueError(f"目录格式只能是 {'/'.join(FORMATS)}，收到：{fmt!r}")
 
-    每项含 `title`（替换后）、`raw_title`（原文）、`level`、`class_name`、`children`。
+
+def to_json(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> list[dict]:
+    """转 JSON 列表供 GUI 预览或 `--toc-format json`。每节点含 `title`（替换后）、
+    `raw_title`（原始）、`level`、`class_name`、`children`，超过 `depth` 的层级不带回来。
     """
     return [_entry(node, depth) for node in tree]
 
 
-def to_text(tree: list[Node], depth: int = DEFAULT_TOC_DEPTH) -> str:
-    """章节树转缩进文本，一行一个标题。"""
+def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:
+    """转缩进文本，一行一个标题。"""
     lines: list[str] = []
 
     def emit(nodes: list[Node]) -> None:

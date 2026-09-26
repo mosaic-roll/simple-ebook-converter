@@ -6,26 +6,18 @@ import pytest
 from simple_ebook_converter.core.config import (
     ALIGN_CHOICES,
     DEFAULT_CHAPTER_RE,
-    DEFAULT_MAX_TITLE_LEN,
-    DEFAULT_PREFACE_TITLE,
-    DEFAULT_TOC_DEPTH,
     DEFAULT_VOLUME_RE,
-    FALLBACK_TITLE,
+    DEFAULTS,
     LEVEL_PRESETS,
     Config,
     default_levels,
 )
-from simple_ebook_converter.core.options import (
-    OPTIONS,
-    Option,
-    option_defaults,
-    option_groups,
-)
+from simple_ebook_converter.core.options import OPTIONS, Option, option_default, option_groups
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.toc import to_json, to_text
 
 #: 不由选项表提供、直接构造 Config 就能设的字段
-_DIRECT_FIELDS = {"input", "levels", "replacements"}
+_DIRECT_FIELDS = {"levels", "replacements"}
 
 
 def _option(name: str) -> Option:
@@ -33,63 +25,32 @@ def _option(name: str) -> Option:
 
 
 def _field_options() -> list[Option]:
-    return [opt for opt in OPTIONS if opt.field]
-
+    return [opt for opt in OPTIONS if opt.in_config]
 
 
 def test_every_config_field_is_either_an_option_or_direct():
     """Config 字段要么有对应选项，要么明确属于直接传入的那几个。"""
-    covered = {opt.field for opt in _field_options()}
+    covered = {opt.name for opt in _field_options()}
     assert set(Config.__dataclass_fields__) - covered == _DIRECT_FIELDS
 
 
 def test_option_defaults_come_from_config():
     """选项默认值从 Config 派生：改 Config 的默认值就同时改了 CLI 行为与 --help。"""
-    cfg = Config()
     for opt in _field_options():
-        if opt.invert:
-            continue
-        assert option_defaults()[opt.name] == getattr(cfg, opt.field), opt.name
-
-
-def test_flag_defaults_are_off():
-    for name, value in option_defaults().items():
-        if _option(name).kind == "bool":
-            assert value is False, name
+        assert option_default(opt) == getattr(DEFAULTS, opt.name), opt.name
 
 
 def test_empty_option_defaults():
-    for name in ("input", "out", "replace_json", "replace_file", "dump_css", "level"):
-        assert option_defaults()[name] == (() if name == "level" else ""), name
-    assert option_defaults()["toc_format"] == "text"
+    """留空即「未指定」：点击参数里只能是 None 或 ()，不能是空串。"""
+    for name in ("title", "date", "out", "dump_css", "cover", "font", "css_file"):
+        assert option_default(_option(name)) is None, name
 
 
-def test_level_presets_match_config_levels():
-    """卷/章/节的默认值就是 Config.levels 里那三条。"""
-    defaults = option_defaults()
-    for level, name, _label in LEVEL_PRESETS:
-        assert defaults[name] == next(r.pattern for r in Config().levels if r.level == level)
-    assert defaults["section"] == ""
-
-
-def test_inverted_flags_default_to_the_positive_field():
+def test_negative_flags_default_to_the_positive_field():
     """反面选项（--no-xxx）默认关掉，等价于正面字段取默认。"""
-    cfg = Config()
     for opt in _field_options():
-        if opt.invert:
-            assert getattr(cfg, opt.field) is True, opt.name
-
-
-def test_option_defaults_returns_fresh_dict():
-    first = option_defaults()
-    first["max_title_len"] = 1234
-    assert option_defaults()["max_title_len"] != 1234
-
-
-def test_option_flags_are_derived_from_name():
-    assert _option("encoding").flags == ("-e", "--encoding")
-    assert _option("no_text_cover").flags == ("--no-text-cover",)
-    assert _option("line_height").flags == ("--line-height",)
+        if opt.negative:
+            assert getattr(DEFAULTS, opt.name) is True, opt.name
 
 
 def test_option_groups_keep_declaration_order():
@@ -98,23 +59,27 @@ def test_option_groups_keep_declaration_order():
     assert set(groups) == {opt.group for opt in OPTIONS}
 
 
+def test_option_flags_are_derived_from_name():
+    assert _option("encoding").flags == ("-e", "--encoding")
+    assert _option("overwrite").flags == ("--no-overwrite",)
+    assert _option("line_height").flags == ("--line-height",)
+
+
 def test_library_defaults_come_from_config():
     """`parse()` / `to_json()` / `to_text()` 的缺省值也必须跟着 Config 走。"""
-    cfg = Config()
     params = inspect.signature(parse).parameters
-    assert params["max_title_len"].default == cfg.max_title_len
-    assert params["preface_title"].default == cfg.preface_title
-    assert params["fallback_title"].default == FALLBACK_TITLE
+    assert params["max_title_len"].default == DEFAULTS.max_title_len
+    assert params["preface_title"].default == DEFAULTS.preface_title
     for fn in (to_json, to_text):
-        assert inspect.signature(fn).parameters["depth"].default == cfg.toc_depth
+        assert inspect.signature(fn).parameters["depth"].default == DEFAULTS.toc_depth
 
 
-def test_default_constants_match_config():
-    assert (DEFAULT_MAX_TITLE_LEN, DEFAULT_PREFACE_TITLE, DEFAULT_TOC_DEPTH) == (
-        Config().max_title_len,
-        Config().preface_title,
-        Config().toc_depth,
-    )
+def test_level_presets_match_config_levels():
+    """卷/章/节的默认值就是 Config.levels 里那三条。"""
+    for level, name, _label, pattern in LEVEL_PRESETS:
+        assert option_default(_option(name)) == pattern
+        assert next(r.pattern for r in DEFAULTS.levels if r.level == level) == pattern
+    assert option_default(_option("section")) == ""
 
 
 def test_default_chapter_regex_covers_common_headings():
@@ -144,7 +109,7 @@ def test_default_regexes_only_match_from_line_start():
 
 
 def test_validate_accepts_defaults():
-    Config().validate()
+    DEFAULTS.validate()
 
 
 def test_validate_rejects_out_of_range():
@@ -177,7 +142,7 @@ def test_align_choices_are_the_only_allowed():
 def test_book_title_falls_back_to_stem_then_constant(tmp_path):
     assert Config(title="书名", input=tmp_path / "x.txt").book_title == "书名"
     assert Config(input=tmp_path / "我的小说.txt").book_title == "我的小说"
-    assert Config().book_title == FALLBACK_TITLE
+    assert Config().book_title == "未命名"
 
 
 def test_default_levels_are_independent_copies():

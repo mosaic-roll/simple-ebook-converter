@@ -60,10 +60,15 @@ def test_all_names_are_importable():
         assert hasattr(core, name), f"__all__ 里的 {name} 并不存在"
 
 
-def test_no_public_name_is_missing_from_all():
-    """新增了公共函数/常量就必须同时加进 __all__。"""
-    missing = _public_names() - set(core.__all__)
-    assert not missing, f"这些公共名字没进 __all__：{sorted(missing)}"
+def test_core_package_does_not_re_export_submodules():
+    """core 是两个前端的内部实现，不是一个公共库门面。
+
+    东西都放在各自的模块里（`core.config`、`core.pipeline`…），`core` 包本身只留版本号：
+    这样谁负责什么一眼可见，前端也从用得着的那一个模块直接导入。
+    """
+    assert core.__all__ == ["__version__"]
+    leaked = _public_names() & set(vars(core))
+    assert not leaked, f"core 不该转手导出子模块的东西：{sorted(leaked)}"
 
 
 def test_all_is_sorted_and_has_no_duplicates():

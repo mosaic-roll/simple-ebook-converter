@@ -138,7 +138,7 @@ def test_empty_input():
 
 def test_anchors_number_chapters_and_pin_preface():
     lines = ["前言内容", "第一卷 风起", "第一章 a", "第二章 b", "尾句"]
-    tree, _ = parse(lines, default_levels())
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
     assert [n.anchor for n in walk(tree)] == ["preface", "p0001", "p0002", "p0003"]
 
 
@@ -151,7 +151,7 @@ def test_titles_are_stripped_but_paragraphs_are_not():
 
 def test_paragraphs_follow_the_nearest_heading():
     lines = ["第一卷 甲", "卷内正文", "第一章 a", "正文一", "第二章 b", "正文二", "结尾"]
-    tree, _ = parse(lines, default_levels())
+    tree, _ = parse(lines, default_levels(), fallback_title="书名")
     (volume,) = tree
     first, second = volume.children
     assert volume.paragraphs == ["卷内正文"]

@@ -35,22 +35,22 @@ def parse_level_spec(spec: str) -> tuple[int, str, str]:
 
 
 def build_levels(patterns: Mapping[str, str], extra: Iterable[str] = ()) -> list[LevelRule]:
-    """生成层级规则。`patterns` 的键是层级名（volume/chapter/section，同 `LEVEL_PRESETS`）：
+    """生成层级规则。`patterns` 的键是预设层级名（volume/chapter/section，同 `LEVEL_PRESETS`）。
 
-    - 键缺失：沿用内置正则
-    - 值为空串：不识别该层级
-    - 其他值：覆盖内置正则
+    - 键缺失：用内置正则
+    - 值为空串：不启用该层级
+    - 其他值：作为该层级的正则
 
-    `extra` 是 `级别:正则[:类名]` 规格，同级别覆盖预设，不同级别追加。
+    `extra` 是 `级别:正则[:类名]`，与预设层级同级同语法。
     """
     by_level = {rule.level: rule for rule in default_levels()}
-    for level, name, label in LEVEL_PRESETS:
-        if name not in patterns:
-            continue
-        pattern = patterns[name] or ""
-        check_pattern(pattern, label)
-        by_level[level].pattern = pattern
-        by_level[level].class_name = name
+    for level, name, label, _pattern in LEVEL_PRESETS:
+        if name in patterns:
+            pattern = patterns[name] or ""
+            check_pattern(pattern, label)
+            by_level[level].pattern = pattern
+            by_level[level].class_name = name
+
     for spec in extra:
         level, pattern, class_name = parse_level_spec(spec)
         check_pattern(pattern, f"{_EXTRA} {level}")

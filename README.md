@@ -4,7 +4,7 @@
 
 | 子包                            | 说明                                                |
 | ------------------------------- | --------------------------------------------------- |
-| `simple_ebook_converter.core`   | 核心库，不依赖任何前端；唯一总入口 `process()`       |
+| `simple_ebook_converter.core`   | 核心库，不依赖任何前端；无状态，模块各管一件事        |
 | `simple_ebook_converter.cli`    | 命令行前端，入口点 `simple-ebook-converter-cli`     |
 | `simple_ebook_converter.gui`    | Tkinter 图形界面前端，入口点 `simple-ebook-converter` |
 
@@ -46,14 +46,21 @@ uv run simple-ebook-converter
 作为库：
 
 ```python
-from simple_ebook_converter.core import Config, process, read_lines
+from pathlib import Path
 
-lines, used = read_lines(src, "auto")
-tree, stats = process(lines, Config(input=src, title="书名"))
+from simple_ebook_converter.core.config import Config
+from simple_ebook_converter.core.encoding import read_lines
+from simple_ebook_converter.core.pipeline import process, resolve
+
+cfg = resolve(Config(input=Path("novel.txt")))  # 补全封面与书名/作者，返回新的 Config
+lines, used = read_lines(cfg.input, cfg.encoding)
+tree, stats = process(lines, cfg)
 ```
 
-书名与作者未显式指定时，`process()` 会先从文件名猜（`《书名》作者：作者`，
-见 `simple_ebook_converter.core.meta.resolve_metadata()`），并写回 `cfg`。
+`core` 是两个前端的内部实现，不设统一门面：每个模块各管一件事，用哪一块就从哪一块导入。
+`resolve()` 从文件名猜书名/作者（`《书名》作者：作者`，
+见 `simple_ebook_converter.core.meta.resolve_metadata()`）并自动发现封面，
+补全后返回**新**的 `Config`，不改传入的那一个。
 
 ## 替换规则的作用范围
 
@@ -102,18 +109,23 @@ simple-ebook-converter-cli novel.txt --cover cover.png        # 显式给图
 
 ## 处理流程
 
-`simple_ebook_converter.core.pipeline.process()` 是唯一入口，按顺序做完这六步：
+`simple_ebook_converter.core.pipeline` 提供完整的「读文件 → 切分 → 写产物」，两个前端都只做
+「收集参数 → 调 pipeline → 展示结果」，不各自实现其中任何一步。程序是无状态的：
+`resolve(cfg)` 补全参数后返回**新**的 `Config`，`read_book(cfg)` 读文件并切分，产出方式由
+`cfg` 上的开关决定：
 
-1. 封面自动发现（没给 `--cover` 时找同目录的 `cover.*`），结果写回 `cfg`
-2. `Config.validate()` —— 校验取值范围、日期格式、字体/封面格式
-3. 读取与编码识别（BOM → chardet → 逐个尝试，`--encoding` 可手动指定）
-4. 按标题正则切分为章节（在原始行上进行，保留空行/空格信息）
-5. 逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）
-6. 按 `scope` 分流应用替换规则（标题规则只进 `node.title`，正文规则只进
-   `node.paragraphs`），然后组装 EPUB3（zip 最高压缩等级 `compresslevel=9`）
+1. `resolve()`：封面自动发现（没给 `--cover` 时找同目录的 `cover.*`）→ `Config.validate()`
+   （校验取值范围、日期格式、字体/封面格式）→ 从文件名猜书名/作者
+2. 读取与编码识别（BOM → chardet → 逐个尝试，`--encoding` 可手动指定）
+3. 按标题正则切分为章节（在原始行上进行，保留空行/空格信息）
+4. 逐页清理（去段首/段尾空格、删空行，`--no-clean` 关闭）
+5. 按 `scope` 分流应用替换规则（标题规则只进 `node.title`，正文规则只进
+   `node.paragraphs`）
+6. 按开关产出：`cfg.toc_only` → `write_toc()` / `toc_text()`；`cfg.dump_css` →
+   `write_css()`（只导出 CSS，不读输入）；否则 `write_epub()` 组装 EPUB3
+   （zip 最高压缩等级 `compresslevel=9`）
 
-封面页是在第 6 步组装时定的，所以「文字封面」拿得到第 1、3 步猜出来的书名/作者。
-两个前端都只做「收集参数 → 调 `process()` → 展示结果」，不再各自实现其中任何一步。
+封面页是在第 6 步组装时定的，所以「文字封面」拿得到第 1、2 步猜出来的书名/作者。
 
 ## 测试
 

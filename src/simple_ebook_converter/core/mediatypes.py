@@ -51,7 +51,7 @@ def find_cover(input_path: Path) -> Path | None:
     反而会咬人，所以不猜。
     """
     try:
-        entries = sorted(input_path.parent.iterdir())
+        entries = list(input_path.parent.iterdir())
     except OSError:
         return None
     hits = [

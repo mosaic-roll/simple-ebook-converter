@@ -6,10 +6,9 @@ from pathlib import Path
 import pytest
 
 from simple_ebook_converter.core.config import Config
-from simple_ebook_converter.core.options import MULTI, OPTIONS, option_default, option_groups
-from simple_ebook_converter.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_LABELS, SCOPE_TITLE
+from simple_ebook_converter.core.options import OPTIONS, option_default, option_groups
+from simple_ebook_converter.core.replace import SCOPE_LABELS
 from simple_ebook_converter.gui.app import (
-    _SCOPE_LABELS_TUPLE,
     form_default,
     generate_output,
     make_config,
@@ -31,7 +30,7 @@ SAMPLE = """前言。
 正文第三段。
 """
 
-_SCOPE = SCOPE_LABELS[SCOPE_TITLE]
+_SCOPE = SCOPE_LABELS["title"]
 
 
 def _opf(epub_path: Path) -> str:
@@ -64,12 +63,11 @@ def test_form_default_comes_from_config():
     """控件初值就是 Config 的默认值，界面不再另写一份字面量。"""
     defaults = Config()
     for opt in OPTIONS:
-        if opt.invert:
-            assert form_default(opt) is (not bool(option_default(opt))), opt.name
-        elif opt.kind == MULTI:
+        if opt.multiple:
             assert form_default(opt) == ""  # 多行文本框，空就是空
         else:
             assert form_default(opt) == ("" if option_default(opt) is None else option_default(opt))
+    assert defaults.overwrite is True  # 勾上 = 覆盖，与正面字段同名同语义
 
 
 def test_multi_line_option_takes_one_item_per_line(tmp_path):
@@ -82,11 +80,11 @@ def test_multi_line_option_takes_one_item_per_line(tmp_path):
     assert {rule.level for rule in make_config(_fields(tmp_path)).levels} == {2, 3, 4}
 
 
-def test_negative_options_are_checked_by_default():
-    """反面选项在界面上按正面说法显示，所以默认都是勾上（= 默认行为）。"""
+def test_checkbox_defaults_match_config():
+    """勾选框与正面字段同名同语义（`覆盖已有文件` 勾上就是覆盖），所以不需要取反。"""
     for opt in OPTIONS:
-        if opt.invert:
-            assert form_default(opt) is True, opt.name
+        if opt.kind is bool:
+            assert form_default(opt) is bool(option_default(opt)), opt.name
 
 
 def test_every_option_has_a_label_and_help():
@@ -122,6 +120,7 @@ def test_make_config_defaults(tmp_path):
 
 
 def test_make_config_rejects_bad_input(tmp_path):
+    """`build_config()` 会检查要读的路径：不存在就直接报错，不必等 core 读到才失败。"""
     with pytest.raises(ValueError, match="输入文件不存在"):
         make_config(_fields(tmp_path, input=str(tmp_path / "不存在.txt")))
 
@@ -139,7 +138,7 @@ def test_bad_date_is_rejected(tmp_path):
 def test_text_cover_checkbox_turns_it_off(tmp_path):
     """勾选框按正面说法显示：不勾 = 不要文字封面页。"""
     assert make_config(_fields(tmp_path)).text_cover is True
-    assert make_config(_fields(tmp_path, no_text_cover=False)).text_cover is False
+    assert make_config(_fields(tmp_path, text_cover=False)).text_cover is False
 
 
 # ---------- 替换规则：表格只是界面写法，内部只走 JSON ----------
@@ -167,21 +166,16 @@ def test_empty_table_keeps_typed_json(tmp_path):
 
 def test_replacement_scope_defaults_to_title(tmp_path):
     cfg = make_config(_fields(tmp_path, replacements=[("正文第一段", "改了", _SCOPE)]))
-    assert [r.scope for r in cfg.replacements] == [SCOPE_TITLE]
+    assert [r.scope for r in cfg.replacements] == ["title"]
 
 
 @pytest.mark.parametrize(
     ("label", "expected"),
-    [("标题", SCOPE_TITLE), ("正文", SCOPE_BODY), ("全文", SCOPE_ALL)],
+    [("标题", "title"), ("正文", "body"), ("全文", "all")],
 )
 def test_replacement_scope_labels_map_to_core_values(tmp_path, label, expected):
     cfg = make_config(_fields(tmp_path, replacements=[("a", "b", label)]))
     assert [r.scope for r in cfg.replacements] == [expected]
-
-
-def test_replacement_scope_labels_come_from_core():
-    """下拉框选项直接来自 core 的 SCOPE_LABELS，不另写一份。"""
-    assert set(_SCOPE_LABELS_TUPLE) == set(SCOPE_LABELS.values())
 
 
 def test_replacement_rejects_unknown_scope_label(tmp_path):
@@ -231,11 +225,11 @@ def test_generate_output_adds_epub_suffix(tmp_path):
 
 
 def test_generate_output_complains_when_not_overwrite(tmp_path):
-    """勾选框写的是「覆盖已有文件」，所以取消勾选（False）才是不覆盖。"""
+    """取消勾选「覆盖已有文件」才是不覆盖。"""
     existing = tmp_path / "result.epub"
     existing.write_bytes(b"x")
     with pytest.raises(ValueError, match="输出文件已存在"):
-        generate_output(_fields(tmp_path, out=str(existing), no_overwrite=False))
+        generate_output(_fields(tmp_path, out=str(existing), overwrite=False))
 
 
 def test_generate_output_toc_only_writes_text(tmp_path):

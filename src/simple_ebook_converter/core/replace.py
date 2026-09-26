@@ -12,19 +12,20 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-#: 替换规则的作用范围
-SCOPE_TITLE = "title"
-SCOPE_BODY = "body"
-SCOPE_ALL = "all"
-SCOPE_CHOICES = (SCOPE_TITLE, SCOPE_BODY, SCOPE_ALL)
+#: 替换规则的作用范围：取值 → (中文标签, 是否改标题, 是否改正文)
+SCOPES = {
+    "title": ("标题", True, False),
+    "body": ("正文", False, True),
+    "all": ("全文", True, True),
+}
 
-#: 默认只改标题：GUI 里只能看到目录，「默认也动正文」反而不符合直觉
-DEFAULT_SCOPE = SCOPE_TITLE
+#: 界面上「不选作用范围」时的取值。默认只改标题：界面只看得到目录，
+#: 「默认也动正文」反而不符合直觉，要改正文时显式写出来。
+DEFAULT_SCOPE = next(iter(SCOPES))
 
-#: 中文标签，供前端下拉框直接用
-SCOPE_LABELS = {SCOPE_TITLE: "标题", SCOPE_BODY: "正文", SCOPE_ALL: "全文"}
-
-_SCOPE_BY_LABEL = {label: scope for scope, label in SCOPE_LABELS.items()}
+#: 文本标签 → 取值，界面下拉框直接用这份中文标签
+SCOPE_BY_LABEL = {label: scope for scope, (label, _, _) in SCOPES.items()}
+SCOPE_LABELS = {scope: label for scope, (label, _, _) in SCOPES.items()}
 
 
 @dataclass
@@ -39,13 +40,14 @@ class Rule:
 
 
 def check_scope(scope: str, where: str = "") -> str:
-    """校验作用范围并返回它，中文标签也接受；出错抛 ValueError。"""
-    resolved = _SCOPE_BY_LABEL.get(scope, scope)
-    if resolved not in SCOPE_CHOICES:
+    """校验作用范围，界面上的中文标签也认，返回真正的取值；不合法抛 `ValueError`。"""
+    resolved = SCOPE_BY_LABEL.get(scope, scope)
+    if resolved not in SCOPES:
         prefix = f"{where}的 " if where else ""
         choices = "/".join(SCOPE_LABELS.values())
-        raise ValueError(f"{prefix}作用范围只能是 {choices}（{'/'.join(SCOPE_CHOICES)}），收到：{scope!r}")
+        raise ValueError(f"{prefix}作用范围只能是 {choices}（{'/'.join(SCOPES)}），收到：{scope!r}")
     return resolved
+
 
 
 def rules_from_json(text: str) -> list[Rule]:
@@ -142,9 +144,10 @@ class Replacer:
 
 
 def replacers_by_scope(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
-    """按作用范围拆成 (标题替换器, 正文替换器)，`scope=all` 两边都算。"""
+    """按作用范围拆成 (标题替换器, 正文替换器)，`scope=all` 两边都进。"""
     rules = list(rules)
     return (
-        Replacer.of(r for r in rules if r.scope in (SCOPE_TITLE, SCOPE_ALL)),
-        Replacer.of(r for r in rules if r.scope in (SCOPE_BODY, SCOPE_ALL)),
+        Replacer.of(r for r in rules if SCOPES[r.scope][1]),
+        Replacer.of(r for r in rules if SCOPES[r.scope][2]),
     )
+

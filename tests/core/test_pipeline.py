@@ -1,11 +1,25 @@
+"""`core.pipeline`：两个前端共用的「读文件 → 切分 → 写产物」那一层。"""
+
+import json
+import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
 from simple_ebook_converter.core.parser import NoEnabledRulesError
-from simple_ebook_converter.core.pipeline import process
-from simple_ebook_converter.core.replace import SCOPE_ALL, SCOPE_BODY, SCOPE_TITLE, Rule
+from simple_ebook_converter.core.pipeline import (
+    process,
+    read_book,
+    resolve,
+    toc_text,
+    write_css,
+    write_epub,
+    write_text,
+    write_toc,
+)
+from simple_ebook_converter.core.replace import Rule
 
 SAMPLE = [
     "封面文案",
@@ -16,55 +30,139 @@ SAMPLE = [
     "正文二字",
 ]
 
+LINES = "第一卷 风起\n第一章 初遇\n正文一字\n第二章 离别\n正文二字\n"
+
+
+@pytest.fixture
+def cfg(tmp_path):
+    src = tmp_path / "《测试书》作者：某人.txt"
+    src.write_text(LINES, encoding="utf-8")
+    return Config(input=src)
+
 
 def _cfg(tmp_path: Path, **kwargs) -> Config:
     return Config(input=tmp_path / "《测试书》作者：某人.txt", **kwargs)
 
 
-def test_process_guesses_metadata_into_cfg(tmp_path):
-    """书名/作者由 process 按文件名猜好并写回 cfg，两个前端不必各自实现。"""
-    cfg = _cfg(tmp_path)
-    assert cfg.title is None and cfg.author == ""
-    process(SAMPLE, cfg)
-    assert (cfg.title, cfg.author) == ("测试书", "某人")
+# ---------- resolve：解析前把参数补全 ----------
 
 
-def test_process_keeps_explicit_metadata(tmp_path):
+def test_resolve_guesses_metadata():
+    """书名/作者按文件名猜好，两个前端不必各自实现。"""
+    cfg = Config(input=Path("《测试书》作者：某人.txt"))
+    assert (cfg.title, cfg.author) == (None, "")
+    assert (resolve(cfg).title, resolve(cfg).author) == ("测试书", "某人")
+
+
+def test_resolve_keeps_explicit_metadata(tmp_path):
     cfg = _cfg(tmp_path, title="手写书名", author="手写作")
-    process(SAMPLE, cfg)
-    assert (cfg.title, cfg.author) == ("手写书名", "手写作")
+    assert (resolve(cfg).title, resolve(cfg).author) == ("手写书名", "手写作")
 
 
-def test_process_metadata_is_idempotent(tmp_path):
-    """重复调用不会把已猜出的值再猜一遍。"""
+def test_resolve_does_not_touch_the_given_config(tmp_path):
+    """core 无状态：补全结果写进新的一份，传进来的那个原样不动。"""
     cfg = _cfg(tmp_path)
-    process(SAMPLE, cfg)
-    process(SAMPLE, cfg)
-    assert (cfg.title, cfg.author) == ("测试书", "某人")
+    resolved = resolve(cfg)
+    assert (cfg.title, cfg.author) == (None, "")
+    assert resolved is not cfg
+    assert resolved.input is cfg.input  # 共享的是只读输入，不是配置本身
 
 
-def test_process_without_input_leaves_metadata_alone():
-    cfg = Config()
-    process(SAMPLE, cfg)
-    assert cfg.title is None and cfg.author == ""
+def test_resolve_without_input_leaves_metadata_alone():
+    assert (resolve(Config()).title, resolve(Config()).author) == (None, "")
 
 
-def test_process_validates_config(tmp_path):
-    """取值范围由 process 兜住，不必指望每个前端记得调 validate()。"""
+def test_resolve_validates_config(tmp_path):
+    """取值范围在这一步兜住，不必指望每个前端记得调 validate()。"""
     with pytest.raises(ValueError, match="目录深度"):
-        process(SAMPLE, _cfg(tmp_path, toc_depth=99))
+        resolve(_cfg(tmp_path, toc_depth=99))
+
+
+# ---------- 封面自动发现 ----------
+
+
+def test_resolve_discovers_cover_next_to_input(tmp_path):
+    cover = tmp_path / "cover.png"
+    cover.write_bytes(b"\x89PNG")
+    cfg = _cfg(tmp_path)
+    assert cfg.cover is None
+    assert resolve(cfg).cover == cover
+
+
+def test_resolve_keeps_explicit_cover(tmp_path):
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    explicit = tmp_path / "mine.jpg"
+    explicit.write_bytes(b"\xff\xd8")
+    assert resolve(_cfg(tmp_path, cover=explicit)).cover == explicit
+
+
+def test_resolve_leaves_cover_none_when_absent(tmp_path):
+    assert resolve(_cfg(tmp_path)).cover is None
+
+
+def test_discovered_cover_passes_validation(tmp_path):
+    """自动发现的封面也必须过得了 Config.validate()。"""
+    (tmp_path / "cover.webp").write_bytes(b"RIFF")
+    resolve(_cfg(tmp_path)).validate()
+
+
+# ---------- read_book：读入 ----------
+
+
+def test_read_book_reads_and_parses(cfg):
+    book = read_book(cfg)
+    assert book.tree[0].title == "第一卷 风起"
+    assert book.encoding == "utf-8"
+    assert book.cfg is not cfg  # 补全过的那一份
+
+
+def test_read_book_fills_metadata_on_its_own_config(cfg):
+    assert (cfg.title, cfg.author) == (None, "")
+    assert (read_book(cfg).cfg.title, read_book(cfg).cfg.author) == ("测试书", "某人")
+
+
+def test_read_book_without_input():
+    with pytest.raises(ValueError, match="缺少输入文件"):
+        read_book(Config())
+
+
+def test_read_book_reports_unreadable_file(tmp_path):
+    with pytest.raises(ValueError, match="无法读取输入文件"):
+        read_book(Config(input=tmp_path / "nope.txt"))
+
+
+def test_read_book_reports_wrong_encoding(tmp_path):
+    """指定了编码却解不开：这是用户能自己改的问题，要说清楚。"""
+    src = tmp_path / "big.txt"
+    src.write_bytes("第一章".encode("gb18030"))
+    with pytest.raises(ValueError, match="无法用编码"):
+        read_book(Config(input=src, encoding="utf-8"))
+
+
+def test_read_book_reports_empty_file(tmp_path):
+    src = tmp_path / "empty.txt"
+    src.write_text("\n\n   \n", encoding="utf-8")
+    with pytest.raises(ValueError, match="没有可生成的内容"):
+        read_book(Config(input=src))
+
+
+def test_read_book_reports_out_of_range_values(tmp_path):
+    """取值范围在读入时就报，消息直接就是 Config.validate() 那句。"""
+    with pytest.raises(ValueError, match="目录深度"):
+        read_book(_cfg(tmp_path, toc_depth=99))
+
+
+# ---------- process：切分 → 清理 → 替换 ----------
 
 
 def test_process_reports_disabled_levels(tmp_path):
-    cfg = _cfg(tmp_path, levels=[LevelRule(2, "", "volume")])
     with pytest.raises(NoEnabledRulesError):
-        process(SAMPLE, cfg)
+        process(SAMPLE, _cfg(tmp_path, levels=[LevelRule(2, "", "volume")]))
 
 
 def test_process_falls_back_to_book_title(tmp_path):
     """没有标题命中时，整篇归到一章，标题取书名。"""
-    src = tmp_path / "我的小说.txt"
-    tree, stats = process(["没有标题的一行", "另一行"], Config(input=src))
+    tree, stats = process(["没有标题的一行", "另一行"], Config(input=tmp_path / "我的小说.txt"))
     assert stats.has_preface is False
     assert len(tree) == 1
     assert tree[0].title == "我的小说"
@@ -73,8 +171,7 @@ def test_process_falls_back_to_book_title(tmp_path):
 
 def test_process_uses_resolved_title_as_fallback(tmp_path):
     """书名是猜出来的也能当兜底章节名。"""
-    src = tmp_path / "《测试书》作者：某人.txt"
-    tree, _ = process(["没有标题"], Config(input=src))
+    tree, _ = process(["没有标题"], resolve(_cfg(tmp_path)))
     assert tree[0].title == "测试书"
 
 
@@ -89,99 +186,13 @@ def test_process_keeps_blank_lines_when_not_cleaning(tmp_path):
 
 
 def test_process_replaces_titles_and_bodies_keeping_raw(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X", SCOPE_ALL)])
+    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X", "all")])
     tree, _ = process(SAMPLE, cfg)
     volume = tree[1]
     assert volume.title == "第X一卷 风起"
     assert volume.raw_title == "第一卷 风起"
     assert volume.children[0].title == "第X一章 初遇"
     assert volume.children[0].raw_title == "第一章 初遇"
-
-
-# ---------- 替换的作用范围 ----------
-
-
-def test_default_scope_touches_titles_only(tmp_path):
-    """默认只改标题：GUI 里只能看到目录，默认动正文反而不符合直觉。"""
-    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了")])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].children[0].paragraphs == ["正文一字"]
-    assert tree[1].title == "第一卷 风起"
-
-
-def test_body_scope_touches_paragraphs_only(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了", SCOPE_BODY)])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].children[0].paragraphs == ["改了字"]
-    assert tree[1].title == "第一卷 风起"
-
-
-def test_all_scope_touches_both(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("一", "壹", SCOPE_ALL)])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].title == "第壹卷 风起"
-    assert tree[1].children[0].paragraphs == ["正文壹字"]
-
-
-def test_scopes_apply_independently_in_one_pass(tmp_path):
-    """标题规则与正文规则混在一份列表里，各走各的，互不干扰。"""
-    cfg = _cfg(
-        tmp_path,
-        replacements=[
-            Rule("风起", "起风", SCOPE_TITLE),
-            Rule("正文一", "P1", SCOPE_BODY),
-            Rule("离别", "别离", SCOPE_ALL),
-        ],
-    )
-    tree, _ = process(SAMPLE, cfg)
-    volume = tree[1]
-    assert volume.title == "第一卷 起风"
-    assert volume.children[0].paragraphs == ["P1字"]
-    # scope=all 的规则两边都进
-    assert volume.children[1].title == "第二章 别离"
-    assert volume.children[1].paragraphs == ["正文二字"]
-
-
-def test_body_only_rules_leave_titles_untouched(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("第", "X", SCOPE_BODY)])
-    tree, _ = process(SAMPLE, cfg)
-    assert tree[1].title == "第一卷 风起"
-    assert tree[1].raw_title == "第一卷 风起"
-
-
-# ---------- 封面自动发现 ----------
-
-
-def test_process_discovers_cover_next_to_input(tmp_path):
-    cover = tmp_path / "cover.png"
-    cover.write_bytes(b"\x89PNG")
-    cfg = _cfg(tmp_path)
-    assert cfg.cover is None
-    process(SAMPLE, cfg)
-    assert cfg.cover == cover
-
-
-def test_process_keeps_explicit_cover(tmp_path):
-    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
-    explicit = tmp_path / "mine.jpg"
-    explicit.write_bytes(b"\xff\xd8")
-    cfg = _cfg(tmp_path, cover=explicit)
-    process(SAMPLE, cfg)
-    assert cfg.cover == explicit
-
-
-def test_process_leaves_cover_none_when_absent(tmp_path):
-    cfg = _cfg(tmp_path)
-    process(SAMPLE, cfg)
-    assert cfg.cover is None
-
-
-def test_discovered_cover_passes_validation(tmp_path):
-    """自动发现的封面也必须过得了 Config.validate()。"""
-    (tmp_path / "cover.webp").write_bytes(b"RIFF")
-    cfg = _cfg(tmp_path)
-    process(SAMPLE, cfg)
-    cfg.validate()
 
 
 def test_process_returns_stats(tmp_path):
@@ -199,3 +210,191 @@ def test_levels_are_not_shared_between_configs(tmp_path):
     process(SAMPLE, a)
     process(SAMPLE, b)
     assert [r.level for r in b.levels] == [r.level for r in default_levels()]
+
+
+# ---------- 替换的作用范围 ----------
+
+
+def test_default_scope_touches_titles_only(tmp_path):
+    """默认只改标题：GUI 里只能看到目录，默认动正文反而不符合直觉。"""
+    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了")])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].children[0].paragraphs == ["正文一字"]
+    assert tree[1].title == "第一卷 风起"
+
+
+def test_body_scope_touches_paragraphs_only(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了", "body")])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].children[0].paragraphs == ["改了字"]
+    assert tree[1].title == "第一卷 风起"
+
+
+def test_all_scope_touches_both(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("一", "壹", "all")])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].title == "第壹卷 风起"
+    assert tree[1].children[0].paragraphs == ["正文壹字"]
+
+
+def test_scopes_apply_independently_in_one_pass(tmp_path):
+    """标题规则与正文规则混在一份列表里，各走各的，互不干扰。"""
+    cfg = _cfg(
+        tmp_path,
+        replacements=[
+            Rule("风起", "起风", "title"),
+            Rule("正文一", "P1", "body"),
+            Rule("离别", "别离", "all"),
+        ],
+    )
+    tree, _ = process(SAMPLE, cfg)
+    volume = tree[1]
+    assert volume.title == "第一卷 起风"
+    assert volume.children[0].paragraphs == ["P1字"]
+    # scope=all 的规则两边都进
+    assert volume.children[1].title == "第二章 别离"
+    assert volume.children[1].paragraphs == ["正文二字"]
+
+
+def test_body_only_rules_leave_titles_untouched(tmp_path):
+    cfg = _cfg(tmp_path, replacements=[Rule("第", "X", "body")])
+    tree, _ = process(SAMPLE, cfg)
+    assert tree[1].title == "第一卷 风起"
+    assert tree[1].raw_title == "第一卷 风起"
+
+
+# ---------- 目录 ----------
+
+
+def test_toc_text_is_indented(cfg):
+    text = toc_text(read_book(cfg))
+    assert "第一卷 风起" in text
+    assert "  第一章 初遇" in text
+
+
+def test_toc_json_round_trips(cfg, tmp_path):
+    book = read_book(replace(cfg, toc_format="json"))
+    data = json.loads(toc_text(book))
+    assert data[0]["title"] == "第一卷 风起"
+    assert data[0]["children"][0]["title"] == "第一章 初遇"
+
+
+def test_toc_rejects_unknown_format(cfg):
+    with pytest.raises(ValueError, match="目录格式"):
+        toc_text(read_book(replace(cfg, toc_format="xml")))
+
+
+def test_write_toc_writes_file(cfg, tmp_path):
+    out = tmp_path / "目录.md"
+    book = read_book(replace(cfg, out=out))
+    assert write_toc(book) == out
+    assert "第一章 初遇" in out.read_text(encoding="utf-8")
+
+
+def test_write_toc_json(cfg, tmp_path):
+    out = tmp_path / "toc.json"
+    write_toc(read_book(replace(cfg, out=out, toc_format="json")))
+    assert json.loads(out.read_text(encoding="utf-8"))[0]["title"] == "第一卷 风起"
+
+
+# ---------- EPUB ----------
+
+
+def test_write_epub_writes_zip(cfg, tmp_path):
+    out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
+    assert zipfile.is_zipfile(out)
+    with zipfile.ZipFile(out) as zf:
+        names = zf.namelist()
+        assert "mimetype" in names
+        assert "EPUB/content.opf" in names
+        assert any(n.startswith("EPUB/text/") for n in names)
+
+
+def test_write_epub_falls_back_to_input_name(cfg):
+    assert write_epub(read_book(cfg)) == cfg.input.with_suffix(".epub")
+
+
+def test_write_epub_adds_missing_suffix(cfg, tmp_path):
+    assert write_epub(read_book(replace(cfg, out=tmp_path / "b"))) == tmp_path / "b.epub"
+
+
+def test_write_epub_keeps_uppercase_suffix(cfg, tmp_path):
+    out = write_epub(read_book(replace(cfg, out=tmp_path / "b.EPUB")))
+    assert out == tmp_path / "b.EPUB"
+
+
+def test_write_epub_creates_output_dir(cfg, tmp_path):
+    assert write_epub(read_book(replace(cfg, out=tmp_path / "deep" / "a.epub"))).is_file()
+
+
+def test_write_epub_respects_overwrite_flag(cfg, tmp_path):
+    out = tmp_path / "out.epub"
+    out.write_bytes(b"x")
+    with pytest.raises(ValueError, match="已存在"):
+        write_epub(read_book(replace(cfg, out=out, overwrite=False)))
+
+
+def test_write_epub_can_overwrite(cfg, tmp_path):
+    out = tmp_path / "a.epub"
+    out.write_bytes(b"x")
+    book = read_book(replace(cfg, out=out, overwrite=True))
+    assert zipfile.is_zipfile(write_epub(book))
+
+
+def test_write_epub_reports_failure_with_context(cfg, tmp_path):
+    """组装阶段出错要补上「无法生成 EPUB」这个上下文。"""
+    book = read_book(replace(cfg, out=tmp_path / "a.epub", css_file=tmp_path / "nope.css"))
+    with pytest.raises(ValueError, match="无法生成 EPUB"):
+        write_epub(book)
+
+
+def test_write_epub_leaves_no_partial_file(cfg, tmp_path):
+    """失败时不该留下半个 EPUB。"""
+    out = tmp_path / "a.epub"
+    book = read_book(replace(cfg, out=out, css_file=tmp_path / "nope.css"))
+    with pytest.raises(ValueError):
+        write_epub(book)
+    assert not out.exists()
+
+
+# ---------- CSS ----------
+
+
+def test_write_css_writes_only_css(cfg, tmp_path):
+    out = tmp_path / "book.css"
+    assert write_css(replace(cfg, dump_css=out)) == out
+    assert "body" in out.read_text(encoding="utf-8")
+    assert not list(tmp_path.glob("*.epub"))
+
+
+def test_write_css_needs_no_input(tmp_path):
+    """只排版不读内容：没有输入文件也能导出 CSS。"""
+    assert "body" in write_css(Config(dump_css=tmp_path / "b.css")).read_text(encoding="utf-8")
+
+
+def test_write_css_needs_a_path():
+    with pytest.raises(ValueError, match="缺少 CSS 输出路径"):
+        write_css(Config())
+
+
+# ---------- write_text ----------
+
+
+def test_write_text_creates_parents(tmp_path):
+    target = tmp_path / "deep" / "out.md"
+    assert write_text(target, "内容") == target
+    assert target.read_text(encoding="utf-8") == "内容"
+
+
+def test_write_text_writes_plain_utf8(tmp_path):
+    target = tmp_path / "out.md"
+    write_text(target, "内容")
+    assert target.read_bytes() == "内容".encode("utf-8")
+
+
+def test_write_text_respects_overwrite_flag(tmp_path):
+    target = tmp_path / "out.md"
+    target.write_text("旧", encoding="utf-8")
+    with pytest.raises(ValueError, match="已存在"):
+        write_text(target, "新", overwrite=False)
+    assert target.read_text(encoding="utf-8") == "旧"

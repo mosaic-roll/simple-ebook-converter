@@ -1,34 +1,29 @@
 """Tkinter 前端：表单按 `core.options` 的选项表生成，动作全部交给 core。
 
-和 CLI 用的是同一张选项表、同一套默认值、同一批任务函数（`core.jobs`），所以
-两个界面上同名选项的含义与默认值必然一致；这里只负责摆控件、收值、显示结果。
+和 CLI 用的是同一张选项表、同一套缺省值、同一个 `core.pipeline`，所以两个界面上
+同名选项的含义与缺省值必然一致；这里只负责摆控件、收值、显示结果。
 """
 
 from __future__ import annotations
 
 import tkinter as tk
+from dataclasses import replace
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from .._meta import DIST_NAME
-from ..core import jobs
 from ..core.config import Config
-from ..core.jobs import CSS, EPUB, TOC
 from ..core.meta import resolve_metadata
 from ..core.options import (
-    BOOL,
-    CHOICE,
-    INT,
-    MULTI,
     OPTIONS,
-    PATH,
     Option,
     build_config,
     option_default,
     option_groups,
 )
+from ..core.pipeline import read_book, write_css, write_epub, write_text, write_toc
 from ..core.replace import (
-    SCOPE_CHOICES,
+    DEFAULT_SCOPE,
     SCOPE_LABELS,
     rules_from_json,
     rules_from_rows,
@@ -37,8 +32,7 @@ from ..core.replace import (
 from ..core.toc import to_json
 
 #: 替换规则下拉框用 core 的中文标签，两个方向都齐全
-_SCOPE_LABELS_TUPLE = tuple(SCOPE_LABELS[scope] for scope in SCOPE_CHOICES)
-_DEFAULT_SCOPE_LABEL = SCOPE_LABELS[SCOPE_CHOICES[0]]
+_DEFAULT_SCOPE_LABEL = SCOPE_LABELS[DEFAULT_SCOPE]
 
 #: 替换规则的表格挂在「清理与替换」这一组下面
 _REPLACE_GROUP = "清理与替换"
@@ -48,18 +42,12 @@ _REPLACE_GROUP = "清理与替换"
 
 
 def form_default(opt: Option):
-    """控件初值。
-
-    反面选项（`--no-clean`）在界面上按正面说法显示，所以初值取反；多行文本框
-    （额外层级）一行一项，空就是空文本框。
+    """控件初值。勾选框与正面字段同名同语义（`覆盖已有文件` 勾上就是覆盖），
+    多行文本框（额外层级）一行一项，空就是空文本框。
     """
     value = option_default(opt)
-    if opt.invert:
-        return not bool(value)
-    if opt.kind == MULTI:
-        if not value:
-            return ""
-        return value if isinstance(value, str) else "\n".join(str(item) for item in value)
+    if opt.multiple:
+        return "\n".join(str(item) for item in value)
     return "" if value is None else value
 
 
@@ -75,13 +63,9 @@ def replacement_json(rows) -> str:
 def option_values(fields: dict) -> dict:
     """控件值 → `build_config()` 认的选项名。
 
-    只做两件事：反面选项取反回去，以及把替换规则表格转成 JSON 填进 `replace_json`
-    （表格非空时以表格为准，提示语里也这么写）。
+    只做一件事：替换规则表格非空时以表格为准，转成 `replace_json` 填进去。
     """
     values = {opt.name: fields[opt.name] for opt in OPTIONS if opt.name in fields}
-    for opt in OPTIONS:
-        if opt.invert and opt.name in values:
-            values[opt.name] = not bool(values[opt.name])
     if fields.get("replacements"):
         values["replace_json"] = replacement_json(fields["replacements"])
     return values
@@ -95,30 +79,22 @@ def make_config(fields: dict) -> Config:
 def preview_data(fields: dict) -> list[dict]:
     """按当前设置解析目录树（JSON 列表），供预览与测试。"""
     cfg = make_config(fields)
-    book = jobs.load(cfg)
-    return to_json(book.tree, cfg.toc_depth)
+    return to_json(read_book(cfg).tree, cfg.toc_depth)
 
 
 def generate_output(fields: dict) -> Path:
     """按当前设置产出文件，返回写出的路径；出错抛 ValueError。
 
-    产出方式与 CLI 的三个开关一一对应：只输出目录 / 只导出 CSS / 生成 EPUB。
+    产出方式与 CLI 的三个开关一一对应：只导出 CSS / 只输出目录 / 生成 EPUB。
     """
-    values = option_values(fields)
-    cfg = build_config(values)
-    if values.get("toc_only"):
-        kind = TOC
-    elif values.get("dump_css"):
-        kind = CSS
-    else:
-        kind = EPUB
-    out = values.get("dump_css") if kind == CSS else values.get("out")
-    if kind == TOC and not out:
-        out = str(Path(cfg.input).with_suffix(".md"))  # GUI 没有标准输出
-    result = jobs.run(cfg, kind, out, str(values.get("toc_format") or "text"))
-    if result.path is None:
-        raise ValueError("缺少目录输出路径")
-    return result.path
+    cfg = make_config(fields)
+    if cfg.dump_css:
+        return write_css(cfg)
+    if cfg.toc_only and not cfg.out:
+        # 界面没有标准输出，目录默认写到输入旁边的同名 .md
+        cfg = replace(cfg, out=Path(cfg.input).with_suffix(".md"))
+    book = read_book(cfg)
+    return write_toc(book) if cfg.toc_only else write_epub(book)
 
 
 # ---------- 界面 ----------
@@ -142,7 +118,7 @@ class App:
 
     def _make_var(self, opt: Option) -> tk.Variable:
         """整数也用字符串存：输入框清空时不会抛 TclError，缺省值交给 core 兜。"""
-        if opt.kind == BOOL:
+        if opt.kind is bool:
             return tk.BooleanVar(value=bool(form_default(opt)))
         return tk.StringVar(value=str(form_default(opt)))
 
@@ -194,13 +170,13 @@ class App:
         var = self._make_var(opt)
         self.vars[opt.name] = var
 
-        if opt.kind == BOOL:
+        if opt.kind is bool:
             widget = ttk.Checkbutton(parent, text=opt.label, variable=var)
             widget.grid(row=row, column=0, columnspan=3, sticky="w", pady=2)
             self._tip(widget, opt)
             return row + 1
 
-        if opt.kind == MULTI:
+        if opt.multiple:
             widget = tk.Text(parent, height=4, width=40)
             widget.insert("1.0", form_default(opt))
             self.texts[opt.name] = widget
@@ -211,7 +187,7 @@ class App:
 
         ttk.Label(parent, text=opt.label).grid(row=row, column=0, sticky="w", pady=2)
         widget.grid(row=row, column=1, sticky="ew", pady=2, padx=4)
-        if opt.kind == PATH:
+        if opt.kind is Path:
             ttk.Button(parent, text="浏览", command=lambda o=opt: self._browse(o)).grid(
                 row=row, column=2, sticky="w", pady=2
             )
@@ -219,11 +195,11 @@ class App:
         return row + 1
 
     def _entry(self, parent: ttk.Frame, opt: Option, var: tk.Variable) -> ttk.Widget:
-        if opt.kind == CHOICE:
+        if opt.choices:
             return ttk.Combobox(
                 parent, textvariable=var, values=list(opt.choices), state="readonly"
             )
-        if opt.kind == INT:
+        if opt.kind is int:
             return ttk.Spinbox(parent, from_=0, to=1000, textvariable=var)
         return ttk.Entry(parent, textvariable=var)
 
@@ -297,7 +273,7 @@ class App:
         ttk.Combobox(
             edit,
             textvariable=self.v_rs,
-            values=list(_SCOPE_LABELS_TUPLE),
+            values=list(SCOPE_LABELS.values()),
             state="readonly",
             width=6,
         ).pack(side="left", padx=4)
@@ -380,7 +356,7 @@ class App:
             messagebox.showerror("导出替换规则", str(e))
             return
         try:
-            jobs.write_text(Path(path), text + "\n")
+            write_text(Path(path), text + "\n")
         except ValueError as e:
             messagebox.showerror("导出替换规则", str(e))
 

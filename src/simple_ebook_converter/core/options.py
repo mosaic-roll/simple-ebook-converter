@@ -1,11 +1,13 @@
-"""选项表：命令行参数、默认值、类型、帮助文本的唯一真源。
+"""选项表：命令行参数与 GUI 表单的唯一真源。
 
-一条 `Option` 同时描述了「前端要收集什么」和「它对应 Config 的哪个字段」，
-`build_config()` 按这张表把前端的原始值翻译成 `Config`。因此：
+表里只写「前端要什么」——选项名、中文标签、说明、分组、旗标形态；**取值类型和缺省值
+一律从 `Config` 取**，所以新增一个转换参数不必在这里再抄一遍类型与默认值：
 
-- 加一个选项只改这一处，CLI 的 `--help`、GUI 的表单初值与提示语都自动跟上；
-- 默认值只在 `Config` 里写一次（`option_default()` 从 Config 派生）；
-- 两个前端只做「收集值 → 交给我」，不各自实现一遍转换规则。
+- `name` 就是 `Config` 的字段名，取值类型按字段注解（`str`/`int`/`bool`/`Path`）推出；
+- `negative` 的选项命令行写 `--no-<name>`，界面按正面说法显示，两个前端收上来的值
+  都已经是 `Config` 的正面语义，`build_config()` 因此不必认识 `--no-xxx`；
+- 不进 `Config` 的只有三类（`in_config=False`）：`--volume/--chapter/--section/--level`
+  决定 `levels`，`--replace-json/--replace-file` 决定 `replacements`。
 """
 
 from __future__ import annotations
@@ -13,221 +15,114 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, Config, LevelRule
+from .config import ALIGN_CHOICES, DEFAULTS, Config
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
-from .replace import Rule, rules_from_source
+from .replace import rules_from_source
+from .toc import FORMATS
 
-#: `--toc-only` 的输出格式
-TOC_FORMATS = ("text", "json")
 
-# 取值类型，决定 GUI 用什么控件、CLI 用什么 click 参数类型
-TEXT = "text"
-INT = "int"
-BOOL = "bool"
-PATH = "path"
-CHOICE = "choice"
-MULTI = "multi"
+def _config_kinds() -> dict[str, type]:
+    """`Config` 字段名 → 取值类型。`Path | None` 取 `Path`；只认 str/int/bool/Path。"""
+    kinds: dict[str, type] = {}
+    for name, hint in get_type_hints(Config).items():
+        kind = next((arg for arg in get_args(hint) if isinstance(arg, type)), hint)
+        if kind in (str, int, bool, Path):
+            kinds[name] = kind
+    return kinds
+
+
+CONFIG_KINDS = _config_kinds()
 
 
 @dataclass(frozen=True)
 class Option:
-    """一个可配置项。
-
-    `field` 指向 `Config` 的字段名；`field` 为 None 表示这个值不进 Config
-    （例如输出路径、只影响某一种输出模式的开关）。`invert` 表示它是该字段的反面
-    （`--no-clean` 对应 `Config.clean`）。
-    """
+    """一个可配置项，值的语义与 `Config` 字段一致。"""
 
     name: str
-    kind: str
     label: str
     help: str
     group: str
     short: str = ""
-    field: str | None = None
-    invert: bool = False
-    level: int | None = None
+    #: 只对 `in_config=False` 的选项有意义：它们的类型不在 `Config` 里
+    value_type: type = str
+    negative: bool = False
+    in_config: bool = True
+    #: 输出路径：不要求已存在
+    output: bool = False
+    #: 可重复（`--level`）
+    multiple: bool = False
+    #: 预设层级 2/3/4（非 0 表示这条选项只决定 `levels`）
+    level: int = 0
     choices: tuple[str, ...] = ()
-    exists: bool = False
-    default: Any = ""
+
+    @property
+    def kind(self) -> type:
+        """取值类型：`Config` 字段按注解，其余看 `value_type`。"""
+        return CONFIG_KINDS.get(self.name) or self.value_type
 
     @property
     def flags(self) -> tuple[str, ...]:
-        long = "--" + self.name.replace("_", "-")
-        return (f"-{self.short}", long) if self.short else (long,)
+        stem = ("no-" if self.negative else "") + self.name.replace("_", "-")
+        return (f"-{self.short}", f"--{stem}") if self.short else (f"--{stem}",)
 
 
 OPTIONS: tuple[Option, ...] = (
     # ---- 输入 ----
+    Option("input", "输入文件", "输入 txt（也可直接作为位置参数）", "输入", short="i"),
     Option(
-        "input", PATH, "输入文件",
-        "输入 txt（也可直接作为位置参数）",
-        "输入", short="i", exists=True,
-    ),
-    Option(
-        "encoding", TEXT, "编码",
-        f"输入编码，auto 为自动检测；也可填 Python codec 名（常用：{'/'.join(ENCODING_CHOICES[1:])}）",
-        "输入", short="e", field="encoding",
+        "encoding", "编码",
+        f"输入编码，auto 为自动检测；也可填 Python codec 名"
+        f"（常用：{'/'.join(ENCODING_CHOICES[1:])}）",
+        "输入", short="e",
     ),
     # ---- 输出 ----
-    Option(
-        "out", PATH, "输出文件",
-        "输出文件，缺 .epub 后缀自动补，默认取输入名",
-        "输出", short="o",
-    ),
-    Option(
-        "no_overwrite", BOOL, "覆盖已有文件",
-        "输出文件已存在时是否覆盖（默认覆盖）",
-        "输出", field="overwrite", invert=True,
-    ),
-    Option(
-        "dump_css", PATH, "导出 CSS",
-        "把当前生效的 CSS 写到这个文件",
-        "输出",
-    ),
+    Option("out", "输出文件", "输出文件，缺 .epub 后缀自动补，默认取输入名", "输出", short="o", output=True),
+    Option("overwrite", "覆盖已有文件", "输出文件已存在时是否覆盖（默认覆盖）", "输出", negative=True),
+    Option("dump_css", "导出 CSS", "把当前生效的 CSS 写到这个文件（不必读输入）", "输出", output=True),
     # ---- 书籍信息 ----
-    Option(
-        "title", TEXT, "书名",
-        "留空则从文件名猜《书名》作者：作者",
-        "书籍信息", field="title",
-    ),
-    Option(
-        "author", TEXT, "作者",
-        "留空则从文件名猜；仍留空则不写入元数据",
-        "书籍信息", field="author",
-    ),
-    Option(
-        "date", TEXT, "出版日期",
-        "如 2024-05-13，留空则省略 dc:date（规范允许缺省）",
-        "书籍信息", field="date",
-    ),
-    Option(
-        "language", TEXT, "语言",
-        "语言代码",
-        "书籍信息", field="language",
-    ),
-    Option(
-        "cover", PATH, "封面图",
-        "留空则先找输入同目录的 cover.*，再退回文字封面页",
-        "书籍信息", field="cover", exists=True,
-    ),
-    Option(
-        "no_text_cover", BOOL, "文字封面页",
-        "没有封面图时是否生成只含书名/作者的封面页（默认生成）",
-        "书籍信息", field="text_cover", invert=True,
-    ),
+    Option("title", "书名", "留空则从文件名猜《书名》作者：作者", "书籍信息"),
+    Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
+    Option("date", "出版日期", "如 2024-05-13，留空则省略 dc:date（规范允许缺省）", "书籍信息"),
+    Option("language", "语言", "语言代码", "书籍信息"),
+    Option("cover", "封面图", "留空则先找输入同目录的 cover.*，再退回文字封面页", "书籍信息"),
+    Option("text_cover", "文字封面页", "没有封面图时是否生成只含书名/作者的封面页（默认生成）", "书籍信息", negative=True),
     # ---- 章节识别 ----
+    Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别", in_config=False, level=2),
+    Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别", in_config=False, level=3),
+    Option("section", "节标题正则", "h4 + class=section；默认留空（不启用）", "章节识别", in_config=False, level=4),
+    Option("volume_titles", "无卷模式", "卷行是否作为标题（卷正则仍会覆盖内置规则）", "章节识别", negative=True),
     Option(
-        "volume", TEXT, "卷标题正则",
-        "h2 + class=volume；留空表示不识别卷标题",
-        "章节识别", level=2,
+        "level", "额外层级", "额外层级规则，可重复；格式 级别:正则[:类名]，级别 1~6",
+        "章节识别", in_config=False, multiple=True,
     ),
-    Option(
-        "chapter", TEXT, "章标题正则",
-        "h3 + class=chapter；留空表示不识别章标题",
-        "章节识别", level=3,
-    ),
-    Option(
-        "section", TEXT, "节标题正则",
-        "h4 + class=section；默认留空（不启用）",
-        "章节识别", level=4,
-    ),
-    Option(
-        "no_volume", BOOL, "无卷模式",
-        "卷行是否作为标题（卷正则仍会覆盖内置规则）",
-        "章节识别", field="volume_titles", invert=True,
-    ),
-    Option(
-        "level", MULTI, "额外层级",
-        "额外层级规则，可重复；格式 级别:正则[:类名]，级别 1~6",
-        "章节识别", default=(),
-    ),
-    Option(
-        "max_title_len", INT, "标题最长字数",
-        "超过这个字数的行即使命中正则也当正文",
-        "章节识别", field="max_title_len",
-    ),
-    Option(
-        "preface_title", TEXT, "前言标题",
-        "首个标题之前那些无标题段落归到这一节",
-        "章节识别", field="preface_title",
-    ),
+    Option("max_title_len", "标题最长字数", "超过这个字数的行即使命中正则也当正文", "章节识别"),
+    Option("preface_title", "前言标题", "首个标题之前那些无标题段落归到这一节", "章节识别"),
     # ---- 清理与替换 ----
+    Option("clean", "清理文本", "去掉段首段尾空格并删除空行（默认清理）", "清理与替换", negative=True),
     Option(
-        "no_clean", BOOL, "清理文本",
-        "去掉段首段尾空格并删除空行（默认清理）",
-        "清理与替换", field="clean", invert=True,
+        "replace_json", "替换规则", "一段 JSON 替换规则（有序列表），与 --replace-file 二选一",
+        "清理与替换", in_config=False,
     ),
     Option(
-        "replace_json", TEXT, "替换规则",
-        "一段 JSON 替换规则（有序列表），与 --replace-file 二选一",
-        "清理与替换",
-    ),
-    Option(
-        "replace_file", PATH, "替换规则文件",
-        "从 JSON 文件读取替换规则，与 --replace-json 二选一",
-        "清理与替换",
+        "replace_file", "替换规则文件", "从 JSON 文件读取替换规则，与 --replace-json 二选一",
+        "清理与替换", in_config=False, value_type=Path,
     ),
     # ---- 排版 ----
-    Option(
-        "indent", INT, "段落缩进",
-        "段落缩进字数，0 为不缩进",
-        "排版", field="indent",
-    ),
-    Option(
-        "line_height", TEXT, "行高",
-        "行高，如 1.5",
-        "排版", field="line_height",
-    ),
-    Option(
-        "para_spacing", TEXT, "段间距",
-        "段间距，带单位，如 1em / 12px",
-        "排版", field="para_spacing",
-    ),
-    Option(
-        "chapter_align", CHOICE, "章对齐",
-        "章标题对齐方式",
-        "排版", field="chapter_align", choices=ALIGN_CHOICES,
-    ),
-    Option(
-        "volume_align", CHOICE, "卷对齐",
-        "卷标题对齐方式",
-        "排版", field="volume_align", choices=ALIGN_CHOICES,
-    ),
-    Option(
-        "font", PATH, "正文字体",
-        "嵌入到书里的正文字体（ttf/otf/woff/woff2）",
-        "排版", field="font", exists=True,
-    ),
-    Option(
-        "css_file", PATH, "外部 CSS 文件",
-        "追加到内置样式之后，可以覆盖内置规则",
-        "排版", field="css_file", exists=True,
-    ),
+    Option("indent", "段落缩进", "段落缩进字数，0 为不缩进", "排版"),
+    Option("line_height", "行高", "行高，如 1.5", "排版"),
+    Option("para_spacing", "段间距", "段间距，带单位，如 1em / 12px", "排版"),
+    Option("chapter_align", "章对齐", "章标题对齐方式", "排版", choices=ALIGN_CHOICES),
+    Option("volume_align", "卷对齐", "卷标题对齐方式", "排版", choices=ALIGN_CHOICES),
+    Option("font", "正文字体", "嵌入到书里的正文字体（ttf/otf/woff/woff2）", "排版"),
+    Option("css_file", "外部 CSS 文件", "追加到内置样式之后，可以覆盖内置规则", "排版"),
     # ---- 目录 ----
-    Option(
-        "no_toc", BOOL, "书页含目录",
-        "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）",
-        "目录", field="toc_in_spine", invert=True,
-    ),
-    Option(
-        "toc_depth", INT, "目录深度",
-        "目录包含到第几级，1~6",
-        "目录", field="toc_depth",
-    ),
-    Option(
-        "toc_only", BOOL, "只输出目录",
-        "只输出目录，不生成 EPUB",
-        "目录",
-    ),
-    Option(
-        "toc_format", CHOICE, "目录格式",
-        "只输出目录时的格式：text | json",
-        "目录", choices=TOC_FORMATS, default="text",
-    ),
+    Option("toc_in_spine", "书页含目录", "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）", "目录", negative=True),
+    Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
+    Option("toc_only", "只输出目录", "只输出目录，不生成 EPUB", "目录"),
+    Option("toc_format", "目录格式", "只输出目录时的格式：text | json", "目录", choices=FORMATS),
 )
 
 
@@ -240,23 +135,12 @@ def option_groups() -> list[tuple[str, tuple[Option, ...]]]:
 
 
 def option_default(opt: Option) -> Any:
-    """选项默认值：能对上 `Config` 的从 Config 派生，其余取选项自带的 `default`。"""
-    if opt.kind == BOOL:
-        return False
-    if opt.level is not None:
-        return next(r.pattern for r in Config().levels if r.level == opt.level)
-    if opt.field:
-        return getattr(Config(), opt.field)
-    return opt.default
-
-
-def option_defaults() -> dict[str, Any]:
-    """全部选项的默认值，键是选项名。
-
-    两个前端都是逐项取 `option_default()`（要按选项类型挑控件/参数），这份整表
-    适合只想拿到「全部缺省值」的调用方。
-    """
-    return {opt.name: option_default(opt) for opt in OPTIONS}
+    """选项的缺省值：Config 字段取 `DEFAULTS`，其余按形态给空值。"""
+    if opt.level:
+        return next(rule.pattern for rule in DEFAULTS.levels if rule.level == opt.level)
+    if opt.in_config:
+        return getattr(DEFAULTS, opt.name)
+    return () if opt.multiple else ""
 
 
 # ---------- 原始值 → Config ----------
@@ -265,51 +149,43 @@ def option_defaults() -> dict[str, Any]:
 def build_config(values: Mapping[str, Any]) -> Config:
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
-    怎么转全写在选项表上：`field` 说这个值进 `Config` 的哪个字段，`invert` 说它是
-    该字段的反面（`--no-clean` → `Config.clean`），`kind` 说按什么类型转。所以
-    `Config` 的字段名只在选项表里出现一次，这里不再按选项名分支。
-
-    留空一律表示「用 `Config` 的默认值」，取值范围由 `Config.validate()` 负责。
-    表里 `field` 为空的选项不进 `Config`：输入文件和三个层级正则需要另外组装，
-    其余只决定某一种产出方式，不影响转换参数。
+    值的语义与 `Config` 字段一致：反面选项（`--no-clean`）收上来时已经是 `False`。
+    留空一律表示「用缺省值」，取值范围由 `Config.validate()` 负责。
     """
+    raw = {opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS}
     return Config(
-        input=_input_path(values),
-        levels=_levels(values),
-        replacements=_replacements(values),
-        **_fields(values),
+        levels=build_levels(_presets(values), raw["level"]),
+        replacements=rules_from_source(_text(raw["replace_json"]), raw["replace_file"]),
+        **{opt.name: raw[opt.name] for opt in OPTIONS if opt.in_config},
     )
 
 
-def _fields(values: Mapping[str, Any]) -> dict[str, Any]:
-    """按选项表逐项转成 `Config` 的字段值。"""
-    fields: dict[str, Any] = {}
-    for opt in OPTIONS:
-        if not opt.field:
-            continue
-        value = values.get(opt.name)
-        fields[opt.field] = not bool(value) if opt.invert else _convert(opt, value)
-    return fields
-
-
 def _convert(opt: Option, value: Any) -> Any:
-    """单个选项的原始值 → `Config` 字段值。"""
-    if opt.kind == INT:
-        return _integer(opt, value)
-    if opt.kind == PATH:
-        return _path(opt, value)
-    if opt.kind == BOOL:
+    """一个选项的原始值 → 收进 `Config`（或 `levels` / `replacements`）的值。"""
+    if value is None:
+        return option_default(opt)
+    if opt.multiple:
+        return _lines(value)
+    if opt.kind is bool:
         return bool(value)
+    if opt.kind is int:
+        return _integer(opt, value)
+    if opt.kind is Path:
+        return _path(opt, value)
     text = _text(value)
     return option_default(opt) if text is None else text
 
 
 def _text(value: Any) -> str | None:
     """字符串选项的值；未给或只填了空白都视同未给。"""
-    if value is None:
-        return None
-    text = str(value).strip()
+    text = "" if value is None else str(value).strip()
     return text or None
+
+
+def _lines(value: Any) -> tuple[str, ...]:
+    """多值选项（`--level`）：GUI 给多行文本，CLI 给元组，都收成去掉空行的元组。"""
+    items = value.splitlines() if isinstance(value, str) else value or ()
+    return tuple(str(item).strip() for item in items if str(item).strip())
 
 
 def _integer(opt: Option, value: Any) -> int:
@@ -323,52 +199,20 @@ def _integer(opt: Option, value: Any) -> int:
 
 
 def _path(opt: Option, value: Any) -> Path | None:
+    """路径选项：输出路径不必存在；输入文件、封面、字体、CSS、规则文件必须存在。"""
     text = _text(value)
     if text is None:
         return None
     path = Path(text)
-    if opt.exists:
-        _require_file(path, opt.label)
+    if not opt.output and not path.is_file():
+        raise ValueError(f"{opt.label}不存在：{path}")
     return path
 
 
-def _input_path(values: Mapping[str, Any]) -> Path:
-    source = _text(values.get("input"))
-    if source is None:
-        raise ValueError("缺少输入文件")
-    path = Path(source)
-    _require_file(path, "输入文件")
-    return path
-
-
-def _require_file(path: Path, label: str) -> None:
-    if not path.is_file():
-        raise ValueError(f"{label}不存在：{path}")
-
-
-def _levels(values: Mapping[str, Any]) -> list[LevelRule]:
-    """卷/章/节三个预设 + 额外层级。预设留空表示不识别该层级，未给才是内置值。"""
-    presets = {
+def _presets(values: Mapping[str, Any]) -> dict[str, str]:
+    """卷/章/节三条预设正则：未给用内置值，给了空串表示不识别该层级。"""
+    return {
         opt.name: option_default(opt) if values.get(opt.name) is None else str(values[opt.name])
         for opt in OPTIONS
-        if opt.level is not None
+        if opt.level
     }
-    return build_levels(presets, _specs(values.get("level")))
-
-
-def _specs(value: Any) -> list[str]:
-    """额外层级规格。GUI 给多行文本，CLI 给一个元组，两种都收。"""
-    if not value:
-        return []
-    if isinstance(value, str):
-        return [line.strip() for line in value.splitlines() if line.strip()]
-    return [str(item).strip() for item in value if str(item).strip()]
-
-
-def _replacements(values: Mapping[str, Any]) -> list[Rule]:
-    """替换规则只有 JSON 一个内部入口：`--replace-json` 文本或 `--replace-file` 文件。
-
-    GUI 的替换规则表格是界面上的写法，先由 `gui.app` 转成 JSON 文本再走这里，
-    所以 core 不需要认识表格行。
-    """
-    return rules_from_source(_text(values.get("replace_json")), _text(values.get("replace_file")))

@@ -1,43 +1,46 @@
 """`build_config()`：前端的原始值 → Config。两个前端共用这一条转换路径。"""
 
 import json
+from pathlib import Path
 
 import pytest
 
 from simple_ebook_converter.core.config import (
     DEFAULT_CHAPTER_RE,
     DEFAULT_VOLUME_RE,
+    DEFAULTS,
     Config,
     LevelRule,
 )
 from simple_ebook_converter.core.options import (
+    CONFIG_KINDS,
     OPTIONS,
     Option,
     build_config,
     option_default,
-    option_defaults,
 )
 from simple_ebook_converter.core.replace import Rule
-
-DEFAULTS = option_defaults()
 
 
 def _values(tmp_path, **overrides) -> dict:
     src = tmp_path / "《测试书》作者：某人.txt"
     src.write_text("第一章 一\n正文\n", encoding="utf-8")
-    values = {"input": str(src)}
-    values.update(overrides)
-    return values
+    return {"input": str(src), **overrides}
 
 
 def _config(tmp_path, **overrides) -> Config:
     return build_config(_values(tmp_path, **overrides))
 
 
+def _option(name: str) -> Option:
+    return next(opt for opt in OPTIONS if opt.name == name)
+
+
 # ---------- 缺省 ----------
 
 
 def test_defaults_to_config_is_the_default_config(tmp_path):
+    """只给 input，得到的配置与直接 `Config(input=...)` 一致（`levels` 逐条比）。"""
     cfg = _config(tmp_path)
     expected = Config(input=tmp_path / "《测试书》作者：某人.txt")
     for name in expected.__dataclass_fields__:
@@ -49,9 +52,9 @@ def test_defaults_to_config_is_the_default_config(tmp_path):
             assert getattr(cfg, name) == getattr(expected, name), name
 
 
-def test_missing_input_is_rejected():
-    with pytest.raises(ValueError, match="缺少输入文件"):
-        build_config({})
+def test_missing_input_is_left_to_the_pipeline():
+    """`build_config()` 只翻译值：没给输入不算错，读文件时再报「缺少输入文件」。"""
+    assert build_config({}) == Config()
 
 
 def test_missing_input_file_is_rejected(tmp_path):
@@ -73,15 +76,18 @@ def test_blank_is_treated_as_absent(tmp_path):
         chapter_align="",
         volume_align="",
         preface_title="",
+        out="",
+        dump_css="",
     )
     assert (cfg.title, cfg.author, cfg.date) == (None, "", None)
     assert cfg.encoding == "auto"
-    assert cfg.language == Config().language
-    assert cfg.line_height == Config().line_height
-    assert cfg.para_spacing == Config().para_spacing
-    assert cfg.chapter_align == Config().chapter_align
-    assert cfg.volume_align == Config().volume_align
-    assert cfg.preface_title == Config().preface_title
+    assert cfg.language == DEFAULTS.language
+    assert cfg.line_height == DEFAULTS.line_height
+    assert cfg.para_spacing == DEFAULTS.para_spacing
+    assert cfg.chapter_align == DEFAULTS.chapter_align
+    assert cfg.volume_align == DEFAULTS.volume_align
+    assert cfg.preface_title == DEFAULTS.preface_title
+    assert (cfg.out, cfg.dump_css) == (None, None)
 
 
 def test_numbers_accept_strings(tmp_path):
@@ -92,7 +98,7 @@ def test_numbers_accept_strings(tmp_path):
 
 def test_numbers_fall_back_when_blank(tmp_path):
     cfg = _config(tmp_path, max_title_len="", toc_depth=None, indent="")
-    assert (cfg.max_title_len, cfg.toc_depth, cfg.indent) == (Config().max_title_len, 6, 2)
+    assert (cfg.max_title_len, cfg.toc_depth, cfg.indent) == (DEFAULTS.max_title_len, 6, 2)
 
 
 def test_bad_number_names_the_option(tmp_path):
@@ -103,14 +109,15 @@ def test_bad_number_names_the_option(tmp_path):
 # ---------- 开关 ----------
 
 
-def test_negative_flags_are_inverted(tmp_path):
+def test_switches_take_positive_values(tmp_path):
+    """前端收上来的已经是 `Config` 的正面语义，`build_config()` 不做取反。"""
     cfg = _config(
         tmp_path,
-        no_overwrite="1",
-        no_toc=True,
-        no_clean=True,
-        no_text_cover=True,
-        no_volume=True,
+        overwrite=False,
+        toc_in_spine=False,
+        clean=False,
+        text_cover=False,
+        volume_titles=False,
     )
     assert cfg.overwrite is False
     assert cfg.toc_in_spine is False
@@ -119,10 +126,22 @@ def test_negative_flags_are_inverted(tmp_path):
     assert cfg.volume_titles is False
 
 
-def test_positive_fields_come_from_flags(tmp_path):
-    assert _config(tmp_path, no_clean=True).clean is False
-    assert _config(tmp_path, no_clean=False).clean is True
-    assert _config(tmp_path, no_toc=True).toc_in_spine is False
+def test_switches_default_to_on(tmp_path):
+    """`--no-xxx` 关掉的是默认开启的功能，所以缺省都是 True。"""
+    cfg = _config(tmp_path)
+    for name in ("overwrite", "toc_in_spine", "clean", "text_cover", "volume_titles"):
+        assert getattr(cfg, name) is True, name
+
+
+# ---------- 产出开关 ----------
+
+
+def test_output_switches_land_on_config(tmp_path):
+    """产出方式也是 `Config` 字段：前端收完值就直接交回 core。"""
+    cfg = _config(tmp_path, toc_only=True, toc_format="json", dump_css=str(tmp_path / "a.css"))
+    assert cfg.toc_only is True
+    assert cfg.toc_format == "json"
+    assert cfg.dump_css == tmp_path / "a.css"
 
 
 # ---------- 层级 ----------
@@ -180,6 +199,10 @@ def test_bad_extra_level_is_rejected(tmp_path):
         _config(tmp_path, level="9:^x")
 
 
+def test_levels_default_to_level_rules():
+    assert all(isinstance(r, LevelRule) for r in DEFAULTS.levels)
+
+
 # ---------- 资源文件 ----------
 
 
@@ -199,6 +222,13 @@ def test_missing_asset_is_rejected(tmp_path):
         _config(tmp_path, cover=str(tmp_path / "nope.png"))
     with pytest.raises(ValueError, match="正文字体不存在"):
         _config(tmp_path, font=str(tmp_path / "nope.ttf"))
+
+
+def test_output_paths_need_not_exist(tmp_path):
+    """输出路径不要求已存在：本来就是要写出来的。"""
+    cfg = _config(tmp_path, out=str(tmp_path / "deep" / "a.epub"), dump_css=str(tmp_path / "b.css"))
+    assert cfg.out == tmp_path / "deep" / "a.epub"
+    assert cfg.dump_css == tmp_path / "b.css"
 
 
 # ---------- 替换规则 ----------
@@ -252,27 +282,56 @@ def test_option_names_are_unique():
 
 
 def test_every_flag_is_a_prefix_of_its_name():
+    """旗标从名字推出来：正面写 `--xxx`，反面写 `--no-xxx`。"""
     for opt in OPTIONS:
-        assert opt.flags[-1] == "--" + opt.name.replace("_", "-"), opt.name
+        stem = ("no-" if opt.negative else "") + opt.name.replace("_", "-")
+        assert opt.flags[-1] == f"--{stem}", opt.name
 
 
-def test_option_kinds_are_known():
-    assert {opt.kind for opt in OPTIONS} <= {"text", "int", "bool", "path", "choice", "multi"}
+def test_option_kinds_come_from_config_annotations():
+    """取值类型不写第二份：`Config` 字段按注解推，其余看 `value_type`。"""
+    assert set(CONFIG_KINDS.values()) <= {str, int, bool, Path}
+    for opt in OPTIONS:
+        if opt.in_config:
+            assert opt.name in CONFIG_KINDS, opt.name
+            assert opt.kind is CONFIG_KINDS[opt.name], opt.name
+        else:
+            assert opt.kind is opt.value_type, opt.name
+
+
+def test_option_defaults_come_from_config():
+    """选项缺省值就是 `Config` 的字段缺省值：改一处，两个前端一起变。"""
+    for opt in OPTIONS:
+        if opt.in_config:
+            assert option_default(opt) == getattr(DEFAULTS, opt.name), opt.name
+
+
+def test_empty_defaults_for_options_outside_config():
+    for name in ("replace_json", "replace_file"):
+        assert option_default(_option(name)) == ""
+    assert option_default(_option("level")) == ()
+
+
+def test_build_config_never_mutates_the_shared_defaults(tmp_path):
+    """`DEFAULTS` 只是缺省值模板：谁都不许改它，否则两次调用会互相污染。"""
+    before = [(r.level, r.pattern) for r in DEFAULTS.levels]
+    _config(tmp_path, volume="^甲", clean=False, replace_json='[{"pattern": "甲"}]')
+    assert [(r.level, r.pattern) for r in DEFAULTS.levels] == before
+    assert DEFAULTS.clean is True
 
 
 def test_choices_options_declare_choices():
     for opt in OPTIONS:
-        if opt.kind == "choice":
-            assert opt.choices, opt.name
+        if opt.choices:
             assert option_default(opt) in opt.choices, opt.name
 
 
-def test_path_options_that_must_exist():
+def test_output_options_are_not_required_to_exist():
+    for name in ("out", "dump_css"):
+        assert _option(name).output, name
     for opt in OPTIONS:
-        if opt.exists:
-            assert opt.kind == "path", opt.name
-    assert not _option("out").exists
-    assert not _option("dump_css").exists
+        if opt.kind is Path and not opt.output:
+            assert opt.in_config or opt.name == "replace_file", opt.name
 
 
 def test_no_option_shadows_another_with_the_same_flag():
@@ -283,11 +342,11 @@ def test_no_option_shadows_another_with_the_same_flag():
             seen[flag] = opt.name
 
 
-def test_inverted_flags_point_at_boolean_fields():
+def test_negative_options_point_at_boolean_fields():
     """反面选项只对布尔字段有意义（`not` 一下就得到正面取值）。"""
     for opt in OPTIONS:
-        if opt.invert:
-            assert isinstance(getattr(Config(), opt.field, None), bool), opt.name
+        if opt.negative:
+            assert opt.kind is bool, opt.name
 
 
 def test_level_presets_are_levels_two_to_four():
@@ -300,11 +359,3 @@ def test_every_option_is_optional_except_input(tmp_path):
     src = tmp_path / "a.txt"
     src.write_text("正文", encoding="utf-8")
     assert build_config({"input": str(src)}) == Config(input=src)
-
-
-def test_levels_default_to_level_rules():
-    assert all(isinstance(r, LevelRule) for r in Config().levels)
-
-
-def _option(name: str) -> Option:
-    return next(opt for opt in OPTIONS if opt.name == name)

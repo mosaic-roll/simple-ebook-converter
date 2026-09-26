@@ -4,11 +4,9 @@ import pytest
 
 from simple_ebook_converter.core.replace import (
     DEFAULT_SCOPE,
-    SCOPE_ALL,
-    SCOPE_BODY,
-    SCOPE_CHOICES,
+    SCOPE_BY_LABEL,
     SCOPE_LABELS,
-    SCOPE_TITLE,
+    SCOPES,
     Replacer,
     Rule,
     check_scope,
@@ -45,18 +43,27 @@ def test_empty_replacer_is_identity():
 
 
 def test_scope_defaults_to_title():
-    assert DEFAULT_SCOPE == SCOPE_TITLE
-    assert Rule("a", "b").scope == SCOPE_TITLE
+    assert DEFAULT_SCOPE == "title"
+    assert Rule("a", "b").scope == "title"
 
 
 def test_scope_choices_and_labels_cover_every_choice():
-    assert SCOPE_CHOICES == (SCOPE_TITLE, SCOPE_BODY, SCOPE_ALL)
-    assert set(SCOPE_LABELS) == set(SCOPE_CHOICES)
+    """`SCOPES` 是唯一一处真相：取值、中文标签、要不要动标题/正文都在这一张表里。"""
+    assert tuple(SCOPES) == ("title", "body", "all")
+    assert set(SCOPE_LABELS) == set(SCOPES)
+    assert set(SCOPE_BY_LABEL) == set(SCOPE_LABELS.values())
     assert list(SCOPE_LABELS.values()) == ["标题", "正文", "全文"]
 
 
+def test_scope_flags_agree_with_names():
+    """标题/正文两个布尔位与 scope 的名字一致，`replacers_by_scope` 才不用另写判断。"""
+    assert SCOPES["title"] == ("标题", True, False)
+    assert SCOPES["body"] == ("正文", False, True)
+    assert SCOPES["all"] == ("全文", True, True)
+
+
 def test_check_scope_passes_through():
-    for scope in SCOPE_CHOICES:
+    for scope in SCOPES:
         assert check_scope(scope) == scope
 
 
@@ -77,11 +84,11 @@ def test_check_scope_error_mentions_where():
 
 
 def test_scope_label_property():
-    assert Rule("a", "b", SCOPE_BODY).scope_label == "正文"
+    assert Rule("a", "b", "body").scope_label == "正文"
 
 
 def test_replacers_by_scope_partitions_rules():
-    rules = [Rule("t", "1", SCOPE_TITLE), Rule("b", "2", SCOPE_BODY), Rule("a", "3", SCOPE_ALL)]
+    rules = [Rule("t", "1", "title"), Rule("b", "2", "body"), Rule("a", "3", "all")]
     titles, bodies = replacers_by_scope(rules)
     assert [r.pattern for r in titles.rules] == ["t", "a"]
     assert [r.pattern for r in bodies.rules] == ["b", "a"]
@@ -99,7 +106,7 @@ def test_replacers_by_scope_on_empty():
 
 def test_rules_from_json_without_scope_is_title():
     assert rules_from_json(json.dumps([{"pattern": "a", "replace": "b"}])) == [
-        Rule("a", "b", SCOPE_TITLE)
+        Rule("a", "b", "title")
     ]
 
 
@@ -112,7 +119,7 @@ def test_rules_from_json_reads_scope():
             ]
         )
     )
-    assert [r.scope for r in rules] == [SCOPE_BODY, SCOPE_ALL]
+    assert [r.scope for r in rules] == ["body", "all"]
 
 
 def test_rules_from_json_rejects_unknown_scope():
@@ -126,15 +133,15 @@ def test_rules_from_json_rejects_non_string_scope():
 
 
 def test_rules_from_rows_skips_blank_pattern():
-    assert rules_from_rows([("", "x", "标题"), ("a", "b", "正文")]) == [Rule("a", "b", SCOPE_BODY)]
+    assert rules_from_rows([("", "x", "标题"), ("a", "b", "正文")]) == [Rule("a", "b", "body")]
 
 
 def test_rules_from_rows_accepts_short_rows():
-    assert rules_from_rows([("a", "b")]) == [Rule("a", "b", SCOPE_TITLE)]
+    assert rules_from_rows([("a", "b")]) == [Rule("a", "b", "title")]
 
 
 def test_rules_from_rows_passes_rules_through():
-    rule = Rule("a", "b", SCOPE_ALL)
+    rule = Rule("a", "b", "all")
     assert rules_from_rows([rule]) == [rule]
 
 
@@ -144,13 +151,13 @@ def test_rules_from_rows_rejects_unknown_label():
 
 
 def test_rules_from_source_from_text():
-    assert rules_from_source('[{"pattern": "a"}]') == [Rule("a", "", SCOPE_TITLE)]
+    assert rules_from_source('[{"pattern": "a"}]') == [Rule("a", "", "title")]
 
 
 def test_rules_from_source_from_file(tmp_path):
     path = tmp_path / "rules.json"
     path.write_text('[{"pattern": "a", "scope": "body"}]', encoding="utf-8")
-    assert rules_from_source(file=path) == [Rule("a", "", SCOPE_BODY)]
+    assert rules_from_source(file=path) == [Rule("a", "", "body")]
 
 
 def test_rules_from_source_rejects_both(tmp_path):
@@ -174,10 +181,10 @@ def test_rules_from_source_reports_unreadable_file(tmp_path):
 
 def test_rules_to_json_always_writes_scope():
     assert json.loads(rules_to_json([Rule("a", "b")])) == [
-        {"pattern": "a", "replace": "b", "scope": SCOPE_TITLE}
+        {"pattern": "a", "replace": "b", "scope": "title"}
     ]
 
 
 def test_rules_to_json_round_trips():
-    rules = [Rule("a", "1", SCOPE_BODY), Rule("b", "2", SCOPE_ALL)]
+    rules = [Rule("a", "1", "body"), Rule("b", "2", "all")]
     assert rules_from_json(rules_to_json(rules)) == rules

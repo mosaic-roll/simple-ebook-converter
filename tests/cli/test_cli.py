@@ -637,7 +637,8 @@ def test_help_lists_every_option():
     result = CliRunner().invoke(convert, ["--help"])
     assert result.exit_code == 0, result.output
     for opt in OPTIONS:
-        assert f"--{opt.name.replace('_', '-')}" in result.output, opt.name
+        for flag in opt.flags:
+            assert flag in result.output, opt.name
 
 
 def test_help_is_grouped_like_the_option_table():
@@ -655,9 +656,9 @@ def test_help_documents_each_option():
     直接在输出里找原句会被折断的中文坑到。
     """
     ctx = click.Context(convert)
-    records = {param.name: param.get_help_record(ctx) for param in convert.params}
+    records = {param.opts[-1]: param.get_help_record(ctx) for param in convert.params}
     for opt in OPTIONS:
-        _flags, help_text = records[opt.name]
+        _flags, help_text = records[opt.flags[-1]]
         assert opt.help in help_text, opt.name
 
 

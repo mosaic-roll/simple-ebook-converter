@@ -1,7 +1,7 @@
-"""转换参数 `Config`、内置标题正则、以及各处共用的缺省值。
+"""转换参数 `Config`、内置标题正则。
 
-这里是全部默认值的唯一真源：选项表（`options.py`）、GUI 表单初值、`parse()` 的缺省
-参数都从这里派生，别处不再写第二份字面量。
+这里是全部缺省值的唯一真源：选项表（`options.py`）、`parse()` / `to_text()` 的缺省
+参数都从 `Config` 的字段默认值派生，别处不再写第二份字面量。
 """
 
 from __future__ import annotations
@@ -38,18 +38,15 @@ DEFAULT_CHAPTER_RE = "|".join(_CHAPTER_FRAGMENTS)
 #: 标题对齐方式，写进 CSS 的 `text-align`
 ALIGN_CHOICES = ("left", "center", "right")
 
-#: 预设层级：级别 → (class 名, 中文名)。CLI 的三个选项、GUI 的三个输入框与错误提示共用
-LEVEL_PRESETS = ((2, "volume", "卷标题"), (3, "chapter", "章标题"), (4, "section", "节标题"))
-
-#: 每个预设层级的内置正则（空串 = 默认不启用）。名字与层级见 LEVEL_PRESETS
-_LEVEL_PATTERNS = {2: DEFAULT_VOLUME_RE, 3: DEFAULT_CHAPTER_RE, 4: ""}
+#: 预设层级：级别 → (class 名, 中文名, 内置正则)。空正则 = 默认不启用。
+LEVEL_PRESETS = (
+    (2, "volume", "卷标题", DEFAULT_VOLUME_RE),
+    (3, "chapter", "章标题", DEFAULT_CHAPTER_RE),
+    (4, "section", "节标题", ""),
+)
 
 # 一条标题都没命中时整篇作为一章，标题取什么
-FALLBACK_TITLE = "未命名"
-# 下列三个默认值同时被 Config 字段与 `parse()` / `toc` 的缺省参数用到
-DEFAULT_MAX_TITLE_LEN = 35
-DEFAULT_PREFACE_TITLE = "前言"
-DEFAULT_TOC_DEPTH = 6
+_FALLBACK_TITLE = "未命名"
 
 
 @dataclass
@@ -80,15 +77,16 @@ class Node:
 
 def default_levels() -> list[LevelRule]:
     """内置的卷/章/节三条层级。调用方拿到的是新列表，可随意改。"""
-    return [LevelRule(level, _LEVEL_PATTERNS[level], name) for level, name, _ in LEVEL_PRESETS]
+    return [LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS]
 
 
 @dataclass
 class Config:
-    """一次转换的全部参数。字段默认值 = 省略该参数时的行为。
+    """一次转换的全部参数：输入什么样、书长什么样、产出什么文件。
 
-    字段一律用正面表述（`overwrite` 而不是 `no_overwrite`），「关掉某功能」由前端
-    表达为 `--no-xxx` / 反向勾选框，转换时再取反。取值范围校验在 `validate()`。
+    字段默认值 = 省略该参数时的行为。两个前端都只收值、调 `pipeline`，不各自拼流程；
+    字段一律用正面表述（`overwrite` 而不是 `no_overwrite`），「关掉某功能」由前端表达为
+    `--no-xxx` / 反向勾选框，收上来时已经是这里的正面语义。取值范围校验在 `validate()`。
     """
 
     # 输入
@@ -108,8 +106,8 @@ class Config:
     levels: list[LevelRule] = field(default_factory=default_levels)
     #: 卷行是否算标题；False 时 `第X卷` 这类行当正文
     volume_titles: bool = True
-    max_title_len: int = DEFAULT_MAX_TITLE_LEN
-    preface_title: str = DEFAULT_PREFACE_TITLE
+    max_title_len: int = 35
+    preface_title: str = "前言"
 
     # 文本处理
     clean: bool = True
@@ -127,22 +125,30 @@ class Config:
     # 目录
     #: 目录页是否进 spine（nav 文档无论如何都生成）
     toc_in_spine: bool = True
-    toc_depth: int = DEFAULT_TOC_DEPTH
+    toc_depth: int = 6
+    #: 目录输出格式：text | json（见 `toc.FORMATS`）
+    toc_format: str = "text"
 
-    # 输出
+    # 产出
+    #: 输出路径。留空时 EPUB 取输入同名，目录由调用方决定（CLI 走 stdout）
+    out: Path | None = None
     overwrite: bool = True
+    #: 只输出目录，不生成 EPUB
+    toc_only: bool = False
+    #: 只把当前生效的 CSS 写到这个文件（给了就不必读输入）
+    dump_css: Path | None = None
 
     @property
     def book_title(self) -> str:
-        """书名：显式值 → 输入文件名 → 「未命名」。`process()` 会先把猜到的值写回 `title`。"""
+        """书名：显式值 → 输入文件名 → 「未命名」。`resolve()` 会先把猜到的值填好。"""
         if self.title:
             return self.title
-        return Path(self.input).stem if self.input else FALLBACK_TITLE
+        return Path(self.input).stem if self.input else _FALLBACK_TITLE
 
     def validate(self) -> None:
         """校验取值范围，非法抛 `ValueError`（消息可直接展示给用户）。
 
-        `process()` 会自动调用，正常走 CLI / GUI 都会校验；直接调 `build_epub()`
+        `resolve()` 会自动调用，正常走 CLI / GUI 都会校验；直接调 `build_epub()`
         的调用方应自己先过一遍。
         """
         if self.max_title_len < 1:
@@ -166,3 +172,7 @@ class Config:
             font_media_type(Path(self.font))
         if self.cover:
             cover_media_type(Path(self.cover))
+
+
+#: 全缺省的模板，只用来取参数默认值与选项初值，谁也不许改它
+DEFAULTS = Config()

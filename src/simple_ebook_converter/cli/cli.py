@@ -1,31 +1,31 @@
-"""命令行前端：把命令行参数绑成 `Config`，交给 core，只负责显示结果。
+"""命令行前端：把命令行参数收成 `Config`，交给 core，只负责显示结果。
 
 选项表不在这里写死：`-h` 的分组、每个选项的说明与默认值都取自
 `core.options.OPTIONS`，所以 core 改一次，命令行界面与 GUI 表单同时跟着变。
+
+三个产出开关就是设计文档里的三种产物：默认生成 EPUB，`--toc-only` 只输出目录
+（`-o` 留空或给 `-` 时走 stdout），`--dump-css` 只导出 CSS。
 """
 
 from __future__ import annotations
 
 import sys
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
 import click
 
 from .._meta import CLI_PROG, __version__
-from ..core import jobs
-from ..core.jobs import CSS, EPUB, TOC, Book, Result
-from ..core.options import (
-    BOOL,
-    CHOICE,
-    INT,
-    MULTI,
-    OPTIONS,
-    Option,
-    build_config,
-    option_default,
-    option_groups,
+from ..core.config import Config
+from ..core.options import OPTIONS, Option, build_config, option_default, option_groups
+from ..core.pipeline import (
+    Book,
+    read_book,
+    toc_text,
+    write_css,
+    write_epub,
+    write_toc,
 )
 
 #: 来自 `_meta`，即 pyproject.toml 那一个版本号；这里不要再写死一份
@@ -34,12 +34,9 @@ VERSION = __version__
 #: `--out` 写这个值表示输出到标准输出
 STDOUT = "-"
 
-#: 三种产出方式各自的成功提示
-_DONE = {EPUB: "已生成", TOC: "目录已写入", CSS: "CSS 已写入"}
-
 
 @contextmanager
-def _usage_errors() -> Iterator[None]:
+def _usage_errors() -> Generator[None, None, None]:
     """把 core 抛的 `ValueError` 转成 `click.UsageError`。
 
     core 的错误消息本来就是写给人看的（"封面文件不存在：…"），转一下就不会吐 traceback。
@@ -53,46 +50,47 @@ def _usage_errors() -> Iterator[None]:
 # ---------- 选项表 → click 参数 ----------
 
 
+def _param_name(opt: Option) -> str:
+    """click 参数名：反面选项的旗标是 `--no-xxx`，参数名也跟着带 `no_`。"""
+    return f"no_{opt.name}" if opt.negative else opt.name
+
+
 def _click_type(opt: Option):
-    """选项类型 → click 参数类型。`--level` 这类多值项在这里只管单个值的类型。"""
-    if opt.kind == INT:
-        return click.INT
-    if opt.kind == CHOICE:
+    """选项类型 → click 参数类型。`--level` 这类多值项只管单个值的类型。"""
+    if opt.choices:
         return click.Choice(opt.choices)
-    if opt.kind == "path":
-        return click.Path(exists=opt.exists, dir_okay=False, path_type=Path)
-    return click.STRING
+    if opt.kind is Path:
+        return click.Path(exists=not opt.output, dir_okay=False, path_type=Path)
+    return click.INT if opt.kind is int else click.STRING
 
 
 def _click_default(opt: Option):
     """click 的默认值：留空表示「未指定」，只能是 `None` 或 `()`。
 
-    空串不能直接给 `--out`：click 会拿它去构造 `Path("")`，得到当前目录。
-    层级正则也不给默认值，`--help` 里印一条几百字的正则没人看得下去。
+    空串不能直接给 `--out`：click 会拿它去构造 `Path("")`，得到当前目录。层级正则也
+    不给默认值，`--help` 里印一条几百字的正则没人看得下去。
     """
-    if opt.kind == BOOL:
-        return None
-    if opt.kind == MULTI:
+    if opt.kind is bool:
+        # 勾上旗标 = 关掉功能，所以旗标值与缺省值相反（`--no-clean` → 缺省 True）
+        return not option_default(opt) if opt.negative else False
+    if opt.multiple:
         return ()
-    if opt.level is not None:
+    if opt.level:
         return None
     value = option_default(opt)
     return None if value == "" else value
 
 
 def _click_option(opt: Option) -> click.Option:
+    """一条 `Option` → 一个 click 参数。默认值与 `Config` 字段的缺省值同源。"""
     default = _click_default(opt)
-    attrs: dict[str, object] = {
-        "help": opt.help,
-        "default": default,
-        "show_default": default not in (None, "", ()),
-    }
-    if opt.kind == BOOL:
-        attrs["is_flag"] = True
+    attrs: dict[str, object] = {"help": opt.help, "default": default}
+    if opt.kind is bool:
+        attrs |= {"is_flag": True, "flag_value": not default}
     else:
-        attrs["type"] = _click_type(opt)
-    if opt.kind == MULTI:
-        attrs["multiple"] = True
+        attrs |= {"type": _click_type(opt), "show_default": default not in (None, "", ())}
+    if opt.multiple:
+        attrs |= {"multiple": True}
     return click.Option(list(opt.flags), **attrs)
 
 
@@ -103,8 +101,8 @@ class _GroupedHelp(click.Command):
         params = {param.name: param for param in self.params}
         listed: set[str] = set()
         for title, options in option_groups():
-            rows = [params[opt.name].get_help_record(ctx) for opt in options if opt.name in params]
-            listed |= {opt.name for opt in options}
+            rows = [params[_param_name(opt)].get_help_record(ctx) for opt in options]
+            listed |= {_param_name(opt) for opt in options}
             if rows:
                 with formatter.section(title):
                     formatter.write_dl(rows)
@@ -120,33 +118,7 @@ class _GroupedHelp(click.Command):
                 formatter.write_dl(rest)
 
 
-# ---------- 产出 ----------
-
-
-def _target(values: dict) -> tuple[str, str | None]:
-    """三个开关挑一种产出方式，并算出它的输出路径。
-
-    `--out` 是 click 给的 `Path`，所以拿字符串比。`-` 只对目录有意义：目录正文走
-    标准输出，EPUB 是二进制文件没地方可去。
-    """
-    out = values.get("out")
-    out = "" if out is None else str(out)
-    if values.get("toc_only"):
-        return TOC, None if out in ("", STDOUT) else out
-    if values.get("dump_css"):
-        return CSS, values["dump_css"]
-    if out == STDOUT:
-        raise click.UsageError("EPUB 是二进制文件，不能输出到标准输出，请用 --out 指定文件路径")
-    return EPUB, out
-
-
-def _report(result: Result) -> None:
-    if result.path is None:
-        click.echo(result.text)
-        return
-    click.echo(f"{_DONE[result.kind]}：{result.path}")
-    if result.kind == EPUB:
-        click.echo(_summary(result.book))
+# ---------- 三种产物 ----------
 
 
 def _summary(book: Book) -> str:
@@ -159,15 +131,35 @@ def _summary(book: Book) -> str:
     )
 
 
-def _convert(input_txt: Path | None, values: dict) -> None:
-    if not values.get("input") and input_txt is None:
+def _produce(cfg: Config) -> None:
+    """按 `cfg` 上的产出开关跑一次转换，并把结果打印到终端。"""
+    if cfg.dump_css:
+        click.echo(f"CSS 已写入：{write_css(cfg)}")
+        return
+    book = read_book(cfg)
+    if cfg.toc_only:
+        if cfg.out is None or str(cfg.out) == STDOUT:
+            click.echo(toc_text(book))
+        else:
+            click.echo(f"目录已写入：{write_toc(book)}")
+        return
+    if str(cfg.out or "") == STDOUT:
+        raise click.UsageError("EPUB 是二进制文件，不能输出到标准输出，请用 --out 指定文件路径")
+    click.echo(f"已生成：{write_epub(book)}")
+    click.echo(_summary(book))
+
+
+def _convert(input_txt: Path | None, params: dict) -> None:
+    """把 click 收上来的参数按选项表翻译成 `Config`，再交给 core。"""
+    if not (params["input"] or input_txt) and not params["dump_css"]:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
-    values["input"] = values.get("input") or input_txt
-    kind, out = _target(values)
+    values: dict = {}
+    for opt in OPTIONS:
+        value = params[_param_name(opt)]
+        values[opt.name] = not value if opt.negative else value
+    values["input"] = params["input"] or input_txt
     with _usage_errors():
-        cfg = build_config(values)
-        result = jobs.run(cfg, kind, out, str(values["toc_format"]))
-    _report(result)
+        _produce(build_config(values))
 
 
 @click.command(
@@ -180,12 +172,12 @@ def _convert(input_txt: Path | None, values: dict) -> None:
     required=False,
 )
 @click.version_option(VERSION, prog_name=CLI_PROG)
-def convert(input_txt: Path | None, **values) -> None:
+def convert(input_txt: Path | None, **params) -> None:
     """把 txt 转成 EPUB。
 
     INPUT_TXT 也可以用 -i/--input 给；--toc-only 只输出目录，--dump-css 只输出 CSS。
     """
-    _convert(input_txt, values)
+    _convert(input_txt, params)
 
 
 for _opt in OPTIONS:
