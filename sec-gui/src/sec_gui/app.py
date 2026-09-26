@@ -6,14 +6,15 @@ from tkinter import filedialog, messagebox, ttk
 
 from sec_core.builder import build_css, build_epub
 from sec_core.config import ALIGN_CHOICES, Config, config_defaults
-from sec_core.encoding import read_lines
+from sec_core.encoding import ENCODING_CHOICES, read_lines
 from sec_core.levels import build_levels
 from sec_core.meta import resolve_metadata
 from sec_core.pipeline import process
 from sec_core.replace import Rule, rules_from_json
 from sec_core.toc import to_json
 
-_ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "cp932", "euc_jp"]
+#: 编码下拉框直接用 core 的候选链，core 加编码这里自动跟着变
+_ENCODINGS = list(ENCODING_CHOICES)
 
 #: 字段缺省值取自 sec-core 的 Config，界面不再另写一份字面量
 _DEFAULTS = config_defaults()

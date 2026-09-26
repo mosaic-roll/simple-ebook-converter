@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from sec_core.config import DEFAULT_VOLUME_RE, config_defaults
+from sec_core.encoding import ENCODING_CHOICES, FALLBACK_ENCODINGS, decode
 from sec_gui.app import build_book, make_config, preview_data, split_extra
 
 SAMPLE = """前言。
@@ -209,3 +210,22 @@ def test_build_book_complains_when_not_overwrite(tmp_path):
     fields = _fields(tmp_path, output=str(existing.with_suffix("")), no_overwrite=True)
     with pytest.raises(ValueError, match="输出文件已存在"):
         build_book(fields)
+
+def test_encoding_choices_come_from_core():
+    """编码下拉框 = core 的候选链，不要在 GUI 里另写一份。"""
+    from sec_gui import app
+
+    assert tuple(app._ENCODINGS) == ENCODING_CHOICES
+    assert ENCODING_CHOICES[0] == "auto"
+    assert set(ENCODING_CHOICES[1:]) == set(FALLBACK_ENCODINGS)
+
+
+def test_every_advertised_encoding_is_a_known_codec():
+    """下拉框/候选链里的每个名字都必须是有效 codec，否则 -e 会直接 LookupError。"""
+    import codecs
+
+    for enc in ENCODING_CHOICES[1:]:
+        codecs.lookup(enc)
+    # 自动探测确实按这个顺序尝试
+    sample = "第一章 起\n正文".encode("gb18030")
+    assert decode(sample)[1] in ENCODING_CHOICES
