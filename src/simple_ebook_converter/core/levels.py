@@ -35,7 +35,7 @@ def parse_level_spec(spec: str) -> tuple[int, str, str]:
 
 
 def build_levels(patterns: Mapping[str, str], extra: Iterable[str] = ()) -> list[LevelRule]:
-    """生成层级规则。`patterns` 的键取自 `LEVEL_FIELDS`（volume/chapter/section）：
+    """生成层级规则。`patterns` 的键是层级名（volume/chapter/section，同 `LEVEL_PRESETS`）：
 
     - 键缺失：沿用内置正则
     - 值为空串：不识别该层级

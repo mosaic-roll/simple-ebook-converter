@@ -2,20 +2,21 @@
 
 import json
 import zipfile
+from dataclasses import replace
 
 import pytest
 
 from simple_ebook_converter.core.config import Config
 from simple_ebook_converter.core.jobs import (
-    STDOUT,
+    CSS,
+    EPUB,
+    TOC,
     epub_path,
     generate,
     guard_overwrite,
     load,
-    preview,
     render_toc,
-    summary,
-    toc_target,
+    run,
     write_text,
 )
 
@@ -90,21 +91,6 @@ def test_epub_path_keeps_uppercase_suffix(cfg, tmp_path):
     assert epub_path(cfg, tmp_path / "b.EPUB") == tmp_path / "b.EPUB"
 
 
-def test_epub_path_rejects_stdout(cfg):
-    with pytest.raises(ValueError, match="不能输出到标准输出"):
-        epub_path(cfg, STDOUT)
-
-
-def test_toc_target_defaults_to_stdout():
-    assert toc_target(None) is None
-    assert toc_target("") is None
-    assert toc_target(STDOUT) is None
-
-
-def test_toc_target_honors_output(tmp_path):
-    assert toc_target(tmp_path / "out.md") == tmp_path / "out.md"
-
-
 # ---------- 覆盖保护 ----------
 
 
@@ -168,19 +154,59 @@ def test_render_toc_rejects_unknown_format(cfg):
         render_toc(load(cfg), "xml")
 
 
-def test_preview_returns_nested_dicts(cfg):
-    data = preview(cfg)
-    assert data[0]["children"][0]["title"] == "第一章 初遇"
+# ---------- run：三种产出方式 ----------
 
 
-# ---------- 汇总 ----------
+def test_run_defaults_to_epub(cfg, tmp_path):
+    result = run(cfg, out=tmp_path / "out")
+    assert result.kind == EPUB
+    assert result.path == tmp_path / "out.epub"
+    assert zipfile.is_zipfile(result.path)
+    assert result.book.cfg is cfg
 
 
-def test_summary_reports_encoding_levels_and_preface(cfg):
-    text = summary(load(cfg))
-    assert "utf-8" in text
-    assert "h2×1" in text and "h3×2" in text
-    assert "前言" in text
+def test_run_epub_falls_back_to_input_name(cfg):
+    assert run(cfg).path == cfg.input.with_suffix(".epub")
+
+
+def test_run_toc_without_output_keeps_text_in_result(cfg):
+    """没给输出路径时目录不落盘，正文交给调用方（CLI 拿去打印）。"""
+    result = run(cfg, TOC)
+    assert result.path is None
+    assert "第一章 初遇" in result.text
+
+
+def test_run_toc_writes_file(cfg, tmp_path):
+    out = tmp_path / "目录.md"
+    result = run(cfg, TOC, out, "json")
+    assert result.path == out
+    assert json.loads(out.read_text(encoding="utf-8"))[0]["title"] == "第一卷 风起"
+    assert result.text == out.read_text(encoding="utf-8").rstrip("\n")
+
+
+def test_run_css_writes_only_css(cfg, tmp_path):
+    out = tmp_path / "book.css"
+    result = run(cfg, CSS, out)
+    assert result.path == out
+    assert "body" in out.read_text(encoding="utf-8")
+    assert not list(tmp_path.glob("*.epub"))
+
+
+def test_run_css_needs_a_path(cfg):
+    with pytest.raises(ValueError, match="缺少 CSS 输出路径"):
+        run(cfg, CSS)
+
+
+def test_run_rejects_unknown_kind(cfg):
+    with pytest.raises(ValueError, match="未知的产出方式"):
+        run(cfg, "pdf")
+
+
+def test_run_respects_overwrite_flag(cfg, tmp_path):
+    out = tmp_path / "out.epub"
+    out.write_bytes(b"x")
+    with pytest.raises(ValueError, match="已存在"):
+        run(replace(cfg, overwrite=False), EPUB, out)
 
 
 # ---------- 生成 ----------

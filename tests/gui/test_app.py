@@ -127,7 +127,7 @@ def test_make_config_rejects_bad_input(tmp_path):
 
 
 def test_make_config_rejects_missing_cover(tmp_path):
-    with pytest.raises(ValueError, match="封面图文件不存在"):
+    with pytest.raises(ValueError, match="封面图不存在"):
         make_config(_fields(tmp_path, cover=str(tmp_path / "没有.png")))
 
 

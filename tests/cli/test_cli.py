@@ -359,7 +359,14 @@ def test_toc_json_has_raw_title(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
         convert,
-        [str(src), "--toc-only", "--replace-json", json.dumps([{"pattern": r"卷", "replace": "部"}]), "--toc-format", "json"],
+        [
+            str(src),
+            "--toc-only",
+            "--replace-json",
+            json.dumps([{"pattern": r"卷", "replace": "部"}]),
+            "--toc-format",
+            "json",
+        ],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -496,7 +503,27 @@ def test_convert_dump_css(tmp_path):
     css_out = tmp_path / "style.css"
     result = CliRunner().invoke(convert, [str(src), "--dump-css", str(css_out)])
     assert result.exit_code == 0
+    assert "CSS 已写入" in result.output
     assert "line-height" in css_out.read_text(encoding="utf-8")
+    assert not list(tmp_path.glob("*.epub"))
+
+
+def test_convert_reports_book_summary(tmp_path):
+    """编码/各级标题数/前言这一行是终端文案，core 不再提供，由 CLI 自己拼。"""
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "-o", str(tmp_path / "out.epub")])
+    assert result.exit_code == 0
+    assert "已生成：" in result.output
+    assert "编码：utf-8" in result.output
+    assert "h3×1" in result.output
+
+
+def test_convert_toc_to_stdout(tmp_path):
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", "-"])
+    assert result.exit_code == 0
+    assert "第一章" in result.output
+    assert "目录已写入" not in result.output
 
 
 def test_convert_missing_input():

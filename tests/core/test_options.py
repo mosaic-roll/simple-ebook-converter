@@ -104,7 +104,14 @@ def test_bad_number_names_the_option(tmp_path):
 
 
 def test_negative_flags_are_inverted(tmp_path):
-    cfg = _config(tmp_path, no_overwrite="1", no_toc=True, no_clean=True, no_text_cover=True, no_volume=True)
+    cfg = _config(
+        tmp_path,
+        no_overwrite="1",
+        no_toc=True,
+        no_clean=True,
+        no_text_cover=True,
+        no_volume=True,
+    )
     assert cfg.overwrite is False
     assert cfg.toc_in_spine is False
     assert cfg.clean is False
@@ -188,9 +195,9 @@ def test_paths_are_resolved(tmp_path):
 
 
 def test_missing_asset_is_rejected(tmp_path):
-    with pytest.raises(ValueError, match="封面图文件不存在"):
+    with pytest.raises(ValueError, match="封面图不存在"):
         _config(tmp_path, cover=str(tmp_path / "nope.png"))
-    with pytest.raises(ValueError, match="字体文件不存在"):
+    with pytest.raises(ValueError, match="正文字体不存在"):
         _config(tmp_path, font=str(tmp_path / "nope.ttf"))
 
 

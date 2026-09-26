@@ -41,9 +41,6 @@ ALIGN_CHOICES = ("left", "center", "right")
 #: 预设层级：级别 → (class 名, 中文名)。CLI 的三个选项、GUI 的三个输入框与错误提示共用
 LEVEL_PRESETS = ((2, "volume", "卷标题"), (3, "chapter", "章标题"), (4, "section", "节标题"))
 
-#: 预设层级在前端的字段名（每个层级一个输入框）
-LEVEL_FIELDS = {level: name for level, name, _ in LEVEL_PRESETS}
-
 #: 每个预设层级的内置正则（空串 = 默认不启用）。名字与层级见 LEVEL_PRESETS
 _LEVEL_PATTERNS = {2: DEFAULT_VOLUME_RE, 3: DEFAULT_CHAPTER_RE, 4: ""}
 

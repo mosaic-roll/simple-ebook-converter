@@ -11,13 +11,11 @@ from simple_ebook_converter.core.config import (
     DEFAULT_TOC_DEPTH,
     DEFAULT_VOLUME_RE,
     FALLBACK_TITLE,
-    LEVEL_FIELDS,
     LEVEL_PRESETS,
     Config,
     default_levels,
 )
 from simple_ebook_converter.core.options import (
-    BOOL,
     OPTIONS,
     Option,
     option_defaults,
@@ -51,8 +49,7 @@ def test_option_defaults_come_from_config():
     for opt in _field_options():
         if opt.invert:
             continue
-        expected = getattr(cfg, opt.field)
-        assert option_defaults()[opt.name] == ("" if expected is None else expected), opt.name
+        assert option_defaults()[opt.name] == getattr(cfg, opt.field), opt.name
 
 
 def test_flag_defaults_are_off():
@@ -68,11 +65,10 @@ def test_empty_option_defaults():
 
 
 def test_level_presets_match_config_levels():
-    """卷/章/节的默认值就是 Config.levels 里那三条，且预设表与 LEVEL_FIELDS 一致。"""
+    """卷/章/节的默认值就是 Config.levels 里那三条。"""
     defaults = option_defaults()
     for level, name, _label in LEVEL_PRESETS:
         assert defaults[name] == next(r.pattern for r in Config().levels if r.level == level)
-        assert LEVEL_FIELDS[level] == name
     assert defaults["section"] == ""
 
 

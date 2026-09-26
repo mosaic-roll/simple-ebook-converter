@@ -12,8 +12,8 @@ from tkinter import filedialog, messagebox, ttk
 
 from .._meta import DIST_NAME
 from ..core import jobs
-from ..core.builder import build_css
 from ..core.config import Config
+from ..core.jobs import CSS, EPUB, TOC
 from ..core.meta import resolve_metadata
 from ..core.options import (
     BOOL,
@@ -34,6 +34,7 @@ from ..core.replace import (
     rules_from_rows,
     rules_to_json,
 )
+from ..core.toc import to_json
 
 #: 替换规则下拉框用 core 的中文标签，两个方向都齐全
 _SCOPE_LABELS_TUPLE = tuple(SCOPE_LABELS[scope] for scope in SCOPE_CHOICES)
@@ -93,31 +94,31 @@ def make_config(fields: dict) -> Config:
 
 def preview_data(fields: dict) -> list[dict]:
     """按当前设置解析目录树（JSON 列表），供预览与测试。"""
-    return jobs.preview(make_config(fields))
+    cfg = make_config(fields)
+    book = jobs.load(cfg)
+    return to_json(book.tree, cfg.toc_depth)
 
 
 def generate_output(fields: dict) -> Path:
     """按当前设置产出文件，返回写出的路径；出错抛 ValueError。
 
-    三种模式与 CLI 一致：只输出目录 / 只导出 CSS / 生成 EPUB，所以选项表里的
-    `toc_only`、`toc_format`、`dump_css` 在界面里同样有效。
+    产出方式与 CLI 的三个开关一一对应：只输出目录 / 只导出 CSS / 生成 EPUB。
     """
     values = option_values(fields)
     cfg = build_config(values)
-    book = jobs.load(cfg)
     if values.get("toc_only"):
-        return _write_toc(book, values, cfg)
-    if fields.get("dump_css"):
-        css = Path(str(fields["dump_css"]))
-        return jobs.write_text(css, build_css(cfg), overwrite=cfg.overwrite)
-    return jobs.generate(book, fields.get("out"))
-
-
-def _write_toc(book: jobs.Book, values: dict, cfg: Config) -> Path:
-    """只输出目录。GUI 没有 stdout，留空就落到输入同目录的同名 .md。"""
-    text = jobs.render_toc(book, str(values.get("toc_format") or "text"))
-    target = jobs.toc_target(values.get("out")) or Path(cfg.input).with_suffix(".md")
-    return jobs.write_text(target, text + "\n", overwrite=cfg.overwrite)
+        kind = TOC
+    elif values.get("dump_css"):
+        kind = CSS
+    else:
+        kind = EPUB
+    out = values.get("dump_css") if kind == CSS else values.get("out")
+    if kind == TOC and not out:
+        out = str(Path(cfg.input).with_suffix(".md"))  # GUI 没有标准输出
+    result = jobs.run(cfg, kind, out, str(values.get("toc_format") or "text"))
+    if result.path is None:
+        raise ValueError("缺少目录输出路径")
+    return result.path
 
 
 # ---------- 界面 ----------

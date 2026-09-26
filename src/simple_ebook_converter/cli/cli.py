@@ -15,9 +15,7 @@ import click
 
 from .._meta import CLI_PROG, __version__
 from ..core import jobs
-from ..core.builder import build_css
-from ..core.config import Config
-from ..core.jobs import Book
+from ..core.jobs import CSS, EPUB, TOC, Book, Result
 from ..core.options import (
     BOOL,
     CHOICE,
@@ -32,6 +30,12 @@ from ..core.options import (
 
 #: 来自 `_meta`，即 pyproject.toml 那一个版本号；这里不要再写死一份
 VERSION = __version__
+
+#: `--out` 写这个值表示输出到标准输出
+STDOUT = "-"
+
+#: 三种产出方式各自的成功提示
+_DONE = {EPUB: "已生成", TOC: "目录已写入", CSS: "CSS 已写入"}
 
 
 @contextmanager
@@ -116,50 +120,54 @@ class _GroupedHelp(click.Command):
                 formatter.write_dl(rest)
 
 
-# ---------- 三种输出模式 ----------
+# ---------- 产出 ----------
 
 
-def _emit_toc(book: Book, values: dict, cfg: Config) -> None:
-    """`--toc-only`：目录走 stdout 或文件，都不生成 EPUB。"""
-    text = jobs.render_toc(book, str(values["toc_format"]))
-    target = jobs.toc_target(values.get("out"))
-    if target is None:
-        click.echo(text)
+def _target(values: dict) -> tuple[str, str | None]:
+    """三个开关挑一种产出方式，并算出它的输出路径。
+
+    `--out` 是 click 给的 `Path`，所以拿字符串比。`-` 只对目录有意义：目录正文走
+    标准输出，EPUB 是二进制文件没地方可去。
+    """
+    out = values.get("out")
+    out = "" if out is None else str(out)
+    if values.get("toc_only"):
+        return TOC, None if out in ("", STDOUT) else out
+    if values.get("dump_css"):
+        return CSS, values["dump_css"]
+    if out == STDOUT:
+        raise click.UsageError("EPUB 是二进制文件，不能输出到标准输出，请用 --out 指定文件路径")
+    return EPUB, out
+
+
+def _report(result: Result) -> None:
+    if result.path is None:
+        click.echo(result.text)
         return
-    with _usage_errors():
-        jobs.write_text(target, text + "\n", overwrite=cfg.overwrite)
-    click.echo(f"目录已写入：{target}")
+    click.echo(f"{_DONE[result.kind]}：{result.path}")
+    if result.kind == EPUB:
+        click.echo(_summary(result.book))
 
 
-def _emit_css(cfg: Config, values: dict) -> None:
-    """`--dump-css`：只写 CSS 就退出。"""
-    target = Path(str(values["dump_css"]))
-    with _usage_errors():
-        jobs.write_text(target, build_css(cfg), overwrite=cfg.overwrite)
-    click.echo(f"CSS 已写入：{target}")
-
-
-def _emit_epub(book: Book, values: dict) -> None:
-    """默认路径：组装 EPUB。"""
-    with _usage_errors():
-        target = jobs.generate(book, values.get("out"))
-    click.echo(f"已生成：{target}")
-    click.echo(jobs.summary(book))
+def _summary(book: Book) -> str:
+    """给终端看的一行处理结果。"""
+    counts = book.stats.level_counts
+    levels = "、".join(f"h{level}×{counts[level]}" for level in sorted(counts))
+    return (
+        f"编码：{book.encoding}；标题：{levels or '无'}；"
+        f"前言：{'有' if book.stats.has_preface else '无'}"
+    )
 
 
 def _convert(input_txt: Path | None, values: dict) -> None:
     if not values.get("input") and input_txt is None:
         raise click.UsageError("缺少输入文件，请指定位置参数或用 -i/--input")
     values["input"] = values.get("input") or input_txt
+    kind, out = _target(values)
     with _usage_errors():
         cfg = build_config(values)
-        book = jobs.load(cfg)
-    if values.get("toc_only"):
-        _emit_toc(book, values, cfg)
-    elif values.get("dump_css"):
-        _emit_css(cfg, values)
-    else:
-        _emit_epub(book, values)
+        result = jobs.run(cfg, kind, out, str(values["toc_format"]))
+    _report(result)
 
 
 @click.command(

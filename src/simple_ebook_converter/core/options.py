@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .config import ALIGN_CHOICES, LEVEL_FIELDS, Config, LevelRule
-from .encoding import AUTO_ENCODING, ENCODING_CHOICES
+from .config import ALIGN_CHOICES, Config, LevelRule
+from .encoding import ENCODING_CHOICES
 from .levels import build_levels
 from .replace import Rule, rules_from_source
 
@@ -203,7 +203,7 @@ OPTIONS: tuple[Option, ...] = (
         "排版", field="font", exists=True,
     ),
     Option(
-        "css_file", PATH, "外部 CSS",
+        "css_file", PATH, "外部 CSS 文件",
         "追加到内置样式之后，可以覆盖内置规则",
         "排版", field="css_file", exists=True,
     ),
@@ -230,8 +230,6 @@ OPTIONS: tuple[Option, ...] = (
     ),
 )
 
-_BY_NAME = {opt.name: opt for opt in OPTIONS}
-
 
 def option_groups() -> list[tuple[str, tuple[Option, ...]]]:
     """按 `OPTIONS` 的先后顺序分组，供 CLI 的 `--help` 与 GUI 的分页使用。"""
@@ -248,13 +246,16 @@ def option_default(opt: Option) -> Any:
     if opt.level is not None:
         return next(r.pattern for r in Config().levels if r.level == opt.level)
     if opt.field:
-        value = getattr(Config(), opt.field)
-        return "" if value is None else value
+        return getattr(Config(), opt.field)
     return opt.default
 
 
 def option_defaults() -> dict[str, Any]:
-    """全部选项的默认值，键是选项名。CLI 直接当 click 默认值，GUI 直接当初值。"""
+    """全部选项的默认值，键是选项名。
+
+    两个前端都是逐项取 `option_default()`（要按选项类型挑控件/参数），这份整表
+    适合只想拿到「全部缺省值」的调用方。
+    """
     return {opt.name: option_default(opt) for opt in OPTIONS}
 
 
@@ -264,77 +265,79 @@ def option_defaults() -> dict[str, Any]:
 def build_config(values: Mapping[str, Any]) -> Config:
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
-    约定：留空 = 省略该参数（用默认值）；三个层级正则留空 = 不识别该层级。
-    这里的检查只管「能不能转成 Config」，取值范围由 `Config.validate()` 负责。
-    """
-    source = _given(values, "input")
-    if source is None:
-        raise ValueError("缺少输入文件")
-    input_path = Path(str(source))
-    _require_file(input_path, "输入文件")
+    怎么转全写在选项表上：`field` 说这个值进 `Config` 的哪个字段，`invert` 说它是
+    该字段的反面（`--no-clean` → `Config.clean`），`kind` 说按什么类型转。所以
+    `Config` 的字段名只在选项表里出现一次，这里不再按选项名分支。
 
+    留空一律表示「用 `Config` 的默认值」，取值范围由 `Config.validate()` 负责。
+    表里 `field` 为空的选项不进 `Config`：输入文件和三个层级正则需要另外组装，
+    其余只决定某一种产出方式，不影响转换参数。
+    """
     return Config(
-        input=input_path,
-        encoding=_given(values, "encoding") or AUTO_ENCODING,
-        title=_given(values, "title"),
-        author=_given(values, "author") or "",
-        date=_given(values, "date"),
-        language=_default(values, "language"),
-        cover=_given_path(values, "cover", "封面图"),
-        text_cover=not _flag(values, "no_text_cover"),
+        input=_input_path(values),
         levels=_levels(values),
-        volume_titles=not _flag(values, "no_volume"),
-        max_title_len=_number(values, "max_title_len"),
-        preface_title=_default(values, "preface_title"),
-        clean=not _flag(values, "no_clean"),
         replacements=_replacements(values),
-        indent=_number(values, "indent"),
-        line_height=_default(values, "line_height"),
-        para_spacing=_default(values, "para_spacing"),
-        chapter_align=_default(values, "chapter_align"),
-        volume_align=_default(values, "volume_align"),
-        font=_given_path(values, "font", "字体"),
-        css_file=_given_path(values, "css_file", "CSS"),
-        toc_in_spine=not _flag(values, "no_toc"),
-        toc_depth=_number(values, "toc_depth"),
-        overwrite=not _flag(values, "no_overwrite"),
+        **_fields(values),
     )
 
 
-def _given(values: Mapping[str, Any], name: str) -> str | None:
-    """取一个字符串选项的值，空白视同未指定。"""
-    value = values.get(name)
+def _fields(values: Mapping[str, Any]) -> dict[str, Any]:
+    """按选项表逐项转成 `Config` 的字段值。"""
+    fields: dict[str, Any] = {}
+    for opt in OPTIONS:
+        if not opt.field:
+            continue
+        value = values.get(opt.name)
+        fields[opt.field] = not bool(value) if opt.invert else _convert(opt, value)
+    return fields
+
+
+def _convert(opt: Option, value: Any) -> Any:
+    """单个选项的原始值 → `Config` 字段值。"""
+    if opt.kind == INT:
+        return _integer(opt, value)
+    if opt.kind == PATH:
+        return _path(opt, value)
+    if opt.kind == BOOL:
+        return bool(value)
+    text = _text(value)
+    return option_default(opt) if text is None else text
+
+
+def _text(value: Any) -> str | None:
+    """字符串选项的值；未给或只填了空白都视同未给。"""
     if value is None:
         return None
     text = str(value).strip()
     return text or None
 
 
-def _default(values: Mapping[str, Any], name: str) -> Any:
-    """取一个字符串选项的值，缺省或空白都退回 `Config` 里的默认值。"""
-    return _given(values, name) or option_default(_BY_NAME[name])
-
-
-def _flag(values: Mapping[str, Any], name: str) -> bool:
-    return bool(values.get(name))
-
-
-def _number(values: Mapping[str, Any], name: str) -> int:
-    value = values.get(name)
-    if value is None or value == "":
-        return int(option_default(_BY_NAME[name]))
+def _integer(opt: Option, value: Any) -> int:
+    text = _text(value)
+    if text is None:
+        return int(option_default(opt))
     try:
-        return int(value)
-    except (TypeError, ValueError):
-        raise ValueError(f"{_BY_NAME[name].label}需为整数，收到：{value!r}") from None
+        return int(text)
+    except ValueError:
+        raise ValueError(f"{opt.label}需为整数，收到：{value!r}") from None
 
 
-def _given_path(values: Mapping[str, Any], name: str, label: str) -> Path | None:
-    text = _given(values, name)
+def _path(opt: Option, value: Any) -> Path | None:
+    text = _text(value)
     if text is None:
         return None
     path = Path(text)
-    _require_file(path, f"{label}文件")
+    if opt.exists:
+        _require_file(path, opt.label)
+    return path
+
+
+def _input_path(values: Mapping[str, Any]) -> Path:
+    source = _text(values.get("input"))
+    if source is None:
+        raise ValueError("缺少输入文件")
+    path = Path(source)
+    _require_file(path, "输入文件")
     return path
 
 
@@ -345,28 +348,21 @@ def _require_file(path: Path, label: str) -> None:
 
 def _levels(values: Mapping[str, Any]) -> list[LevelRule]:
     """卷/章/节三个预设 + 额外层级。预设留空表示不识别该层级，未给才是内置值。"""
-    presets = {name: _preset(values, level, name) for level, name in LEVEL_FIELDS.items()}
+    presets = {
+        opt.name: option_default(opt) if values.get(opt.name) is None else str(values[opt.name])
+        for opt in OPTIONS
+        if opt.level is not None
+    }
     return build_levels(presets, _specs(values.get("level")))
 
 
 def _specs(value: Any) -> list[str]:
     """额外层级规格。GUI 给多行文本，CLI 给一个元组，两种都收。"""
-    if value is None or value == "":
+    if not value:
         return []
     if isinstance(value, str):
         return [line.strip() for line in value.splitlines() if line.strip()]
     return [str(item).strip() for item in value if str(item).strip()]
-
-
-def _preset(values: Mapping[str, Any], level: int, name: str) -> str:
-    value = values.get(name)
-    if value is None:
-        return _default_pattern(level)
-    return str(value)
-
-
-def _default_pattern(level: int) -> str:
-    return next(r.pattern for r in Config().levels if r.level == level)
 
 
 def _replacements(values: Mapping[str, Any]) -> list[Rule]:
@@ -375,4 +371,4 @@ def _replacements(values: Mapping[str, Any]) -> list[Rule]:
     GUI 的替换规则表格是界面上的写法，先由 `gui.app` 转成 JSON 文本再走这里，
     所以 core 不需要认识表格行。
     """
-    return rules_from_source(_given(values, "replace_json"), _given(values, "replace_file"))
+    return rules_from_source(_text(values.get("replace_json")), _text(values.get("replace_file")))

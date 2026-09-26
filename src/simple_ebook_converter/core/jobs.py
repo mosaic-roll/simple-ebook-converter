@@ -1,7 +1,7 @@
-"""前端能跑的活：读文件、生成 EPUB、导出目录、写盘。
+"""一次转换的完整流程：读文件、切分、产出文件。
 
-`process()` 只管「行 → 章节树」，这里负责读文件、决定输出到哪、落盘，并把失败翻成
-一句能直接展示的话（`ValueError`）。两个前端都只调这里，不自己拼流程。
+`pipeline.process()` 只管「行 → 章节树」，这里负责读输入、决定产出什么、写盘，
+并把失败翻成一句能直接展示的话（`ValueError`）。两个前端只调这里，不自己拼流程。
 """
 
 from __future__ import annotations
@@ -18,8 +18,10 @@ from .parser import ParseStats, walk
 from .pipeline import process
 from .toc import to_json, to_text
 
-#: 输出路径写这个值表示标准输出（只对文本产物有意义）
-STDOUT = "-"
+#: `run()` 的三种产出方式
+EPUB = "epub"
+TOC = "toc"
+CSS = "css"
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,49 @@ class Book:
     tree: list[Node]
     stats: ParseStats
     encoding: str
+
+
+@dataclass(frozen=True)
+class Result:
+    """一次产出的结果。
+
+    `path` 为 None 表示产物没有落盘（目录交给调用方自己处理），`text` 是目录正文。
+    """
+
+    book: Book
+    kind: str
+    path: Path | None = None
+    text: str = ""
+
+
+def run(
+    cfg: Config,
+    kind: str = EPUB,
+    out: str | Path | None = None,
+    toc_format: str = "text",
+) -> Result:
+    """跑一次转换，返回产物。
+
+    三种产出方式：生成 EPUB（默认）、只输出目录、只导出 CSS。EPUB 的 `out` 留空
+    就落到输入同名；目录的 `out` 留空表示不落盘，`Result.path` 为 None、`text`
+    是目录正文，由调用方决定打印还是写文件。
+    """
+    book = load(cfg)
+    if kind == EPUB:
+        return Result(book, kind, generate(book, out))
+    if kind == TOC:
+        text = render_toc(book, toc_format)
+        target = None if out in (None, "") else Path(str(out))
+        if target is not None:
+            write_text(target, text + "\n", overwrite=cfg.overwrite)
+        return Result(book, kind, target, text)
+    if kind == CSS:
+        if not out:
+            raise ValueError("缺少 CSS 输出路径")
+        target = Path(str(out))
+        write_text(target, build_css(cfg), overwrite=cfg.overwrite)
+        return Result(book, kind, target)
+    raise ValueError(f"未知的产出方式：{kind!r}（只能是 {EPUB} / {TOC} / {CSS}）")
 
 
 def load(cfg: Config) -> Book:
@@ -46,12 +91,6 @@ def load(cfg: Config) -> Book:
     if not any(node.paragraphs for node in walk(tree)):
         raise ValueError(f"文件里没有可生成的内容：{Path(cfg.input).name}")
     return Book(cfg, tree, stats, used)
-
-
-def preview(cfg: Config) -> list[dict]:
-    """按当前设置解析目录树（GUI 的目录预览）。"""
-    book = load(cfg)
-    return to_json(book.tree, cfg.toc_depth)
 
 
 def generate(book: Book, out: str | Path | None = None) -> Path:
@@ -76,22 +115,13 @@ def render_toc(book: Book, fmt: str = "text") -> str:
     raise ValueError(f"目录格式只能是 {'/'.join(TOC_FORMATS)}，收到：{fmt!r}")
 
 
-def toc_target(out: str | Path | None) -> Path | None:
-    """目录输出路径；留空或写 `-` 表示输出到标准输出（返回 None）。"""
-    if out is None or str(out) in ("", STDOUT):
-        return None
-    return Path(out)
-
-
 def epub_path(cfg: Config, out: str | Path | None = None) -> Path:
     """EPUB 落盘路径：留空取输入名，缺 `.epub` 后缀就补上。"""
     if out is None or str(out) == "":
         if cfg.input is None:
             raise ValueError("缺少输入文件")
         return Path(cfg.input).with_suffix(".epub")
-    if str(out) == STDOUT:
-        raise ValueError("EPUB 是二进制文件，不能输出到标准输出，请指定文件路径")
-    path = Path(out)
+    path = Path(str(out))
     return path if path.suffix.lower() == ".epub" else path.with_name(path.name + ".epub")
 
 
@@ -109,12 +139,3 @@ def write_text(path: Path, text: str, overwrite: bool = True) -> Path:
 def guard_overwrite(path: Path, overwrite: bool) -> None:
     if not overwrite and path.exists():
         raise ValueError(f"输出文件已存在：{path}（当前设置为不覆盖）")
-
-
-def summary(book: Book) -> str:
-    """给终端看的一行处理结果。"""
-    levels = "、".join(f"h{level}×{count}" for level, count in sorted(book.stats.level_counts.items()))
-    return (
-        f"编码：{book.encoding}；标题：{levels or '无'}；"
-        f"前言：{'有' if book.stats.has_preface else '无'}"
-    )
