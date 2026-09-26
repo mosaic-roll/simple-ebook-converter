@@ -102,15 +102,19 @@ def read_book(cfg: Config) -> Book:
     if cfg.input is None:
         raise ValueError("缺少输入文件")
     resolved = resolve(cfg)
-    lines, used = _decode(resolved)
+    lines, used = decode(resolved)
     tree, stats = process(lines, resolved)
     if not any(node.paragraphs for node in walk(tree)):
         raise ValueError(f"文件里没有可生成的内容：{resolved.input.name}")
     return Book(resolved, tree, stats, used)
 
 
-def _decode(cfg: Config) -> tuple[list[str], str]:
-    """读输入文件并探测编码，读不了或解不开转可读的 ValueError。"""
+def decode(cfg: Config) -> tuple[list[str], str]:
+    """读输入文件并探测编码，读不了或解不开转可读的 ValueError。
+
+    `read_book()`（完整组装）与 GUI 预览（只跑阶段一）共用这一步；调用方需先保证
+    `cfg.input` 不为 `None`。
+    """
     try:
         return read_lines(cfg.input, cfg.encoding)
     except EncodingError as e:

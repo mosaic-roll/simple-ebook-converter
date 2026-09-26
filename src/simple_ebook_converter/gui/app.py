@@ -13,7 +13,6 @@ from tkinter import filedialog, messagebox, ttk
 
 from .._meta import DIST_NAME
 from ..core.config import Config
-from ..core.encoding import EncodingError, read_lines
 from ..core.meta import resolve_metadata
 from ..core.options import (
     OPTIONS,
@@ -23,6 +22,7 @@ from ..core.options import (
     option_groups,
 )
 from ..core.pipeline import (
+    decode,
     read_book,
     resolve as resolve_config,
     scan_toc,
@@ -92,12 +92,7 @@ def preview_data(fields: dict) -> tuple[list[dict], object]:
     只走两阶段里的阶段一，不读正文内容之外的任何重活。
     """
     cfg = resolve_config(make_config(fields))
-    try:
-        lines, _ = read_lines(cfg.input, cfg.encoding)
-    except EncodingError as e:
-        raise ValueError(str(e)) from e
-    except OSError as e:
-        raise ValueError(f"无法读取输入文件：{e}") from e
+    lines, _ = decode(cfg)
     tree, _ = scan_toc(lines, cfg)
     titles, _ = replacers_by_scope(cfg.replacements)
     return to_json(tree, cfg.toc_depth), titles.text
