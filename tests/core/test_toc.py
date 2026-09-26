@@ -158,7 +158,3 @@ def test_tree_from_json_rejects_bad_entries():
         )
     with pytest.raises(ValueError, match="不是 JSON 对象"):
         tree_from_json(["不是字典"], lines)
-    with pytest.raises(ValueError, match="不应有 children"):
-        tree_from_json(
-            [{"raw_title": "x", "level": 2, "lines": [1, 1], "children": []}], lines
-        )

@@ -115,8 +115,6 @@ def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
     """一个 JSON 条目 → `Node`（直属正文随后统一切）；不合法时抛指出位置的 ValueError。"""
     if not isinstance(entry, dict):
         raise ValueError(f"{where}不是 JSON 对象")
-    if "children" in entry:
-        raise ValueError(f"{where}不应有 children（扁平格式，层级由 level 决定）")
     title = entry.get("raw_title")
     level = entry.get("level")
     span = entry.get("lines")
