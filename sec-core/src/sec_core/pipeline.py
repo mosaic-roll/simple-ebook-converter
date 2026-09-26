@@ -7,11 +7,12 @@ from .replace import apply, apply_lines, compile_rules
 
 
 def process(lines: list[str], cfg: Config, fallback_title: str) -> tuple[list[Node], ParseStats]:
-    """统一处理管线：切分 → 清理 → 替换（标题与正文）。
+    """统一处理管线：校验 → 切分 → 清理 → 替换（标题与正文）。
 
     标题替换后存在 node.title，原始标题保留在 node.raw_title。
     正则只编译一次，避免对每章反复编译。
     """
+    cfg.validate()
     tree, stats = parse(
         lines,
         cfg.levels,

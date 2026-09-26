@@ -115,10 +115,12 @@ def test_convert_date(tmp_path):
 
 
 def test_convert_date_invalid(tmp_path):
+    """日期由 core 的 Config.validate() 校验，CLI 与 GUI 用同一条消息。"""
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "--date", "not-a-date"])
-    assert result.exit_code != 0
-    assert "--date" in result.output
+    assert result.exit_code == 2, result.output
+    assert "日期格式错误：not-a-date" in result.output
+    assert not isinstance(result.exception, ValueError)
 
 
 def test_convert_unsupported_font(tmp_path):
@@ -404,3 +406,21 @@ def test_help_shows_config_defaults():
     for opt, field in _SCALAR_OPTIONS.items():
         token = f"[default: {defaults[field]}]"
         assert token in result.output, f"--{opt.replace('_', '-')} 未显示 Config.{field} 的默认值 {token}"
+
+
+@pytest.mark.parametrize(
+    ("flag", "value", "message"),
+    [
+        ("--toc-depth", "0", "目录深度"),
+        ("--toc-depth", "7", "目录深度"),
+        ("--max-title-len", "0", "标题最大字数"),
+        ("--indent", "-1", "段落缩进"),
+    ],
+)
+def test_out_of_range_values_report_clean_error(tmp_path, flag, value, message):
+    """取值范围由 core 把关，CLI 只负责转成 UsageError，不吐 traceback。"""
+    src = _write_sample(tmp_path)
+    result = CliRunner().invoke(convert, [str(src), flag, value])
+    assert result.exit_code == 2, result.output
+    assert message in result.output
+    assert not isinstance(result.exception, ValueError)

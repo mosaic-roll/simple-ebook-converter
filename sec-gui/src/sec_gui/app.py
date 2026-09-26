@@ -6,7 +6,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from sec_core.builder import build_css, build_epub
-from sec_core.config import Config, config_defaults
+from sec_core.config import ALIGN_CHOICES, Config, config_defaults
 from sec_core.encoding import read_lines
 from sec_core.levels import build_levels
 from sec_core.meta import resolve_metadata
@@ -45,13 +45,6 @@ def make_config(fields: dict) -> Config:
         Rule(p, r) for p, r in fields.get("replacements", []) if p
     ]
 
-    date = (fields.get("date") or "").strip() or None
-    if date:
-        try:
-            datetime.fromisoformat(date)
-        except ValueError as e:
-            raise ValueError(f"日期格式错误：{date}（应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM）") from e
-
     cover = (fields.get("cover") or "").strip()
     if cover and not Path(cover).is_file():
         raise ValueError(f"封面文件不存在：{cover}")
@@ -62,7 +55,7 @@ def make_config(fields: dict) -> Config:
         overwrite=not bool(fields.get("no_overwrite")),
         title=fields.get("title") or None,
         author=fields.get("author") or "",
-        date=date,
+        date=(fields.get("date") or "").strip() or None,
         language=fields.get("language") or "zh",
         cover=Path(cover) if cover else None,
         levels=levels,
@@ -298,8 +291,8 @@ class SecGui:
         self._grid(f, [
             ("行高", ttk.Entry(f, textvariable=self.v_line_height)),
             ("段间距", ttk.Entry(f, textvariable=self.v_para_spacing)),
-            ("章对齐", ttk.Combobox(f, textvariable=self.v_chapter_align, values=["left", "center", "right"], state="readonly")),
-            ("卷对齐", ttk.Combobox(f, textvariable=self.v_volume_align, values=["left", "center", "right"], state="readonly")),
+        ("章对齐", ttk.Combobox(f, textvariable=self.v_chapter_align, values=list(ALIGN_CHOICES), state="readonly")),
+        ("卷对齐", ttk.Combobox(f, textvariable=self.v_volume_align, values=list(ALIGN_CHOICES), state="readonly")),
             ("目录深度", ttk.Spinbox(f, from_=1, to=6, textvariable=self.v_toc_depth)),
             ("段落缩进", ttk.Spinbox(f, from_=0, to=10, textvariable=self.v_indent)),
         ])

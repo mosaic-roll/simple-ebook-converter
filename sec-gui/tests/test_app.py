@@ -103,9 +103,11 @@ def test_make_config_rejects_bad_input(tmp_path):
         make_config(fields)
 
 
-def test_make_config_rejects_bad_date(tmp_path):
+def test_bad_date_is_rejected(tmp_path):
+    """日期格式由 core 的 Config.validate() 兜底（make_config 不再自己解析日期）。"""
+    fields = _fields(tmp_path, date="2024/13/05")
     with pytest.raises(ValueError, match="日期格式错误"):
-        make_config(_fields(tmp_path, date="2024/13/05"))
+        build_book(fields)
 
 
 def test_make_config_rejects_missing_cover(tmp_path):

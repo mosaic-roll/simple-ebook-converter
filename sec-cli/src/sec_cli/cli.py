@@ -2,17 +2,15 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import click
 
 from sec_core.builder import build_css, build_epub, font_media_type
-from sec_core.config import Config, LevelRule, config_defaults
+from sec_core.config import ALIGN_CHOICES, Config, LevelRule, config_defaults
 from sec_core.encoding import EncodingError, read_lines
 from sec_core.levels import build_levels
 from sec_core.meta import resolve_metadata
-from sec_core.parser import NoEnabledRulesError
 from sec_core.pipeline import process
 from sec_core.replace import Rule, rules_from_json
 from sec_core.toc import to_json, to_text
@@ -73,15 +71,9 @@ def _resolve_output(input_path: Path, out: Path | None) -> Path:
     return out
 
 
-def _validate_date(value: str | None) -> str | None:
-    if value is None:
-        return None
-
-    try:
-        datetime.fromisoformat(value.strip())
-    except ValueError:
-        raise click.UsageError(f"--date 格式应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]，收到：{value}")
-    return value.strip()
+def _guard_overwrite(out: Path, no_overwrite: bool) -> None:
+    if no_overwrite and out.exists():
+        raise click.UsageError(f"输出文件已存在：{out}（去掉 --no-overwrite 覆盖）")
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -108,8 +100,8 @@ def _validate_date(value: str | None) -> str | None:
 @click.option("--indent", default=_DEFAULTS["indent"], show_default=True, help="段落缩进字数，0 为不缩进")
 @click.option("--line-height", default=_DEFAULTS["line_height"], show_default=True)
 @click.option("--para-spacing", default=_DEFAULTS["para_spacing"], show_default=True)
-@click.option("--chapter-align", type=click.Choice(["left", "center", "right"]), default=_DEFAULTS["chapter_align"], show_default=True)
-@click.option("--volume-align", type=click.Choice(["left", "center", "right"]), default=_DEFAULTS["volume_align"], show_default=True)
+@click.option("--chapter-align", type=click.Choice(ALIGN_CHOICES), default=_DEFAULTS["chapter_align"], show_default=True)
+@click.option("--volume-align", type=click.Choice(ALIGN_CHOICES), default=_DEFAULTS["volume_align"], show_default=True)
 @click.option("--font", type=_PATH, help="嵌入正文字体")
 @click.option("--css-file", type=_PATH, help="加载外部 CSS（追加到内置样式之后）")
 @click.option("--dump-css", type=_OUT_PATH, help="输出当前生效 CSS 后退出")
@@ -164,7 +156,7 @@ def convert(
         overwrite=not no_overwrite,
         title=title,
         author=author,
-        date=_validate_date(date),
+        date=(date or "").strip() or None,
         language=language,
         cover=cover,
         levels=_build_levels(volume, chapter, section, extra_levels),
@@ -187,7 +179,8 @@ def convert(
     lines, used = _read_input(input_path, encoding)
     try:
         tree, stats = process(lines, cfg, title)
-    except NoEnabledRulesError as e:
+    except ValueError as e:
+        # 含 NoEnabledRulesError 与 Config.validate() 的取值范围错误
         raise click.UsageError(str(e)) from e
     if not tree:
         raise click.UsageError(f"文件为空，没有可生成的内容：{input_path.name}")
@@ -200,8 +193,7 @@ def convert(
         if out is None or str(out) == "-":
             click.echo(content)
         else:
-            if out.exists() and no_overwrite:
-                raise click.UsageError(f"输出文件已存在：{out}（去掉 --no-overwrite 覆盖）")
+            _guard_overwrite(out, no_overwrite)
             try:
                 out.write_text(content + "\n", encoding="utf-8")
             except OSError as e:
@@ -216,13 +208,13 @@ def convert(
 
     css = build_css(cfg)
     if dump_css is not None:
+        _guard_overwrite(dump_css, no_overwrite)
         dump_css.write_text(css, encoding="utf-8")
         click.echo(f"CSS 已写入 {dump_css}")
         return
 
     output = _resolve_output(input_path, out)
-    if output.exists() and no_overwrite:
-        raise click.UsageError(f"输出文件已存在：{output}（去掉 --no-overwrite 覆盖）")
+    _guard_overwrite(output, no_overwrite)
 
     build_epub(cfg, tree, css, output)
     click.echo(f"已生成：{output}")

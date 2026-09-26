@@ -1,4 +1,7 @@
+import pytest
+
 from sec_core.config import (
+    ALIGN_CHOICES,
     DEFAULT_CHAPTER_RE,
     DEFAULT_VOLUME_RE,
     Config,
@@ -76,3 +79,34 @@ def test_defaults_returns_fresh_dict():
     first = config_defaults()
     first["max_title_len"] = 1234
     assert config_defaults()["max_title_len"] != 1234
+
+
+def test_validate_accepts_defaults():
+    Config().validate()  # 默认值必须全部合法
+
+
+def test_validate_rejects_out_of_range():
+    cases = [
+        ({"max_title_len": 0}, "标题最大字数"),
+        ({"toc_depth": 0}, "目录深度"),
+        ({"toc_depth": 7}, "目录深度"),
+        ({"indent": -1}, "段落缩进"),
+        ({"chapter_align": "middle"}, "章对齐"),
+        ({"volume_align": "MIDDLE"}, "卷对齐"),
+        ({"date": "2024/13/05"}, "日期格式错误"),
+        ({"date": "not-a-date"}, "日期格式错误"),
+    ]
+    for kwargs, message in cases:
+        with pytest.raises(ValueError, match=message):
+            Config(**kwargs).validate()
+
+
+def test_validate_accepts_edge_values():
+    Config(max_title_len=1, toc_depth=1, indent=0, date="2024-05-13 08:30:00").validate()
+    Config(toc_depth=6, date="2024-05-13").validate()
+
+
+def test_align_choices_are_the_only_allowed():
+    for value in ALIGN_CHOICES:
+        Config(chapter_align=value, volume_align=value).validate()
+    assert set(ALIGN_CHOICES) == {"left", "center", "right"}

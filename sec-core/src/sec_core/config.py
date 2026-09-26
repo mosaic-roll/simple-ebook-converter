@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 from pathlib import Path
 
 from .replace import Rule
@@ -26,6 +27,9 @@ _CHAPTER_FRAGMENTS = [
 
 DEFAULT_VOLUME_RE = "|".join(_VOLUME_FRAGMENTS)
 DEFAULT_CHAPTER_RE = "|".join(_CHAPTER_FRAGMENTS)
+
+#: 标题对齐方式，最终写进 CSS 的 `text-align`；两个前端的下拉/Choice 共用这一份
+ALIGN_CHOICES = ("left", "center", "right")
 
 
 @dataclass
@@ -91,6 +95,30 @@ class Config:
     volume_align: str = "right"
     font: Path | None = None
     css_file: Path | None = None
+
+    def validate(self) -> None:
+        """校验取值范围，非法抛 `ValueError`（消息可直接展示给用户）。
+
+        `pipeline.process()` 会自动调用，所以正常走 CLI/GUI 都会校验；
+        直接调 `build_css` / `build_epub` 的调用方应自己先过一遍。
+        """
+        if self.max_title_len < 1:
+            raise ValueError(f"标题最大字数需为正整数，收到：{self.max_title_len}")
+        if not 1 <= self.toc_depth <= 6:
+            raise ValueError(f"目录深度需在 1~6 之间，收到：{self.toc_depth}")
+        if self.indent < 0:
+            raise ValueError(f"段落缩进字数不能为负，收到：{self.indent}")
+        for name, label in (("chapter_align", "章对齐"), ("volume_align", "卷对齐")):
+            value = getattr(self, name)
+            if value not in ALIGN_CHOICES:
+                raise ValueError(f"{label}只能是 {'/'.join(ALIGN_CHOICES)}，收到：{value}")
+        if self.date:
+            try:
+                datetime.fromisoformat(self.date)
+            except ValueError as e:
+                raise ValueError(
+                    f"日期格式错误：{self.date}（应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]）"
+                ) from e
 
 
 #: `config_defaults()` 里把 levels 拆成单条正则的字段（前端每条一个输入框）
