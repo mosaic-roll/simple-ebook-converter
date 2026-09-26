@@ -2,14 +2,6 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
-[manifest]
-members = [
-    "ebook-builder",
-    "sec-cli",
-    "sec-core",
-    "sec-gui",
-]
-
 [[package]]
 name = "chardet"
 version = "7.6.0"
@@ -68,11 +60,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
 ]
-
-[[package]]
-name = "ebook-builder"
-version = "0.1.0"
-source = { virtual = "." }
 
 [[package]]
 name = "ebooklib"
@@ -250,34 +237,12 @@ wheels = [
 ]
 
 [[package]]
-name = "sec-cli"
+name = "sec"
 version = "0.1.0"
-source = { editable = "sec-cli" }
-dependencies = [
-    { name = "click" },
-    { name = "sec-core" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "click", specifier = ">=8.5.0" },
-    { name = "sec-core", editable = "sec-core" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
-
-[[package]]
-name = "sec-core"
-version = "0.1.0"
-source = { editable = "sec-core" }
+source = { editable = "." }
 dependencies = [
     { name = "chardet" },
+    { name = "click" },
     { name = "ebooklib" },
 ]
 
@@ -289,27 +254,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chardet", specifier = ">=7.6.0" },
+    { name = "click", specifier = ">=8.5.0" },
     { name = "ebooklib", specifier = ">=0.20" },
 ]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
-
-[[package]]
-name = "sec-gui"
-version = "0.1.0"
-source = { editable = "sec-gui" }
-dependencies = [
-    { name = "sec-core" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "sec-core", editable = "sec-core" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]

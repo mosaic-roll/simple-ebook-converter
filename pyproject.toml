@@ -1,8 +1,28 @@
 [project]
-name = "ebook-builder"
+name = "sec"
 version = "0.1.0"
-description = "TXT 转 EPUB3 工具工作区（core + CLI + GUI）"
+description = "TXT 转 EPUB3 工具：核心库 + 命令行前端 + 图形界面前端"
+readme = "README.md"
 requires-python = ">=3.12"
+dependencies = [
+    "chardet>=7.6.0",
+    "click>=8.5.0",
+    "ebooklib>=0.20",
+]
 
-[tool.uv.workspace]
-members = ["sec-core", "sec-cli", "sec-gui"]
+[project.scripts]
+sec-cli = "sec.cli.cli:main"
+sec-gui = "sec.gui.app:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.14,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
