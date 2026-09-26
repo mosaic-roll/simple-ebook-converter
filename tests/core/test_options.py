@@ -212,14 +212,14 @@ def test_replacements_from_file(tmp_path):
     assert _config(tmp_path, replace_file=str(path)).replacements[0].replace == "乙"
 
 
-def test_replacements_from_gui_rows(tmp_path):
+def test_core_ignores_gui_table_rows(tmp_path):
+    """GUI 的表格不是 core 的输入：core 内部只接受 JSON，别的键一律不认。"""
     cfg = _config(tmp_path, replacements=[("甲", "乙", "正文"), ("", "忽略", "标题")])
-    assert [(r.pattern, r.replace, r.scope) for r in cfg.replacements] == [("甲", "乙", "body")]
+    assert cfg.replacements == []
 
 
-def test_replacements_from_rule_objects(tmp_path):
-    cfg = _config(tmp_path, replacements=[Rule("甲", "乙", "all")])
-    assert cfg.replacements[0].scope == "all"
+def test_core_ignores_rule_objects(tmp_path):
+    assert _config(tmp_path, replacements=[Rule("甲", "乙", "all")]).replacements == []
 
 
 def test_replace_json_and_file_together_is_rejected(tmp_path):

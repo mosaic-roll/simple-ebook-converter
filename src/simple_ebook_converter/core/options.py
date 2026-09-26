@@ -18,7 +18,7 @@ from typing import Any
 from .config import ALIGN_CHOICES, LEVEL_FIELDS, Config, LevelRule
 from .encoding import AUTO_ENCODING, ENCODING_CHOICES
 from .levels import build_levels
-from .replace import Rule, rules_from_json, rules_from_rows, rules_from_source
+from .replace import Rule, rules_from_source
 
 #: `--toc-only` 的输出格式
 TOC_FORMATS = ("text", "json")
@@ -75,17 +75,17 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 输出 ----
     Option(
         "out", PATH, "输出文件",
-        "输出文件，不含扩展名（默认取输入名）；--toc-only 时留空则输出到标准输出",
+        "输出文件，缺 .epub 后缀自动补，默认取输入名",
         "输出", short="o",
     ),
     Option(
-        "no_overwrite", BOOL, "不覆盖",
-        "输出文件已存在时报错而不是覆盖",
+        "no_overwrite", BOOL, "覆盖已有文件",
+        "输出文件已存在时是否覆盖（默认覆盖）",
         "输出", field="overwrite", invert=True,
     ),
     Option(
         "dump_css", PATH, "导出 CSS",
-        "只把当前生效的 CSS 写到这个文件然后退出",
+        "把当前生效的 CSS 写到这个文件",
         "输出",
     ),
     # ---- 书籍信息 ----
@@ -115,8 +115,8 @@ OPTIONS: tuple[Option, ...] = (
         "书籍信息", field="cover", exists=True,
     ),
     Option(
-        "no_text_cover", BOOL, "无文字封面",
-        "没有封面图时也不生成只含书名/作者的封面页（默认生成）",
+        "no_text_cover", BOOL, "文字封面页",
+        "没有封面图时是否生成只含书名/作者的封面页（默认生成）",
         "书籍信息", field="text_cover", invert=True,
     ),
     # ---- 章节识别 ----
@@ -137,7 +137,7 @@ OPTIONS: tuple[Option, ...] = (
     ),
     Option(
         "no_volume", BOOL, "无卷模式",
-        "卷行不作为标题（--volume 的正则仍会覆盖内置规则）",
+        "卷行是否作为标题（卷正则仍会覆盖内置规则）",
         "章节识别", field="volume_titles", invert=True,
     ),
     Option(
@@ -157,8 +157,8 @@ OPTIONS: tuple[Option, ...] = (
     ),
     # ---- 清理与替换 ----
     Option(
-        "no_clean", BOOL, "不清理",
-        "保留空行与段首段尾空格（默认清理）",
+        "no_clean", BOOL, "清理文本",
+        "去掉段首段尾空格并删除空行（默认清理）",
         "清理与替换", field="clean", invert=True,
     ),
     Option(
@@ -209,8 +209,8 @@ OPTIONS: tuple[Option, ...] = (
     ),
     # ---- 目录 ----
     Option(
-        "no_toc", BOOL, "书页无目录",
-        "目录页不进正文流（nav 文档仍然生成，供阅读器导航面板使用）",
+        "no_toc", BOOL, "书页含目录",
+        "目录页是否进正文流（nav 文档无论如何都生成，供阅读器导航面板使用）",
         "目录", field="toc_in_spine", invert=True,
     ),
     Option(
@@ -225,7 +225,7 @@ OPTIONS: tuple[Option, ...] = (
     ),
     Option(
         "toc_format", CHOICE, "目录格式",
-        "--toc-only 的输出格式",
+        "只输出目录时的格式：text | json",
         "目录", choices=TOC_FORMATS, default="text",
     ),
 )
@@ -370,14 +370,9 @@ def _default_pattern(level: int) -> str:
 
 
 def _replacements(values: Mapping[str, Any]) -> list[Rule]:
-    """替换规则的三个来源：GUI 表格、--replace-json、--replace-file。"""
-    json_text = _given(values, "replace_json")
-    file = _given(values, "replace_file")
-    if json_text or file:
-        return rules_from_source(json_text, file)
-    rows = values.get("replacements")
-    if not rows:
-        return []
-    if isinstance(rows, str):
-        return rules_from_json(rows)
-    return rules_from_rows(rows)
+    """替换规则只有 JSON 一个内部入口：`--replace-json` 文本或 `--replace-file` 文件。
+
+    GUI 的替换规则表格是界面上的写法，先由 `gui.app` 转成 JSON 文本再走这里，
+    所以 core 不需要认识表格行。
+    """
+    return rules_from_source(_given(values, "replace_json"), _given(values, "replace_file"))
