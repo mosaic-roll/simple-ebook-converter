@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import click
@@ -14,7 +15,8 @@ from sec_core.pipeline import process
 from sec_core.replace import Rule, rules_from_json
 from sec_core.toc import to_json, to_text
 
-VERSION = "0.1.0"
+#: 版本号以 pyproject.toml 为唯一真源，这里读出来给 --version 用，不要再写死一份
+VERSION = version("sec-cli")
 
 _PATH = click.Path(exists=True, dir_okay=False, path_type=Path)
 _OUT_PATH = click.Path(dir_okay=False, path_type=Path)
