@@ -32,8 +32,8 @@ import tkinter.font as tkfont
 
 #: 界面字体的候选链，按偏好顺序。第一个真实存在的胜出。
 UI_CANDIDATES = (
-    "Segoe UI",           # Windows
     "Microsoft YaHei UI",  # Windows 中文
+    "Segoe UI",           # Windows
     "PingFang SC",        # macOS
     "Noto Sans CJK SC",   # Linux 常见
     "DejaVu Sans",        # Linux 兜底
