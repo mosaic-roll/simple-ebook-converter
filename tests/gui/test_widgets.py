@@ -381,6 +381,21 @@ def test_toc_panel_clamps_depth(tk_root) -> None:
 # ---------- 页签往返 ----------
 
 
+def test_identify_tab_preserves_regex_whitespace(tk_root) -> None:
+    """正则首尾空格有意义，不能被 strip 掉（别把用户写的正则悄悄改短）。"""
+    tab = IdentifyTab(tk_root)
+    tab._levels["chapter"][1].set("  ^第.章  ")
+    assert tab.get().levels["chapter"] == "  ^第.章  "
+
+
+def test_extra_levels_preserve_regex_whitespace(tk_root) -> None:
+    """额外层级的正则同样原样保留。"""
+    editor = ExtraLevelsEditor(tk_root)
+    editor.set([{"h": "h5", "class_name": "scene", "regex": "  ^序  "}])
+    assert editor.get()[0]["regex"] == "  ^序  "
+    assert editor.get_specs() == ["h5.scene:  ^序  "]
+
+
 def test_basic_tab_round_trip(tk_root) -> None:
     tab = BasicTab(tk_root)
     values = BasicValues(

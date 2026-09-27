@@ -164,7 +164,9 @@ class ExtraLevelsEditor(ttk.Frame):
         for row in self.rows:
             level = _level_of(row["h"].get())
             class_name = row["class_name"].get().strip()
-            regex = row["regex_box"].get().strip()
+            # 正则**原样收**，不 strip：首尾空格在正则里有意义（core 也只 strip
+            # 选择器那一段，冒号之后整段保留）。
+            regex = row["regex_box"].get()
             row["regex"] = regex
 
             if level is None:
@@ -176,8 +178,9 @@ class ExtraLevelsEditor(ttk.Frame):
             if level in seen and self._is_enabled_level(level):
                 self._mark(row, False, f"h{level} 重复")
                 continue
-            if not regex:
-                # 空正则 = 这一行还没填完，跳过。不拼出 `h1:` 那种 core 读不出意思的串。
+            if not regex.strip():
+                # 空（或只有空白）= 这一行还没填完，跳过。不拼出 `h1:` 那种 core
+                # 读不出意思的串。只对「是否为空」做 strip，regex 本身原样保留。
                 row["valid"] = False
                 self._mark(row, False, "正则不能为空")
                 continue

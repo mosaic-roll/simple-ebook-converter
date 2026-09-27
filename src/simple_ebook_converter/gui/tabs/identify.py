@@ -60,6 +60,9 @@ class IdentifyTab(ttk.Frame):
         self._touched: dict[str, bool] = {}
         for index, (name, label) in enumerate(_TITLES):
             self._levels[name] = self._level_row(box, name, label, index)
+            # 初始都算「没动过」。不预置的话，没调过 `set()` 就 `get()` 会 KeyError
+            # （App 里 `set()` 先跑所以看不出来，但控件不该依赖调用顺序）。
+            self._touched[name] = False
 
         extra = ttk.LabelFrame(body, text="额外层级", padding=(s(8), s(6)))
         extra.pack(fill="both", expand=True, pady=(s(12), 0))
@@ -131,6 +134,10 @@ class IdentifyTab(ttk.Frame):
         * 取消勾选 → `""`：显式关闭
         * 动过且框里有内容 → 该正则
         * 动过但框被清空 → `""`（空正则在 core 里就是不启用）
+
+        **正则原样收，不做 `strip`**：首尾空格在正则里是有意义的（比如要匹配段首的
+        空白、或故意匹配行尾空格）。core 的 `parse_level_spec()` 也只在 `:` 之前
+        `strip`，冒号之后整段保留。
         """
         state: dict[str, str | None] = {}
         for name, (enabled, pattern) in self._levels.items():
@@ -139,7 +146,10 @@ class IdentifyTab(ttk.Frame):
             elif not self._touched[name]:
                 state[name] = None
             else:
-                state[name] = pattern.get().strip() or ""
+                text = pattern.get()
+                # 只判「是不是空」，返回值原样保留首尾空格：`"  "` 当作没填（关闭），
+                # 但 `"  ^第.章  "` 里的空格要留住。
+                state[name] = text if text.strip() else ""
         return state
 
     # ---------- 内部 ----------
