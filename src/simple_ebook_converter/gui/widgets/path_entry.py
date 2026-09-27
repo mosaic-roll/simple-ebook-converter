@@ -10,7 +10,7 @@
 所以这里的检查**不替代** core，只是提前告诉用户。**黄框不拦生成**：输出目录
 不存在是可以的，生成时会建目录（`pipeline.write_epub` 里的 `mkdir(parents=True)`）。
 
-红/黄框用 ttkbootstrap 的 `bootstyle="danger"` / `"warning"`，不再自己配 `bordercolor`。
+校验态用 theme.py 配置的 `Error.TEntry` / `Warn.TEntry` style。
 """
 
 from __future__ import annotations
@@ -19,15 +19,12 @@ import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
-from ..theme import COLORS
+from ..theme import _ERROR_STYLE, _WARN_STYLE
 
 #: 校验结论
 OK, ERROR, WARN = "ok", "error", "warn"
-
-#: 提示文字用 ttkbootstrap 的次级色
-_MUTED = "secondary"
 
 
 class PathEntry(ttk.Entry):
@@ -49,7 +46,7 @@ class PathEntry(ttk.Entry):
         self._valid: Path | None = None
         self._state = OK
 
-        self.hint = ttk.Label(master, text="", bootstyle=_MUTED, wraplength=0)
+        self.hint = ttk.Label(master, text="", wraplength=0)
         self.bind("<KeyRelease>", self._on_key_release, add="+")
         self.bind("<FocusOut>", self._on_focus_out, add="+")
 
@@ -64,23 +61,15 @@ class PathEntry(ttk.Entry):
         return self.get_path() is not None and self._state != ERROR
 
     def set_state(self, state: str, message: str = "") -> None:
-        """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。
-
-        `bootstyle` 的复位值是 `"default"`（空串**不会**复位，ttkbootstrap 会
-        保留上一次的 style 名）。
-        """
+        """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。"""
         self._state = state
         if state == ERROR:
-            self.configure(bootstyle="danger")
+            self.configure(style=_ERROR_STYLE)
         elif state == WARN:
-            self.configure(bootstyle="warning")
+            self.configure(style=_WARN_STYLE)
         else:
-            self.configure(bootstyle="default")
-        self.hint.configure(
-            text=message,
-            bootstyle=_MUTED,
-            foreground=COLORS["error"] if state == ERROR else COLORS["warn"],
-        )
+            self.configure(style="")
+        self.hint.configure(text=message)
 
     def clear_message(self) -> None:
         self.hint.configure(text="")

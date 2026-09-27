@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..build_config_from_ui import TocSettings, entry_id
 from ..metrics import s, set_row_height
@@ -139,7 +139,7 @@ class TocPanel(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(4), 0))
         self.v_count = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.v_count, bootstyle="secondary").pack(side="right")
+        ttk.Label(bar, textvariable=self.v_count, ).pack(side="right")
 
     # ---------- 内容 ----------
 

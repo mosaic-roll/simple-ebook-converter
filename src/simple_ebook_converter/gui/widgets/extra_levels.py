@@ -13,7 +13,7 @@ from __future__ import annotations
 import re
 import tkinter as tk
 from collections.abc import Callable
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..metrics import s
 from ..theme import COLORS
@@ -51,7 +51,7 @@ class ExtraLevelsEditor(ttk.Frame):
         self._is_enabled = is_builtin_enabled or (lambda _name: True)
 
         self.rows: list[dict] = []
-        ttk.Label(self, text=_HINT, bootstyle="secondary", wraplength=s(420)).pack(
+        ttk.Label(self, text=_HINT, wraplength=s(420)).pack(
             anchor="w", pady=(0, s(4)
             )
         )
@@ -64,7 +64,7 @@ class ExtraLevelsEditor(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
         ttk.Button(bar, text="添加", command=self.add, width=8).pack(side="left")
-        self.v_hint = ttk.Label(bar, text="", bootstyle="secondary", foreground=COLORS["error"])
+        self.v_hint = ttk.Label(bar, text="", , foreground=COLORS["error"])
         self.v_hint.pack(side="left", padx=(s(8), 0))
 
     # ---------- 值 ----------
@@ -199,10 +199,10 @@ class ExtraLevelsEditor(ttk.Frame):
     def _mark(self, row: dict, ok: bool, message: str) -> None:
         row["valid"] = ok
         row["error"] = message
-        # ttkbootstrap 的复位值是 "default"，空串不会复位
-        bootstyle = "default" if ok else "danger"
-        row["regex_box"].configure(bootstyle=bootstyle)
-        row["class_box"].configure(bootstyle=bootstyle)
+        # 用标准 ttk style 替代 bootstyle
+        style = "" if ok else "Error.TEntry"
+        row["regex_box"].configure(style=style)
+        row["class_box"].configure(style=style)
         self.v_hint.configure(text=message if not ok else "")
 
     def _hint(self, message: str) -> None:

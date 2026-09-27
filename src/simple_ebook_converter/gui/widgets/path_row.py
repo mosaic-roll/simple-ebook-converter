@@ -10,7 +10,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import filedialog
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..metrics import s
 from .path_entry import PathEntry

@@ -29,7 +29,7 @@ import tkinter as tk
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..metrics import s
 from .path_row import PathRow
@@ -135,7 +135,7 @@ class _TextControl(_Control):
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
         entry.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
         if spec.help:
-            ttk.Label(frame, text=spec.help, bootstyle="secondary").pack(
+            ttk.Label(frame, text=spec.help, ).pack(
                 anchor="w", padx=(s(8), 0)
             )
 
@@ -211,7 +211,7 @@ class _SpinControl(_Control):
         spin.configure(command=lambda: on_change(field.name))
         self._low, self._high = spec.low, spec.high
         if spec.help:
-            ttk.Label(frame, text=spec.help, bootstyle="secondary").pack(
+            ttk.Label(frame, text=spec.help, ).pack(
                 anchor="w", padx=(s(8), 0)
             )
 
@@ -272,7 +272,7 @@ class _PathControl(_Control):
         if spec.hide_hint:
             self._row.hint.grid_forget()
         if spec.help:
-            ttk.Label(parent, text=spec.help, bootstyle="secondary").pack(
+            ttk.Label(parent, text=spec.help, ).pack(
                 anchor="w", pady=(0, s(2))
             )
 

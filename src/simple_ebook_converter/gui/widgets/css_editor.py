@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..build_config_from_ui import CSS_APPEND, CSS_MODES, CSS_NONE, CSS_OVERRIDE
 from ..fonts import font
@@ -79,7 +79,7 @@ class CssEditor(ttk.Frame):
                 variable=self._mode,
                 command=self._on_mode,
             ).pack(side="left", padx=(0, s(12)))
-        self._note = ttk.Label(bar, text="", bootstyle="secondary", wraplength=s(360))
+        self._note = ttk.Label(bar, text="", , wraplength=s(360))
         self._note.pack(side="left")
 
     def _build_text(self) -> None:
@@ -89,7 +89,7 @@ class CssEditor(ttk.Frame):
         ttk.Button(bar, text=LOAD_BUILTIN, command=self.load_builtin).pack(
             side="left", padx=(s(8), 0)
         )
-        self.hint = ttk.Label(bar, text="", bootstyle="secondary")
+        self.hint = ttk.Label(bar, text="", )
         self.hint.pack(side="left", padx=(s(8), 0))
 
         # ScrollFrame 里放 Text：CSS 普遍长于屏幕高度

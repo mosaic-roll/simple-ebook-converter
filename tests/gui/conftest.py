@@ -19,7 +19,7 @@ import pytest
 
 #: ttkbootstrap 是 GUI 的可选依赖（`[gui]` extra）。没装时：
 #: - 纯数据测试（test_app / test_options_coverage）照常跑；
-#: - 需要真窗口的模块自己在文件顶部 `pytest.importorskip("ttkbootstrap")` 跳过。
+#: - 需要真窗口的模块自己在文件顶部 `pytest.importorskip("sv_ttk")` 跳过。
 _HAS_GUI_DEPS = importlib.util.find_spec("ttkbootstrap") is not None
 
 if _HAS_GUI_DEPS:

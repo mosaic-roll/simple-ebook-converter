@@ -1,59 +1,41 @@
-"""主题：ttkbootstrap 的 `flatly`。
+"""主题：使用 sv_ttk 提供现代外观。
 
-**样式交给 ttkbootstrap，本模块只做三件它不管的事**：
-
-1. 把界面字体换成 `fonts` 探测到的族（ttkbootstrap 默认字号偏小、族也不受控）。
-2. 给「等宽」控件一个 `Mono.*` style（正则是代码，不该用比例字体）。
-3. 把主题色导出一个 `COLORS` 给极少数必须用原始颜色的地方（已划掉的灰字、
-   校验提示文字）。**别处一律用 `bootstyle=`，不要手写颜色。**
-
-不自己 `style.configure("TButton", …)`：那正是上一版「很多代码浪费在调样式上」的
-由来。ttkbootstrap 的主题已经把这些定好了。
+sv_ttk 是 ttk 的扩展主题引擎，提供扁平化、现代化的控件外观，
+无需手写大量样式配置。本模块只做字体定制和校验态样式。
 """
 
 from __future__ import annotations
 
 import tkinter as tk
 
-import ttkbootstrap as ttk
+import sv_ttk
+import tkinter.ttk as ttk
 
 from .fonts import UI_SIZE, font
 
-#: ttkbootstrap 主题名。`bootstrap-light` 是 2.x 的现代浅色主题，`flatly` 已被标记为
-#: legacy（3.0 移除）—— 两者同源，用前者免得下一次升级主题名失效。
-THEME = "bootstrap-light"
+#: 默认主题（light）
+DEFAULT_THEME = "light"
 
-#: 主题色，`apply()` 时从 ttkbootstrap 填进来。别处不许出现字面量颜色。
-COLORS: dict[str, str] = {}
+#: 校验态 style 名
+_ERROR_STYLE = "Error.TEntry"
+_WARN_STYLE = "Warn.TEntry"
 
 
 def apply(root: tk.Misc) -> ttk.Style:
-    """装主题，返回配好的 `Style`。
+    """安装 sv_ttk 主题并配置校验态样式。
 
-    前置条件由调用点保证（见 `__main__.py`）：`metrics.sync_scaling()` 与
-    `fonts.bind_fonts()` 都已跑过 —— 本模块用 `font()` 定字体。
+    sv_ttk 自动处理大部分样式，这里只设置全局字体和校验边框颜色。
     """
-    style = ttk.Style(theme=THEME)
-    colors = style.colors
-    COLORS.update(
-        {
-            "fg": colors.fg,
-            "bg": colors.bg,
-            "muted": colors.secondary,
-            "line": colors.border,
-            "accent": colors.primary,
-            "accent_fg": colors.selectfg,
-            "error": colors.danger,
-            "warn": colors.warning,
-            "del": colors.secondary,
-            "sel": colors.selectbg,
-        }
-    )
-    root.configure(background=colors.bg)
-
-    # 全局字体：ttkbootstrap 的主题字体不受 fonts 控制，这里统一盖掉
+    sv_ttk.set_theme(DEFAULT_THEME)
+    style = ttk.Style(root)
+    # 全局字体：sv_ttk 默认字号偏小，用 fonts 模块统一控制
     style.configure(".", font=font("ui", UI_SIZE))
-    # 等宽：正则框、CSS 文本框、替换表格
+    # 等宽控件（正则、CSS 编辑器）
     style.configure("Mono.TEntry", font=font("mono", UI_SIZE))
     style.configure("Mono.Treeview", font=font("mono", UI_SIZE))
+    # 校验态：红/黄框
+    style.configure(_ERROR_STYLE, bordercolor="#c62828", lightcolor="#c62828", darkcolor="#c62828")
+    style.map(_ERROR_STYLE, bordercolor=[("focus", "#c62828")])
+    style.configure(_WARN_STYLE, bordercolor="#b26a00", lightcolor="#b26a00", darkcolor="#b26a00")
+    style.map(_WARN_STYLE, bordercolor=[("focus", "#b26a00")])
     return style

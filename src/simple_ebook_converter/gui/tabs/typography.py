@@ -12,7 +12,7 @@ from __future__ import annotations
 import tkinter as tk
 from collections.abc import Callable
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ...core.config import ALIGN_CHOICES
 from ...core.options import OPTIONS, option_default

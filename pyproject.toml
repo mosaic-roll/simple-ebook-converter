@@ -15,7 +15,7 @@ dependencies = [
 #:   pip install simple-ebook-converter        # 仅 CLI
 #:   pip install "simple-ebook-converter[gui]" # 带图形界面
 gui = [
-    "ttkbootstrap>=2.2.3",
+    "sv-ttk>=2.4",
 ]
 
 [project.scripts]

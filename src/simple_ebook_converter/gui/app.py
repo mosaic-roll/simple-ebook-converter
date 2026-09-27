@@ -26,7 +26,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ..core import pipeline
 
@@ -128,7 +128,7 @@ class App(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=s(8), pady=(s(8), s(4)))
         self.btn_generate = ttk.Button(
-            bar, text="生成 EPUB", bootstyle="primary", command=self.generate
+            bar, text="生成 EPUB", command=self.generate
         )
         self.btn_generate.pack(side="left")
         self.status = StatusBar(bar, on_busy_change=lambda _busy: self._refresh_enabled())

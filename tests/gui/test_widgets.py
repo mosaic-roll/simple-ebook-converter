@@ -18,7 +18,7 @@ import pytest
 from tkinter import ttk
 
 # 没装 GUI 可选依赖时整文件跳过（必须在导入 GUI 模块之前）
-pytest.importorskip("ttkbootstrap")
+pytest.importorskip("sv_ttk")
 
 from simple_ebook_converter.core.replace import Rule, rules_from_rows
 from simple_ebook_converter.gui import fonts, theme

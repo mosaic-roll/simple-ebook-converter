@@ -10,7 +10,7 @@ import tkinter as tk
 from collections.abc import Callable
 from dataclasses import asdict
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 from ...core.encoding import AUTO_ENCODING, ENCODING_CHOICES
 from ..build_config_from_ui import BasicValues

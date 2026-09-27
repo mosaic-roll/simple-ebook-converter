@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import tkinter as tk
 
-import ttkbootstrap as ttk
+import tkinter.ttk as ttk
 
 
 class StatusBar(ttk.Frame):
@@ -24,7 +24,7 @@ class StatusBar(ttk.Frame):
         super().__init__(master, **kwargs)
         self._busy = False
         self._on_busy_change = on_busy_change
-        self.text = ttk.Label(self, text="", bootstyle="secondary", anchor="e")
+        self.text = ttk.Label(self, text="", , anchor="e")
         self.text.pack(side="right", fill="x", expand=True)
 
     # ---------- 状态 ----------
@@ -44,13 +44,13 @@ class StatusBar(ttk.Frame):
 
     def ok(self, message: str = "") -> None:
         self._finish()
-        self.text.configure(bootstyle="secondary")
+        self.text.configure()
         self.set_text(message)
 
     def fail(self, message: str) -> None:
         """出错：状态文字转成危险色。消息本身已含原因，这里不再重复。"""
         self._finish()
-        self.text.configure(bootstyle="danger")
+        self.text.configure(foreground="#c62828")
         self.set_text(message)
 
     def _finish(self) -> None:
