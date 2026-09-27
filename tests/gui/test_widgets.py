@@ -317,15 +317,15 @@ def test_css_editor_load_builtin_matches_core(tk_root) -> None:
 # ---------- StatusBar ----------
 
 
-def test_status_bar_stops_progress_on_finish(tk_root) -> None:
-    """忙状态必须收尾，否则进度条会永远转下去。"""
+def test_status_bar_busy_transitions(tk_root) -> None:
+    """忙状态必须收尾，否则按钮会一直灰着。"""
     bar = StatusBar(tk_root)
     assert bar.busy is False
     bar.begin("处理中")
     assert bar.busy is True
     bar.ok("完成")
     assert bar.busy is False
-    assert str(bar.bar.cget("mode")) == "determinate"
+    assert bar.text.cget("text") == "完成"
 
 
 def test_status_bar_fail_turns_red(tk_root) -> None:

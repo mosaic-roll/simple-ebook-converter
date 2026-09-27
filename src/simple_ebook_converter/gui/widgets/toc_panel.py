@@ -64,7 +64,7 @@ class TocPanel(ttk.Frame):
 
         self._build_toolbar()
         self._build_tree()
-        self._build_settings()
+        self._build_count()
 
     # ---------- 布局 ----------
 
@@ -77,6 +77,27 @@ class TocPanel(ttk.Frame):
         self.v_all = tk.BooleanVar(value=False)
         self.cb_all = ttk.Checkbutton(bar, text="全部启用", variable=self.v_all, command=self._toggle_all)
         self.cb_all.pack(side="left", padx=(s(12), 0))
+
+        # 目录深度 / 书页含目录放工具条**右侧**（原先在面板底部）。移到这里后目录
+        # 面板底部只剩表格本身，左右两栏的底边就齐了。
+        right = ttk.Frame(bar)
+        right.pack(side="right")
+        ttk.Label(right, text="目录深度").pack(side="left")
+        self.v_depth = tk.IntVar(value=6)
+        ttk.Spinbox(
+            right,
+            from_=DEPTH_RANGE[0],
+            to=DEPTH_RANGE[1],
+            width=4,
+            textvariable=self.v_depth,
+            command=self._settings_changed,
+        ).pack(side="left", padx=(s(4), s(12)))
+        self.v_depth.trace_add("write", lambda *_: self._settings_changed())
+
+        self.v_in_spine = tk.BooleanVar(value=True)
+        ttk.Checkbutton(
+            right, text="书页含目录", variable=self.v_in_spine, command=self._settings_changed
+        ).pack(side="left")
 
     def _build_tree(self) -> None:
         wrap = ttk.Frame(self)
@@ -108,25 +129,12 @@ class TocPanel(ttk.Frame):
         self.tree.bind("<Button-1>", self._on_click)
         self.set_result_column(None)  # 初始没有替换规则 → 结果列隐藏
 
-    def _build_settings(self) -> None:
+    def _build_count(self) -> None:
+        """底部一行：右对齐的「N 个标题」。"""
         bar = ttk.Frame(self)
-        bar.pack(fill="x", pady=(s(6), 0))
-        ttk.Label(bar, text="目录深度").pack(side="left")
-        self.v_depth = tk.IntVar(value=6)
-        ttk.Spinbox(
-            bar,
-            from_=DEPTH_RANGE[0],
-            to=DEPTH_RANGE[1],
-            width=4,
-            textvariable=self.v_depth,
-            command=self._settings_changed,
-        ).pack(side="left", padx=(s(4), s(12)))
-        self.v_depth.trace_add("write", lambda *_: self._settings_changed())
-
-        self.v_in_spine = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            bar, text="书页含目录", variable=self.v_in_spine, command=self._settings_changed
-        ).pack(side="left")
+        bar.pack(fill="x", pady=(s(4), 0))
+        self.v_count = tk.StringVar(value="")
+        ttk.Label(bar, textvariable=self.v_count, bootstyle="secondary").pack(side="right")
 
     # ---------- 内容 ----------
 
@@ -231,6 +239,10 @@ class TocPanel(ttk.Frame):
     def set_toc_settings(self, data: TocSettings) -> None:
         self.v_depth.set(_clamp_depth(data.toc_depth))
         self.v_in_spine.set(data.toc_in_spine)
+
+    def set_count(self, count: int) -> None:
+        """目录条目数（底部右对齐）。"""
+        self.v_count.set(f"{count} 个标题" if count else "")
 
     # ---------- 导出给 core ----------
 

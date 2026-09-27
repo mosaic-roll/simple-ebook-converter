@@ -29,8 +29,7 @@ from tkinter import filedialog, messagebox
 import ttkbootstrap as ttk
 
 from ..core import pipeline
-from ..core.builder import builtin_css
-from ..core.config import DEFAULTS
+
 from ..core.levels import build_levels
 from ..core.replace import rules_to_json
 from ..core.toc import to_json
@@ -43,7 +42,7 @@ from .build_config_from_ui import (
     write_temp_css,
     write_temp_toc,
 )
-from .fonts import actual_family, font
+from .fonts import font
 from .mainthread import MainThread
 from .metrics import s
 from .settings import Settings, load_settings, save_settings
@@ -119,24 +118,21 @@ class App(ttk.Frame):
         panes.add(right, weight=4)
         self._build_right(right)
 
-        self.status = StatusBar(self, on_busy_change=lambda _busy: self._refresh_enabled())
-        self.status.pack(fill="x", padx=s(8), pady=(0, s(6)))
-
     def _build_actions(self) -> None:
+        """顶部动作条：左边主操作，右边状态行。
+
+        不再放「载入内置 CSS」「导出目录 JSON」两个按钮：前者和排版页里的「载入
+        内置模板」重复，后者和目录面板工具条里的「导出」重复。状态行也从原来的
+        底部搬到这里 —— 没有进度条要显示，单独占一条底栏只为了几行字不划算。
+        """
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=s(8), pady=(s(8), s(4)))
         self.btn_generate = ttk.Button(
             bar, text="生成 EPUB", bootstyle="primary", command=self.generate
         )
         self.btn_generate.pack(side="left")
-        ttk.Button(bar, text="载入内置 CSS", command=self.dump_css).pack(
-            side="left", padx=(s(8), 0)
-        )
-        ttk.Button(bar, text="导出目录 JSON", command=self.export_toc).pack(
-            side="left", padx=(s(4), 0)
-        )
-        self.v_font_note = tk.StringVar()
-        ttk.Label(bar, textvariable=self.v_font_note, bootstyle="secondary").pack(side="right")
+        self.status = StatusBar(bar, on_busy_change=lambda _busy: self._refresh_enabled())
+        self.status.pack(side="right", fill="x", expand=True, padx=(s(12), 0))
 
     def _build_left(self, parent: ttk.Frame) -> None:
         notebook = ttk.Notebook(parent)
@@ -225,8 +221,6 @@ class App(ttk.Frame):
         self._temp_css: Path | None = None
         self._temp_toc: Path | None = None
         self.apply_settings(data)
-        self.v_font_note.set(f"界面字体：{actual_family('ui')}")
-        self.status.set_detail("就绪")
         # 输入/输出路径**不存**（settings.py 的决定：换一本书就该重来），所以这里
         # 问界面而不是问设置 —— 界面才是「这次要处理哪个文件」的唯一真源。写
         # `if data.input:` 的话读的是个根本不存在的字段，报错还是最好的结果。
@@ -303,10 +297,8 @@ class App(ttk.Frame):
     def _scan_done(self, entries, used: str, resolved) -> None:
         self._scan_running = False
         self._show_entries(entries)
-        self.status.ok(
-            f"识别到 {len(entries)} 个标题",
-            f"编码 {used} · 书名 {resolved.title}",
-        )
+        # 标题数归目录面板（底部右对齐），不在这里重复；成功就保持安静
+        self.status.ok("")
         # **顺序要紧**：必须先 `status.ok()` 解冻左栏，再自动填充。
         # 冻结期间控件的 `state` 是 disabled，而禁用的 ttk.Entry 会**静默忽略**
         # `insert` —— 输出/封面这两个 PathRow 会填了个寂寞（靠 StringVar 活着的
@@ -340,6 +332,7 @@ class App(ttk.Frame):
     def _show_entries(self, entries: list[dict]) -> None:
         self._toc_entries = list(entries)
         self.toc.set_entries(entries)
+        self.toc.set_count(len(entries))
         self._refresh_preview()
         self._refresh_enabled()
 
@@ -442,7 +435,7 @@ class App(ttk.Frame):
         self._run(work)
 
     def _generate_ok(self, target: Path) -> None:
-        self.status.ok(f"已生成：{target}", str(target))
+        self.status.ok(f"已生成：{target}")
         # 生成后别把输入路径忘了，下次打开还想接着改
         self._save_settings()
 
@@ -468,21 +461,7 @@ class App(ttk.Frame):
         self._cleanup_temp_css()
         self._cleanup_one("_temp_toc")
 
-    # ---------- 导出 ----------
-
-    def dump_css(self) -> None:
-        """把内置 CSS 模板写到文件，作改样式的起点。"""
-        path = filedialog.asksaveasfilename(
-            title="导出内置 CSS", defaultextension=".css", filetypes=[("CSS", "*.css")]
-        )
-        if not path:
-            return
-        try:
-            Path(path).write_text(builtin_css(DEFAULTS), encoding="utf-8")
-        except OSError as exc:
-            self.status.fail(f"导出失败：{exc}")
-            return
-        self.status.ok(f"已导出内置 CSS：{path}")
+    # ---------- 目录导入/导出 ----------
 
     def export_toc(self) -> str:
         """把当前目录（**含划掉标记**）写成 `--toc-file` 能吃的 JSON。返回路径，取消给空串。"""

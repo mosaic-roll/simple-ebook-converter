@@ -64,7 +64,7 @@ _GUI_ONLY_EXCLUSIONS = {
     "section": "未动过（None）时不写键，交给 core 缺省",
     "no_volume": "界面用显式空串表达，不用这个旗标",
     # 这些是「一次性动作」，不是设置项
-    "dump_css": "界面是「导出内置 CSS」按钮",
+    "dump_css": "只给命令行；界面用「载入内置模板」把模板填进文本框",
     "toc_only": "界面只做生成，不做只输出目录",
     "toc_format": "同上，目录格式不在界面选",
     "toc_file": "界面直接持有目录树，不必经文件往返",
@@ -113,7 +113,7 @@ _NO_UI_FIELD = {
     "css_file": "由 CssEditor 的 override 模式产出（与 css_append 二选一）",
     "toc_file": "目录在内存里，不走 --toc-file",
     # 「一次性动作」而非设置
-    "dump_css": "界面是「导出内置 CSS」按钮",
+    "dump_css": "只给命令行；界面用「载入内置模板」把模板填进文本框",
     "toc_only": "界面只做生成",
     "toc_format": "目录格式不在界面选",
 }
