@@ -105,7 +105,10 @@ class Config:
     chapter_align: str = "center"
     volume_align: str = "right"
     font: Path | None = None
+    #: 整份替代内置样式（与 `css_append` 互斥）
     css_file: Path | None = None
+    #: 追加到内置样式之后（与 `css_file` 互斥）
+    css_append: Path | None = None
 
     # 目录
     #: 目录页是否进 spine（nav 文档无论如何都生成）
@@ -160,6 +163,10 @@ class Config:
             font_media_type(Path(self.font))
         if self.cover:
             cover_media_type(Path(self.cover))
+        if self.css_file and self.css_append:
+            raise ValueError(
+                "--css-file 与 --css-append 互斥：前者替代内置样式，后者追加在内置样式之后"
+            )
 
 
 #: 全缺省的模板，只用来取参数默认值与选项初值，谁也不许改它

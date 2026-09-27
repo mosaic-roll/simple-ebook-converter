@@ -28,13 +28,21 @@ PAGE_MAX_LEVEL = 3
 
 
 def build_css(cfg: Config) -> str:
-    """产出用的 CSS：给了 `--css-file` 就以它为全部样式（**替代**内置），否则用内置模板。
+    """产出用的 CSS。
 
-    想在内置基础上改，先用 `--dump-css` 导一份 `builtin_css()`，改完再当 `--css-file` 传回来。
+    三种情形：给了 `--css-file` 就以它为全部样式（**替代**内置）；给了 `--css-append`
+    就把它追加在内置样式之后；都不给就是内置模板。三者不同时出现（`Config.validate()`
+    会拦下 `--css-file` 与 `--css-append` 同给）。
+
+    想在内置基础上大改，先用 `--dump-css` 导一份 `builtin_css()`，改完再当 `--css-file`
+    传回来。
     """
     if cfg.css_file:
         return _read_css(cfg.css_file)
-    return builtin_css(cfg)
+    css = builtin_css(cfg)
+    if cfg.css_append:
+        css = f"{css}\n{_read_css(cfg.css_append)}"
+    return css
 
 
 def builtin_css(cfg: Config) -> str:

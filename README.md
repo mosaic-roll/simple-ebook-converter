@@ -82,7 +82,7 @@ tree, stats = process(lines, cfg)
 
 `raw` 先于 `html`：先改原文标题（写进 `node.title`，目录页/NCX/元数据都用它），
 再转义，然后 `html` 规则在转义结果上再改一次，结果写进书页标题的 HTML 片段。
-所以 `html` 阶段适合给标题里的片段（如整段「第…章」）套 `<span>`，再用 `--css-file`
+所以 `html` 阶段适合给标题里的片段（如整段「第…章」）套 `<span>`，再用 `--css-append`
 上样式；它不会影响纯文本的目录与元数据。原始标题始终保留在 `node.raw_title`。
 
 ## 封面
@@ -100,8 +100,9 @@ tree, stats = process(lines, cfg)
 封面页走 EPUB 标准，不自造 CSS class：内容放在 `<section epub:type="cover">` 里，
 阅读器认这个语义角色。有图时图片在 OPF manifest 里带 `properties="cover-image"`，
 并额外补一条 `<meta name="cover">` 兼容 EPUB2 时代的阅读器。封面页会链到 `style.css`，
-内置样式用 `body > section` 这组结构选择器排版；`--css-file` 是**整份替代**内置样式，
-要用它定封面样式就照抄这组选择器（`--dump-css` 可导出内置模板作起点）
+内置样式用 `body > section` 这组结构选择器排版；`--css-append` 追加在内置样式之后，
+`--css-file` 则是**整份替代**内置样式（两者互斥，要用它定封面样式就照抄这组选择器，
+`--dump-css` 可导出内置模板作起点）
 （各家阅读器对 CSS 里带命名空间的 `epub|type` 属性选择器支持不一致，所以没拿它来选）。
 
 ```bash

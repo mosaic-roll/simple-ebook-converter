@@ -215,11 +215,21 @@ def test_paths_are_resolved(tmp_path):
     assert (cfg.cover, cfg.font, cfg.css_file) == (cover, font, css)
 
 
+def test_css_append_is_resolved(tmp_path):
+    css = tmp_path / "extra.css"
+    css.write_text("p{}", encoding="utf-8")
+    assert _config(tmp_path, css_append=str(css)).css_append == css
+
+
 def test_missing_asset_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="封面图不存在"):
         _config(tmp_path, cover=str(tmp_path / "nope.png"))
     with pytest.raises(ValueError, match="正文字体不存在"):
         _config(tmp_path, font=str(tmp_path / "nope.ttf"))
+    with pytest.raises(ValueError, match="外部 CSS 文件不存在"):
+        _config(tmp_path, css_file=str(tmp_path / "nope.css"))
+    with pytest.raises(ValueError, match="附加 CSS 文件不存在"):
+        _config(tmp_path, css_append=str(tmp_path / "nope.css"))
 
 
 def test_output_paths_need_not_exist(tmp_path):

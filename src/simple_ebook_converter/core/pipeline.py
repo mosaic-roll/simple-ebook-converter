@@ -151,7 +151,7 @@ def write_epub(book: Book) -> Path:
 def write_css(cfg: Config) -> Path:
     """把内置 CSS 模板写到 `cfg.dump_css`。只用排版参数，不必读输入。
 
-    导出的是 `builtin_css()`（不受 `--css-file` 影响，方便当自定义样式表的起点）。
+    导出的是 `builtin_css()`（不受 `--css-file` / `--css-append` 影响，方便当样式表起点）。
     格式校验（字体、封面）照样走 `Config.validate()`：参数错在哪，哪种产出方式都该报。
     """
     if not cfg.dump_css:

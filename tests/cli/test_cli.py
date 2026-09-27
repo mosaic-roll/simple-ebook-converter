@@ -550,6 +550,32 @@ def test_dump_css_exports_builtin_template_not_css_file(tmp_path):
     assert "color: red" not in dumped
 
 
+def test_css_append_keeps_builtin_and_goes_last(tmp_path):
+    src = _write_sample(tmp_path)
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
+    out = tmp_path / "novel.epub"
+    result = CliRunner().invoke(convert, [str(src), "--css-append", str(extra), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    with zipfile.ZipFile(out) as z:
+        css = z.read("EPUB/style.css").decode("utf-8")
+    assert "line-height" in css  # 内置样式还在
+    assert css.rstrip().endswith("body { color: red; }")  # 追加在最后，因而能覆盖内置
+
+
+def test_css_file_and_css_append_conflict(tmp_path):
+    src = _write_sample(tmp_path)
+    a, b = tmp_path / "a.css", tmp_path / "b.css"
+    a.write_text("body {}", encoding="utf-8")
+    b.write_text("body {}", encoding="utf-8")
+    result = CliRunner().invoke(
+        convert, [str(src), "--css-file", str(a), "--css-append", str(b)]
+    )
+    assert result.exit_code == 2, result.output
+    assert "互斥" in result.output
+    assert not list(tmp_path.glob("*.epub"))
+
+
 def test_convert_reports_book_summary(tmp_path):
     """编码/各级标题数/前言这一行是终端文案，core 不再提供，由 CLI 自己拼。"""
     src = _write_sample(tmp_path)

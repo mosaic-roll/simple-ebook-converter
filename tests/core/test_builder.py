@@ -386,8 +386,34 @@ def test_builtin_css_is_unaffected_by_css_file(tmp_path):
     assert builtin_css(cfg) == build_css(Config(input=tmp_path / "novel.txt"))
 
 
+def test_css_append_adds_to_builtin(tmp_path):
+    """`--css-append` 加在内置样式之后，所以能覆盖内置规则。"""
+    extra = tmp_path / "extra.css"
+    extra.write_text("body > section h1 { color: red; }", encoding="utf-8")
+    cfg = Config(input=tmp_path / "novel.txt", css_append=extra)
+    css = build_css(cfg)
+    assert css.index("color: red;") > css.index("max-height: 100vh;")  # 追加在内置之后
+    assert "text-indent" in css  # 内置正文样式还在
+
+
+def test_css_append_keeps_font_face(tmp_path):
+    """追加不影响 `--font` 的 `@font-face`（那是内置样式的一部分）。"""
+    font = tmp_path / "f.ttf"
+    font.write_bytes(b"\x00\x01\x00\x00")
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
+    cfg = Config(input=tmp_path / "novel.txt", font=font, css_append=extra)
+    assert "@font-face" in build_css(cfg)
+
+
 def test_build_css_reports_unreadable_css_file(tmp_path):
     cfg = Config(input=tmp_path / "novel.txt", css_file=tmp_path / "nope.css")
+    with pytest.raises(ValueError, match="无法读取外部 CSS"):
+        build_css(cfg)
+
+
+def test_build_css_reports_unreadable_css_append(tmp_path):
+    cfg = Config(input=tmp_path / "novel.txt", css_append=tmp_path / "nope.css")
     with pytest.raises(ValueError, match="无法读取外部 CSS"):
         build_css(cfg)
 

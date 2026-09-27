@@ -133,6 +133,16 @@ def test_validate_accepts_edge_values():
     Config(toc_depth=6, date="2024-05-13").validate()
 
 
+def test_css_file_and_css_append_are_mutually_exclusive(tmp_path):
+    a, b = tmp_path / "a.css", tmp_path / "b.css"
+    a.write_text("", encoding="utf-8")
+    b.write_text("", encoding="utf-8")
+    Config(css_file=a).validate()
+    Config(css_append=b).validate()
+    with pytest.raises(ValueError, match="互斥"):
+        Config(css_file=a, css_append=b).validate()
+
+
 def test_align_choices_are_the_only_allowed():
     for value in ALIGN_CHOICES:
         Config(chapter_align=value, volume_align=value).validate()
