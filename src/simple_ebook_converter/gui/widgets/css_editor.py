@@ -76,7 +76,7 @@ class CssEditor(ttk.Frame):
                 value=mode,
                 variable=self._mode,
                 command=self._on_mode).pack(side="left", padx=(0, s(12)))
-        self._note = ttk.Label(bar, text="", , wraplength=s(360))
+        self._note = ttk.Label(bar, text="", wraplength=s(360))
         self._note.pack(side="left")
 
     def _build_text(self) -> None:

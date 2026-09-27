@@ -24,7 +24,7 @@ class StatusBar(ttk.Frame):
         super().__init__(master, **kwargs)
         self._busy = False
         self._on_busy_change = on_busy_change
-        self.text = ttk.Label(self, text="", , anchor="e")
+        self.text = ttk.Label(self, text="", anchor="e")
         self.text.pack(side="right", fill="x", expand=True)
 
     # ---------- 状态 ----------
