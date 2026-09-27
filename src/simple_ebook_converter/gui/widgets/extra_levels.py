@@ -198,10 +198,6 @@ class ExtraLevelsEditor(ttk.Frame):
     def _mark(self, row: dict, ok: bool, message: str) -> None:
         row["valid"] = ok
         row["error"] = message
-        # 用标准 ttk style 替代 bootstyle
-        style = "" if ok else "Error.TEntry"
-        row["regex_box"].configure(style=style)
-        row["class_box"].configure(style=style)
         self.v_hint.configure(text=message if not ok else "")
 
     def _hint(self, message: str) -> None:
