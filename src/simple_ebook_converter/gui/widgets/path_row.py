@@ -59,6 +59,8 @@ class PathRow(ttk.Frame):
         )
         self.entry.grid(row=0, column=1, sticky="ew")
         self.columnconfigure(1, weight=1)
+        # hint 挂在 entry 上，外部要提示文案时不必摸两层
+        self.hint = self.entry.hint
 
         buttons = ttk.Frame(self)
         buttons.grid(row=0, column=2, sticky="w", padx=(s(4), 0))
@@ -69,7 +71,7 @@ class PathRow(ttk.Frame):
             )
 
         # 提示文字在整行下面，跨三列
-        self.entry.hint.grid(row=1, column=0, columnspan=3, sticky="w")
+        self.hint.grid(row=1, column=0, columnspan=3, sticky="w")
 
     # ---------- 值 ----------
 

@@ -97,7 +97,7 @@ class TocPanel(ttk.Frame):
                 stretch=column is not TITLE,
             )
         # height 不设，交给 pack(expand=True)
-        set_row_height(self.style, "Toc.Treeview", px=ROW_HEIGHT)
+        set_row_height(ttk.Style(self), "Toc.Treeview", px=ROW_HEIGHT)
 
         vbar = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vbar.set)

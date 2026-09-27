@@ -77,9 +77,17 @@ class ExtraLevelsEditor(ttk.Frame):
         return [row["spec"] for row in self.rows if row.get("valid") and row.get("spec")]
 
     def get(self) -> list[dict]:
-        """UI 自己的中间结构（给 `settings.py` 存），不是 `values` 的键。"""
+        """UI 自己的中间结构（给 `settings.py` 存），不是 `values` 的键。
+
+        取 `.get()` 拿实际字符串：`row["h"]` / `row["class_name"]` 存的是 Tk 变量，
+        直接存进设置文件会写出 `<StringVar object ...>`。
+        """
         return [
-            {"h": row["h"], "class_name": row["class_name"], "regex": row["regex"]}
+            {
+                "h": row["h"].get(),
+                "class_name": row["class_name"].get().strip(),
+                "regex": row["regex"],
+            }
             for row in self.rows
         ]
 
@@ -111,13 +119,13 @@ class ExtraLevelsEditor(ttk.Frame):
     def _append(self, level: str, class_name: str, regex: str) -> None:
         frame = ttk.Frame(self.body)
         frame.pack(fill="x", pady=(0, s(4)))
+        index = len(self.rows)  # 先取序号：self.rows.append 在下面，会变
 
         v_h = tk.StringVar(value=level)
         v_class = tk.StringVar(value=class_name)
-        combo = ttk.Combobox(
+        ttk.Combobox(
             frame, textvariable=v_h, values=[f"h{n}" for n in range(1, 7)], state="readonly", width=4
-        )
-        combo.pack(side="left")
+        ).pack(side="left")
         v_regex = regex_entry(frame, width=32)
         v_regex.pack(side="left", fill="x", expand=True, padx=s(4))
         if regex:
@@ -126,7 +134,7 @@ class ExtraLevelsEditor(ttk.Frame):
         e_class = ttk.Entry(frame, textvariable=v_class, width=14)
         e_class.pack(side="left", padx=(0, s(4)))
         ttk.Button(
-            frame, text="删除", width=6, command=lambda i=len(self.rows): self._remove_by_frame(i)
+            frame, text="删除", width=6, command=lambda i=index: self.remove(i)
         ).pack(side="left")
 
         row = {
@@ -143,9 +151,6 @@ class ExtraLevelsEditor(ttk.Frame):
         v_regex.bind("<KeyRelease>", lambda _e: self._changed(), add="+")
         self._changed()
 
-    def _remove_by_frame(self, index: int) -> None:
-        self.remove(index)
-
     # ---------- 校验 ----------
 
     def _changed(self) -> None:
@@ -155,8 +160,8 @@ class ExtraLevelsEditor(ttk.Frame):
 
     def _revalidate(self) -> None:
         """逐行重算 `spec` 与 `valid`。hN / class 重复或不合法 → 该行标红并跳过。"""
-        seen: dict[int, int] = {}
-        for index, row in enumerate(self.rows):
+        seen: dict[int, bool] = {}
+        for row in self.rows:
             level = _level_of(row["h"].get())
             class_name = row["class_name"].get().strip()
             regex = row["regex_box"].get().strip()
@@ -168,16 +173,20 @@ class ExtraLevelsEditor(ttk.Frame):
             if class_name and not _CLASS_RE.match(class_name):
                 self._mark(row, False, "class 名不合法")
                 continue
-            if level in seen and _is_enabled_level(level):
+            if level in seen and self._is_enabled_level(level):
                 self._mark(row, False, f"h{level} 重复")
                 continue
-            if regex:
-                try:
-                    re.compile(regex)
-                except re.error as exc:
-                    self._mark(row, False, f"正则非法：{exc}")
-                    continue
-            seen[level] = index
+            if not regex:
+                # 空正则 = 这一行还没填完，跳过。不拼出 `h1:` 那种 core 读不出意思的串。
+                row["valid"] = False
+                self._mark(row, False, "正则不能为空")
+                continue
+            try:
+                re.compile(regex)
+            except re.error as exc:
+                self._mark(row, False, f"正则非法：{exc}")
+                continue
+            seen[level] = True
             # 格式归 core 所有：hN + (.class)? + ":" + 正则。冒号后整段都是正则，
             # 所以正则里可以有冒号、不必转义。
             head = f"h{level}.{class_name}" if class_name else f"h{level}"
