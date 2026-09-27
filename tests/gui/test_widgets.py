@@ -65,18 +65,21 @@ def test_font_returns_tuple_not_none(tk_root) -> None:
     assert fonts.font("mono")[0]
 
 
-def test_theme_apply_registers_error_styles(tk_root) -> None:
-    """红/黄校验框依赖这两个 style；没注册就等于没有红框。"""
+def test_theme_uses_ttkbootstrap(tk_root) -> None:
+    """主题走 ttkbootstrap，不再自己配一堆 `TButton`/`TLabel`。"""
+    from simple_ebook_converter.gui import theme as theme_mod
+
     fonts.bind_fonts(tk_root)
     style = theme.apply(tk_root)
-    assert style.lookup("Error.TEntry", "bordercolor")
-    assert style.lookup("Warn.TEntry", "bordercolor")
+    assert style.theme_use() == theme_mod.THEME
 
 
-def test_border_color_supported_on_clam(tk_root) -> None:
+def test_theme_configures_mono_fonts(tk_root) -> None:
+    """等宽 style 必须真的挂上字体：正则/CSS/替换表格都靠它。"""
     fonts.bind_fonts(tk_root)
-    theme.apply(tk_root)
-    assert theme.border_color_supported(tk_root) is True
+    style = theme.apply(tk_root)
+    assert style.lookup("Mono.TEntry", "font")
+    assert style.lookup("Mono.Treeview", "font")
 
 
 # ---------- ScrollFrame ----------

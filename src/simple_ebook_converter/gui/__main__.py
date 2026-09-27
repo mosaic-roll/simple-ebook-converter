@@ -28,7 +28,6 @@ from __future__ import annotations
 
 import sys
 import tkinter as tk
-from tkinter import ttk
 
 from . import dpi, fonts, metrics, theme
 from .app import App

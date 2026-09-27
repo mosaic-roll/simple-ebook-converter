@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ...core.encoding import AUTO_ENCODING, ENCODING_CHOICES
 from ..build_config_from_ui import BasicValues
@@ -213,10 +213,6 @@ class BasicTab(ttk.Frame):
         self.input_row.set(path)
         self._changed()
 
-    def detect_border_support(self, root: tk.Misc) -> None:
-        for row in (self.input_row, self.out_row, self.cover_row):
-            row.detect_border_support(root)
-
     # ---------- 内部 ----------
 
     def _text_row(
@@ -233,7 +229,7 @@ class BasicTab(ttk.Frame):
         notify = (lambda: self._field_changed(key)) if key else self._changed
         entry.bind("<KeyRelease>", lambda _e: notify(), add="+")
         if hint:
-            ttk.Label(parent, text=hint, style="Muted.TLabel").grid(
+            ttk.Label(parent, text=hint, bootstyle="secondary").grid(
                 row=row, column=2, sticky="w", padx=(s(6), 0)
             )
         parent.columnconfigure(1, weight=1)
@@ -253,7 +249,7 @@ class BasicTab(ttk.Frame):
         notify = (lambda: self._field_changed(key)) if key else self._changed
         combo.bind("<<ComboboxSelected>>", lambda _e: notify())
         if hint:
-            ttk.Label(row, text=hint, style="Muted.TLabel").pack(side="left", padx=(s(8), 0))
+            ttk.Label(row, text=hint, bootstyle="secondary").pack(side="left", padx=(s(8), 0))
         return var
 
     def _input_valid(self, _path) -> None:

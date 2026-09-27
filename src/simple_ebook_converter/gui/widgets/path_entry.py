@@ -10,9 +10,7 @@
 所以这里的检查**不替代** core，只是提前告诉用户。**黄框不拦生成**：输出目录
 不存在是可以的，生成时会建目录（`pipeline.write_epub` 里的 `mkdir(parents=True)`）。
 
-红框靠 `Error.TEntry` / `Warn.TEntry` 的 `bordercolor`，**只有 `clam` 生效**（§4.2）。
-`theme.apply()` 之后用 `theme.border_color_supported()` 探一次；不支持时退化成
-只有提示文字。
+红/黄框用 ttkbootstrap 的 `bootstyle="danger"` / `"warning"`，不再自己配 `bordercolor`。
 """
 
 from __future__ import annotations
@@ -20,17 +18,16 @@ from __future__ import annotations
 import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import ttk
 
-from ..theme import COLORS, border_color_supported
+import ttkbootstrap as ttk
+
+from ..theme import COLORS
 
 #: 校验结论
 OK, ERROR, WARN = "ok", "error", "warn"
 
-#: 提示文字的 style 名（写在 `theme.apply()` 里）
-_MUTED = "Muted.TLabel"
-_ERROR_STYLE = "Error.TEntry"
-_WARN_STYLE = "Warn.TEntry"
+#: 提示文字用 ttkbootstrap 的次级色
+_MUTED = "secondary"
 
 
 class PathEntry(ttk.Entry):
@@ -50,10 +47,9 @@ class PathEntry(ttk.Entry):
         self._on_change = on_change
         self._on_valid = on_valid
         self._valid: Path | None = None
-        self._has_border = True
         self._state = OK
 
-        self.hint = ttk.Label(master, text="", style=_MUTED, wraplength=0)
+        self.hint = ttk.Label(master, text="", bootstyle=_MUTED, wraplength=0)
         self.bind("<KeyRelease>", self._on_key_release, add="+")
         self.bind("<FocusOut>", self._on_focus_out, add="+")
 
@@ -68,24 +64,23 @@ class PathEntry(ttk.Entry):
         return self.get_path() is not None and self._state != ERROR
 
     def set_state(self, state: str, message: str = "") -> None:
-        """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。"""
+        """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。
+
+        `bootstyle` 的复位值是 `"default"`（空串**不会**复位，ttkbootstrap 会
+        保留上一次的 style 名）。
+        """
         self._state = state
-        if self._has_border and state == ERROR:
-            self.configure(style=_ERROR_STYLE)
-        elif self._has_border and state == WARN:
-            self.configure(style=_WARN_STYLE)
+        if state == ERROR:
+            self.configure(bootstyle="danger")
+        elif state == WARN:
+            self.configure(bootstyle="warning")
         else:
-            self.configure(style="")
+            self.configure(bootstyle="default")
         self.hint.configure(
             text=message,
-            style=_MUTED,
+            bootstyle=_MUTED,
             foreground=COLORS["error"] if state == ERROR else COLORS["warn"],
         )
-
-    def detect_border_support(self, root: tk.Misc) -> bool:
-        """探测当前主题认不认 `bordercolor`；不认就退化成只有提示文字。"""
-        self._has_border = border_color_supported(root)
-        return self._has_border
 
     def clear_message(self) -> None:
         self.hint.configure(text="")

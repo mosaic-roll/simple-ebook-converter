@@ -11,7 +11,7 @@ toplevel 之前，能收到所有后代的事件）。
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ..metrics import s
 

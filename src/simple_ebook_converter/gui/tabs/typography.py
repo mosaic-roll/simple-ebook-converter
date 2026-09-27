@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ...core.config import ALIGN_CHOICES
 from ...core.options import OPTIONS, option_default
@@ -70,7 +70,7 @@ class TypographyTab(ttk.Frame):
         ttk.Label(
             body,
             text="字体只从文件选取：ttf / otf / woff / woff2，会嵌入书里。",
-            style="Muted.TLabel",
+            bootstyle="secondary",
         ).pack(anchor="w")
 
         css = ttk.LabelFrame(body, text="样式表", padding=(s(8), s(6)))
@@ -106,9 +106,6 @@ class TypographyTab(ttk.Frame):
         self.font_row.set(values.font)
         self.css.set(values.css_mode, values.css_path, values.css_text)
 
-    def detect_border_support(self, root: tk.Misc) -> None:
-        self.font_row.detect_border_support(root)
-
     # ---------- 内部 ----------
 
     def _int_row(
@@ -119,7 +116,7 @@ class TypographyTab(ttk.Frame):
             parent, from_=span[0], to=span[1], width=5, textvariable=var, command=self._changed
         ).grid(row=row, column=1, sticky="w", padx=(s(6), 0), pady=(0, s(4)))
         var.trace_add("write", lambda *_: self._changed())
-        ttk.Label(parent, text=hint, style="Muted.TLabel").grid(
+        ttk.Label(parent, text=hint, bootstyle="secondary").grid(
             row=row, column=2, sticky="w", padx=(s(6), 0)
         )
         parent.columnconfigure(1, weight=1)
@@ -130,7 +127,7 @@ class TypographyTab(ttk.Frame):
             row=row, column=1, sticky="ew", padx=(s(6), s(6)), pady=(0, s(4))
         )
         var.trace_add("write", lambda *_: self._changed())
-        ttk.Label(parent, text=hint, style="Muted.TLabel").grid(
+        ttk.Label(parent, text=hint, bootstyle="secondary").grid(
             row=row, column=2, sticky="w"
         )
         parent.columnconfigure(1, weight=1)

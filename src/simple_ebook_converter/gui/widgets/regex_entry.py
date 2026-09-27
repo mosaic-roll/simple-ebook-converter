@@ -19,7 +19,7 @@ r"""单行正则编辑框。
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ..fonts import font
 

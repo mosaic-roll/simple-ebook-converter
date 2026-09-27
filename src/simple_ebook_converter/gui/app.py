@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox
+
+import ttkbootstrap as ttk
 
 from ..core import pipeline
 from ..core.builder import builtin_css
@@ -49,7 +51,7 @@ from .tabs.basic import BasicTab
 from .tabs.identify import IdentifyTab
 from .tabs.replace import ReplaceTab
 from .tabs.typography import TypographyTab
-from .theme import border_color_supported
+
 from .widgets.scroll_frame import ScrollFrame
 from .widgets.status_bar import StatusBar
 from .widgets.toc_panel import TocPanel
@@ -105,7 +107,7 @@ class App(ttk.Frame):
         # 动作条在最上：生成是主要动作，放顶部比放底部好找
         self._build_actions()
 
-        panes = ttk.PanedWindow(self, orient="horizontal")
+        panes = ttk.Panedwindow(self, orient="horizontal")
         panes.pack(fill="both", expand=True, padx=s(8), pady=s(4))
 
         left = ttk.Frame(panes)
@@ -124,7 +126,7 @@ class App(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=s(8), pady=(s(8), s(4)))
         self.btn_generate = ttk.Button(
-            bar, text="生成 EPUB", style="Accent.TButton", command=self.generate
+            bar, text="生成 EPUB", bootstyle="primary", command=self.generate
         )
         self.btn_generate.pack(side="left")
         ttk.Button(bar, text="载入内置 CSS", command=self.dump_css).pack(
@@ -134,7 +136,7 @@ class App(ttk.Frame):
             side="left", padx=(s(4), 0)
         )
         self.v_font_note = tk.StringVar()
-        ttk.Label(bar, textvariable=self.v_font_note, style="Muted.TLabel").pack(side="right")
+        ttk.Label(bar, textvariable=self.v_font_note, bootstyle="secondary").pack(side="right")
 
     def _build_left(self, parent: ttk.Frame) -> None:
         notebook = ttk.Notebook(parent)
@@ -223,7 +225,6 @@ class App(ttk.Frame):
         self._temp_css: Path | None = None
         self._temp_toc: Path | None = None
         self.apply_settings(data)
-        self._probe_borders()
         self.v_font_note.set(f"界面字体：{actual_family('ui')}")
         self.status.set_detail("就绪")
         # 输入/输出路径**不存**（settings.py 的决定：换一本书就该重来），所以这里
@@ -233,13 +234,6 @@ class App(ttk.Frame):
             self.rescan()
         else:
             self._refresh_enabled()
-
-    def _probe_borders(self) -> None:
-        """红/黄框只 clam 支持。主题认不认 `bordercolor` 探一次，不认就只留文字提示。"""
-        if border_color_supported(self.root):
-            for key in ("basic", "typography"):
-                self.tabs[key].detect_border_support(self.root)
-        self.status.set_detail("")
 
     # ---------- 目录扫描 ----------
 
@@ -601,6 +595,20 @@ class App(ttk.Frame):
 
         threading.Thread(target=guarded, daemon=True).start()
 
+    def _cancel_debounce(self) -> None:
+        """取消还没触发的防抖重扫。
+
+        不取消的话，销毁窗口后那个 `after` 回调仍会触发，在已销毁的控件上
+        `input_row.get()` → `TclError: invalid command name …`。关窗和 `destroy()`
+        都要走这里。
+        """
+        if self._debounce_id is not None:
+            try:
+                self.root.after_cancel(self._debounce_id)
+            except tk.TclError:
+                pass
+            self._debounce_id = None
+
     def quit(self) -> None:
         if self.status.busy:
             if not messagebox.askyesno("还在生成", "正在生成中，确定退出？", parent=self.root):
@@ -608,7 +616,14 @@ class App(ttk.Frame):
         # 先停轮询：后台线程可能还在往队列里塞（daemon 线程随进程退出，
         # 但它仍可能在 root.destroy() 之后再 post 一次，那次 post 只是入队，
         # 没人执行 —— 排干净比留着强）。
+        self._cancel_debounce()
         self.main.stop()
         self._cleanup_temps()
         self._save_settings()
         self.root.destroy()
+
+    def destroy(self) -> None:
+        """测试常直接 `destroy()`，不走 `quit()` —— 防抖也得在这里取消。"""
+        self._cancel_debounce()
+        self.main.stop()
+        super().destroy()

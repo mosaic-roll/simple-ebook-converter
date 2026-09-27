@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ...core.config import LEVEL_PRESETS
 from ...core.options import option_default

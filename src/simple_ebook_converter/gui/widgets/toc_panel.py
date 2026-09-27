@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ..build_config_from_ui import TocSettings, entry_id
 from ..metrics import s, set_row_height
@@ -97,7 +97,7 @@ class TocPanel(ttk.Frame):
                 stretch=column is not TITLE,
             )
         # height 不设，交给 pack(expand=True)
-        set_row_height(ttk.Style(self), "Toc.Treeview", px=ROW_HEIGHT)
+        set_row_height("Toc.Treeview", px=ROW_HEIGHT)
 
         vbar = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vbar.set)

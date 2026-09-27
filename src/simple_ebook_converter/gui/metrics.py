@@ -102,7 +102,13 @@ def capture_scaling(root: tk.Misc) -> float:
     return _SCALE
 
 
-def set_row_height(style: ttk.Style, name: str, px: int) -> None:
+def set_row_height(name: str, px: int) -> None:
     """给某个 Treeview style 设行高（**必须显式设**，否则 150% 下字大了行没变高、
-    文字上下被裁）。`name` 是自定义 style 名，别改全局 `Treeview`。"""
-    style.configure(name, rowheight=s(px))
+    文字上下被裁）。`name` 是自定义 style 名，别改全局 `Treeview`。
+
+    这里用**朴素**的 `tkinter.ttk.Style` 而不是 `ttkbootstrap.Style`：
+    `ttkbootstrap.Style(root)` 的第一个参数是**主题名**，传 root 会当成主题名去查、
+    直接抛 TclError（而且 `ttkbootstrap.Style()` 不带主题会**重置**成默认主题）。
+    行高只是往 Tcl 的 style 数据库里写一个值，两者共用同一个数据库。
+    """
+    ttk.Style().configure(name, rowheight=s(px))

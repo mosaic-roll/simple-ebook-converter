@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import filedialog, ttk
+from tkinter import filedialog
+
+import ttkbootstrap as ttk
 
 from ..metrics import s
 from .path_entry import PathEntry
@@ -88,9 +90,6 @@ class PathRow(ttk.Frame):
 
     def set_state(self, state: str, message: str = "") -> None:
         self.entry.set_state(state, message)
-
-    def detect_border_support(self, root: tk.Misc) -> bool:
-        return self.entry.detect_border_support(root)
 
     # ---------- 事件 ----------
 

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+import ttkbootstrap as ttk
 
 from ..metrics import s
 from ..theme import COLORS
@@ -31,9 +31,9 @@ class StatusBar(ttk.Frame):
 
         self.bar = ttk.Progressbar(self, mode="determinate", length=s(160))
         self.bar.pack(side="left")
-        self.text = ttk.Label(self, text="就绪", style="Muted.TLabel")
+        self.text = ttk.Label(self, text="就绪", bootstyle="secondary")
         self.text.pack(side="left", padx=(s(8), 0))
-        self.detail = ttk.Label(self, text="", style="Muted.TLabel", foreground=COLORS["muted"])
+        self.detail = ttk.Label(self, text="", bootstyle="secondary", foreground=COLORS["muted"])
         self.detail.pack(side="right")
 
     # ---------- 状态 ----------

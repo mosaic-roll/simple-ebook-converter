@@ -8,6 +8,7 @@ dependencies = [
     "chardet>=7.6.0",
     "click>=8.5.0",
     "ebooklib>=0.20",
+    "ttkbootstrap>=2.2.3",
 ]
 
 [project.scripts]
