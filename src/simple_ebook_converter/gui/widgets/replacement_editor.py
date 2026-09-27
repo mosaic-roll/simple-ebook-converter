@@ -83,10 +83,10 @@ class ReplacementEditor(ttk.Frame):
         self.tree.pack(side="left", fill="both", expand=True)
         vbar.pack(side="right", fill="y")
 
-        self.tree.tag_configure("bad", foreground=COLORS["error"])
+        self.tree.tag_configure("bad", foreground="#c62828")
         self.tree.bind("<Double-1>", self._on_edit)
         self.tree.bind("<Delete>", self._on_delete)
-        self.hint = ttk.Label(self, text="", foreground=COLORS["error"])
+        self.hint = ttk.Label(self, text="", foreground="#c62828")
 
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)

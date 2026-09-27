@@ -21,7 +21,8 @@ from pathlib import Path
 
 import tkinter.ttk as ttk
 
-from ..theme import _ERROR_STYLE, _WARN_STYLE
+from ..theme import apply  # noqa: F401 - 确保主题被安装
+
 
 #: 校验结论
 OK, ERROR, WARN = "ok", "error", "warn"
@@ -63,13 +64,13 @@ class PathEntry(ttk.Entry):
     def set_state(self, state: str, message: str = "") -> None:
         """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。"""
         self._state = state
+        # sv_ttk 不提供自定义边框色，用文字提示代替
         if state == ERROR:
-            self.configure(style=_ERROR_STYLE)
+            self.hint.configure(text=message, foreground="#c62828")
         elif state == WARN:
-            self.configure(style=_WARN_STYLE)
+            self.hint.configure(text=message, foreground="#b26a00")
         else:
-            self.configure(style="")
-        self.hint.configure(text=message)
+            self.hint.configure(text=message, foreground="")
 
     def clear_message(self) -> None:
         self.hint.configure(text="")

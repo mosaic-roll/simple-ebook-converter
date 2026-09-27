@@ -126,7 +126,7 @@ class TocPanel(ttk.Frame):
         self.tree.pack(side="left", fill="both", expand=True)
         vbar.pack(side="right", fill="y")
 
-        self.tree.tag_configure(TAG_DELETED, foreground=COLORS["del"])
+        self.tree.tag_configure(TAG_DELETED, foreground="#9a9a9a")
         self.tree.bind("<Button-1>", self._on_click)
         self.set_result_column(None)  # 初始没有替换规则 → 结果列隐藏
 

@@ -64,7 +64,7 @@ class ExtraLevelsEditor(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
         ttk.Button(bar, text="添加", command=self.add, width=8).pack(side="left")
-        self.v_hint = ttk.Label(bar, text="", foreground=COLORS["error"])
+        self.v_hint = ttk.Label(bar, text="", foreground="#c62828")
         self.v_hint.pack(side="left", padx=(s(8), 0))
 
     # ---------- 值 ----------
