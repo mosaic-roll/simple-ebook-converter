@@ -433,6 +433,48 @@ def test_typography_tab_round_trip(tk_root) -> None:
     assert got.css_path == "a.css"
 
 
+def test_basic_tab_autofill_only_fills_empty_or_stale(tk_root) -> None:
+    """自动填充只碰「空的」或「仍等于上次自动值」的字段（设计 §7.4）。"""
+    tab = BasicTab(tk_root)
+    assert tab.autofill(
+        {"encoding": "gb18030", "title": "猜的书名", "author": "猜的作者", "out": "a.epub"}
+    )
+    assert tab.get().encoding == "gb18030"
+    assert tab.get().title == "猜的书名"
+    assert tab.get().out == "a.epub"
+
+    # 用户改了书名 → 再扫不许冲掉；输出仍是上次自动值 → 允许更新
+    tab._title.set("用户书名")
+    tab._field_changed("title")
+    tab.autofill({"title": "又一次猜测", "out": "b.epub"})
+    assert tab.get().title == "用户书名", "用户填的书名被自动填充覆盖了"
+    assert tab.get().out == "b.epub", "输出仍是上次自动值，应当允许更新"
+
+
+def test_basic_tab_autofill_does_not_clobber_manual_output(tk_root) -> None:
+    """非空且不等于上次自动值的输出路径，绝不覆盖（不管是不是通过 UI 改的）。"""
+    tab = BasicTab(tk_root)
+    tab.out_row.set("我选的输出.epub")
+    tab.autofill({"out": "自动推导.epub"})
+    assert tab.get().out == "我选的输出.epub"
+
+
+def test_basic_tab_explicit_auto_encoding_is_respected(tk_root) -> None:
+    """默认 `auto` 会被自动填充填成实际编码；用户**显式**选回 auto 则不许再动。
+
+    `auto` 是个非空串，光看值分不出「默认」还是「用户选的」——靠 `_touched` 区分。
+    """
+    tab = BasicTab(tk_root)
+    assert tab.get().encoding == "auto"
+    tab.autofill({"encoding": "gb18030"})
+    assert tab.get().encoding == "gb18030"
+
+    tab._encoding.set("auto")
+    tab._field_changed("encoding")  # 用户显式选回 auto
+    tab.autofill({"encoding": "utf-8"})
+    assert tab.get().encoding == "auto", "用户显式选的 auto 被自动填充覆盖了"
+
+
 def test_replace_tab_round_trip(tk_root) -> None:
     tab = ReplaceTab(tk_root)
     tab.set_rows([("a", "1", "原文"), ("b", "", "HTML")])

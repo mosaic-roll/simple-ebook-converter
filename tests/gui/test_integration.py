@@ -187,6 +187,44 @@ def test_generate_without_scan_falls_back_to_detection(app, tk_root, tmp_path) -
         assert any("toc" in n.lower() for n in zf.namelist()), "现场识别没生效，目录空了"
 
 
+def test_open_file_autofills_metadata_output_and_cover(app, tk_root, tmp_path) -> None:
+    """打开文件后：编码/输出/书名/作者/封面按 §7.4 自动填（core 支持的子集）。
+
+    日期与语言没有 core 来源，不填 —— 这条测试同时钉住「不去编造没有的值」。
+    """
+    src = tmp_path / "《三体》作者：刘慈欣.txt"
+    src.write_text(SAMPLE, encoding="gb18030")
+    (tmp_path / "cover.jpg").write_bytes(b"\xff\xd8\xff\xe0junk")
+
+    app.tabs["basic"].set_input(str(src))
+    app.rescan()
+    _pump(tk_root, lambda: not app.status.busy)
+
+    got = app.tabs["basic"].get()
+    assert got.encoding == "gb18030", "编码没按探测结果自动填"
+    assert got.out == str(tmp_path / "《三体》作者：刘慈欣.epub")
+    assert got.title == "三体", "书名没从文件名猜出来"
+    assert got.author == "刘慈欣"
+    assert got.cover == str(tmp_path / "cover.jpg"), "同目录封面没自动发现"
+
+
+def test_autofill_does_not_overwrite_user_edited_title(app, tk_root, tmp_path) -> None:
+    """用户改过书名后再重扫，不能被自动填充冲掉（dirty 规则）。"""
+    src = tmp_path / "《三体》作者：刘慈欣.txt"
+    src.write_text(SAMPLE, encoding="utf-8")
+
+    app.tabs["basic"].set_input(str(src))
+    app.rescan()
+    _pump(tk_root, lambda: not app.status.busy)
+    assert app.tabs["basic"].get().title == "三体"
+
+    app.tabs["basic"]._title.set("我自己的书名")
+    app.tabs["basic"]._field_changed("title")
+    app.rescan()
+    _pump(tk_root, lambda: not app.status.busy)
+    assert app.tabs["basic"].get().title == "我自己的书名"
+
+
 def test_busy_blocks_duplicate_generate(app, tk_root, tmp_path) -> None:
     """连点生成不排队，第二次直接忽略。"""
     _prepare(app, tmp_path)

@@ -296,24 +296,47 @@ class App(ttk.Frame):
             try:
                 resolved = pipeline.resolve(cfg)
                 lines, used = pipeline.read_input(resolved)
-                tree, stats = pipeline.scan_toc(lines, resolved)
+                tree, _stats = pipeline.scan_toc(lines, resolved)
                 entries = to_json(tree, resolved.toc_depth)
                 self.main.post(
-                    lambda: self._scan_done(entries, stats, used, resolved.title)
+                    lambda: self._scan_done(entries, used, resolved)
                 )
             except (ValueError, OSError) as exc:
                 self.main.post(lambda e=exc: self._scan_failed(e))
 
         self._run(work)
 
-    def _scan_done(self, entries, stats, used: str, title: str) -> None:
+    def _scan_done(self, entries, used: str, resolved) -> None:
         self._scan_running = False
         self._show_entries(entries)
-        # stats 的字段名直接来自 core.parser.ParseStats，这里只用三个已确认存在的
         self.status.ok(
             f"识别到 {len(entries)} 个标题",
-            f"编码 {used} · 书名 {title}",
+            f"编码 {used} · 书名 {resolved.title}",
         )
+        # **顺序要紧**：必须先 `status.ok()` 解冻左栏，再自动填充。
+        # 冻结期间控件的 `state` 是 disabled，而禁用的 ttk.Entry 会**静默忽略**
+        # `insert` —— 输出/封面这两个 PathRow 会填了个寂寞（靠 StringVar 活着的
+        # 那几个字段反倒正常，于是错误只表现成「路径没自动填」）。
+        self._autofill(resolved, used)
+
+    def _autofill(self, resolved, used: str) -> None:
+        """扫完按设计 §7.4 填输出路径/编码/书名/作者/封面。
+
+        日期与语言没有 core 来源，不填。这里填的就是 core 接下来会用的值 ——
+        显示出来是为了让用户在生成前看得见、改得动，而不是替他做决定：
+        `BasicTab.autofill` 只覆盖「空的」或「仍等于上次自动值」的字段。
+        """
+        source = resolved.input
+        desired: dict[str, str | None] = {
+            "out": str(Path(source).with_suffix(".epub")) if source else None,
+            "encoding": used,
+            "title": resolved.title or None,
+            "author": resolved.author or None,
+            "cover": str(resolved.cover) if resolved.cover else None,
+        }
+        if self.tabs["basic"].autofill(desired):
+            # 自动填只动基础页字段，不影响目录；重算按钮可用性即可，不必重扫
+            self._refresh_enabled()
 
     def _scan_failed(self, exc: Exception) -> None:
         self._scan_running = False
