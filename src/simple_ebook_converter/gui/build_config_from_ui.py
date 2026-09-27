@@ -63,15 +63,45 @@ class BasicValues:
 
 @dataclass
 class IdentifyValues:
-    """「识别」页签的字段。"""
+    """「识别」页签的字段。
+
+    额外层级有**两份**表示，用途不同，不能互相替代：
+
+    * `level_rows`：编辑器/设置文件用的行结构（`{h, class_name, regex}`），
+      能表达「这一行还没填完」；
+    * `level_specs`：交给 core 的 `hN[.class]:正则` 规格串。
+
+    只留后者会丢掉未填完的行，只留前者则每个调用点都得自己拼规格、拼错就是 core
+    静默忽略该层。`level_rows` 是真源，`level_specs` 由 `option_values()` 现拼。
+    """
 
     #: 层级名 → 正则。**三态**：`None` = 用户没动过（跟随 core 缺省）、
     #: `""` = 显式关闭该层级、非空 = 显式正则。语义见模块 docstring。
     levels: dict[str, str | None] = field(default_factory=dict)
-    #: `hN[.class]:正则` 规格列表，交给 core 的 `build_levels` 解析
-    level_specs: list[str] = field(default_factory=list)
+    #: 额外层级的行（真源）
+    level_rows: list[dict] = field(default_factory=list)
     max_title_len: int = 35
     preface_title: str = ""
+
+    @property
+    def level_specs(self) -> list[str]:
+        """把 `level_rows` 拼成 core 认的规格串。格式归 core 所有，**这里不拆开重组**。
+
+        `hN` + 可选 `.class` + 冒号 + 正则。冒号后整段都是正则，所以正则里可以自带
+        冒号（`h5:^a:b` 合法），不转义。跳过空正则的行：那等于「没填」，交给
+        `levels.build_levels` 当没配。
+        """
+        specs: list[str] = []
+        for row in self.level_rows:
+            regex = str(row.get("regex", "")).strip()
+            if not regex:
+                continue
+            head = f"h{row.get('h', '').lstrip('h')}"
+            class_name = str(row.get("class_name", "")).strip()
+            if class_name:
+                head = f"{head}.{class_name}"
+            specs.append(f"{head}:{regex}")
+        return specs
 
 
 @dataclass
@@ -115,18 +145,31 @@ class UiValues:
 
 
 def build_config_from_ui(values: UiValues) -> Config:
-    """界面原始值 → `Config`，出错抛 `ValueError`（消息可直接展示）。"""
-    return build_config(option_values(values, write_temp_css=_write_temp_css))
+    """界面原始值 → `Config`，出错抛 `ValueError`（消息可直接展示）。
+
+    **注意临时 CSS 的生命周期**：勾了 CSS 但只改了内联文本时，这里会落一个临时
+    文件。core 读它是在生成时（工作线程），所以这个文件**不能在返回前删** ——
+    生成的收尾处负责清理（`App._cleanup_temp_css`）。真要拿到那个路径去跟踪，
+    调 `option_values()` 自己传 `write_temp_css`。
+
+    这里**主动调 `validate()`**：`build_config()` 只翻译不校验（校验归
+    `pipeline.resolve()`，那是工作线程里跑）。界面上一个填错的日期如果等到工作
+    线程才报，用户看到的是「生成失败」而不是「日期格式错误」——问题定位从一行
+    消息变成一段排查。同步校验能在开线程之前就拦下并弹窗。
+    """
+    cfg = build_config(option_values(values, write_temp_css=write_temp_css))
+    cfg.validate()
+    return cfg
 
 
 def option_values(values: UiValues, *, write_temp_css=None) -> dict[str, Any]:
     """`UiValues` → `build_config()` 认的键名字典。
 
     `write_temp_css` 只在「勾了 CSS 且没给路径、只改了文本」时被调用，注入是为了
-    让测试不落盘。
+    让测试不落盘、以及让调用方跟踪临时文件的路径。
     """
     if write_temp_css is None:
-        write_temp_css = _write_temp_css
+        write_temp_css = globals()["write_temp_css"]
     out: dict[str, Any] = {}
 
     # ---- 基础 ----
@@ -196,12 +239,13 @@ def _add_css(out: dict[str, Any], typo: TypographyValues, write_temp_css) -> Non
         out[key] = str(write_temp_css(typo.css_text))
 
 
-def _write_temp_css(text: str) -> Path:
+def write_temp_css(text: str) -> Path:
     """把界面里编辑的 CSS 写到临时文件，返回路径。
 
     core 的一切都走文件，没有「一段 CSS 字符串」这个入口，所以界面上改完的文本必须
-    先落盘。文件在 core 读完之后由调用方负责清理（`NamedTemporaryFile(delete=False)`
-    才是对的：默认那种「退出即删」会把还没被 core 读的文件删掉）。
+    先落盘。**生命周期由调用方负责**：core 是在工作线程里才读它的，读完才能删。
+    用 `mkstemp` 而不是 `NamedTemporaryFile` —— 后者在 Windows 上不手动 close 就
+    无法再次打开，而 core 要用路径重新打开。
     """
     handle, name = tempfile.mkstemp(prefix="sec-style-", suffix=".css", text=True)
     with os.fdopen(handle, "w", encoding="utf-8") as fh:
