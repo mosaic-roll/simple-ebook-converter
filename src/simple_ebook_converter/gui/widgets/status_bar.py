@@ -1,7 +1,8 @@
 """状态栏：进度条 + 状态文字 + 忙时按钮禁用。
 
-**Tk 不是线程安全的**：后台线程不能碰任何控件，只能 `after()` 回主线程。本类只提供
-`begin/ok/fail` 三个入口，各自内部保证「状态更新」和「控件更新」在主线程上发生。
+只管**显示**。后台线程要回主线程更新界面，走 `mainthread.MainThread.post()` ——
+那不是本类的职责：状态栏没有任何东西是「线程相关的」，把它当线程跳板会让
+「谁在碰控件」这个问题变得更难回答。
 
 进度是**不确定态**（不确定时长的活给假百分比更糟）：用 `mode="indeterminate"` 起转、
 `stop()` 收，而不是 `value` 从 0 爬到 100。
@@ -67,14 +68,3 @@ class StatusBar(ttk.Frame):
         self.bar.stop()
         self.bar.configure(mode="determinate", value=0)
         self.text.configure(foreground="")
-
-    # ---------- 线程回调 ----------
-
-    def on_main(self, callback, delay_ms: int = 0) -> str:
-        """后台线程回到主线程的**唯一**入口。
-
-        Tk 不是线程安全的：后台线程碰控件会随机卡死或直接崩。收口到这一个方法，
-        比让每处自己 `root.after(0, ...)` 更难写错。
-        """
-        root = self.winfo_toplevel()
-        return root.after(delay_ms, callback) if delay_ms > 0 else root.after_idle(callback)

@@ -580,6 +580,70 @@ def test_app_rule_edits_refresh_preview_without_rescan(tk_root, monkeypatch) -> 
     app.destroy()
 
 
+def test_mainthread_dispatch_survives_real_worker_thread(tk_root) -> None:
+    """后台线程 post 的回调必须真的在主线程上跑起来。
+
+    这条是给 `MainThread` 存在本身一个理由：上一版 `StatusBar.on_main()` 直接在
+    worker 线程里 `root.after(...)`，而 **`after()` 本身就是一次 Tk 调用**，从非
+    主线程调会抛 `RuntimeError: main thread is not in main loop`。后果不是崩，
+    是重扫永远收不了尾 —— 状态栏 busy 卡在 True，界面看起来「一直在处理中」。
+    """
+    import threading
+    import time
+
+    from simple_ebook_converter.gui.mainthread import MainThread
+
+    dispatcher = MainThread(tk_root, poll_ms=5)
+    done = threading.Event()
+    ran_on: list[int] = []
+
+    def work() -> None:
+        def touch_widget() -> None:  # 真的碰一下控件：只允许在主线程发生
+            tk_root.winfo_exists()
+            ran_on.append(threading.get_ident())
+
+        dispatcher.post(touch_widget)
+        done.set()
+
+    thread = threading.Thread(target=work)
+    thread.start()
+    thread.join(timeout=5)
+    assert done.wait(timeout=5), "worker 线程没跑完"
+
+    deadline = time.time() + 5
+    while not ran_on and time.time() < deadline:
+        tk_root.update()
+        time.sleep(0.005)
+
+    dispatcher.stop()
+    assert ran_on, "回调从没被执行（旧的 root.after 写法会卡在这里）"
+    assert ran_on == [threading.get_ident()], "回调不在主线程上跑"
+
+
+def test_mainthread_survives_raising_callback(tk_root) -> None:
+    """一个坏回调不该让整个界面停止响应。"""
+    import time
+
+    from simple_ebook_converter.gui.mainthread import MainThread
+
+    dispatcher = MainThread(tk_root, poll_ms=5)
+    after_boom: list[bool] = []
+
+    def boom() -> None:
+        raise ValueError("故意炸")
+
+    dispatcher.post(boom)
+    dispatcher.post(lambda: after_boom.append(True))
+
+    deadline = time.time() + 5
+    while not after_boom and time.time() < deadline:
+        tk_root.update()
+        time.sleep(0.005)
+
+    dispatcher.stop()
+    assert after_boom, "前一个回调抛异常后，后面的没被执行（轮询死了）"
+
+
 def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> None:
     """用户自己选的 CSS 文件不能被当成临时文件删掉。"""
     import simple_ebook_converter.gui.app as app_mod

@@ -3,7 +3,7 @@
 ## 线程
 
 Tk **不是线程安全的**：任何控件只能在主线程上碰。读文件、扫目录、生成 EPUB 都在
-后台线程跑，算完 `StatusBar.on_main()` 回主线程更新界面。
+后台线程跑，算完经 `mainthread.MainThread.post()` 回主线程更新界面。
 
 **busy 期间不排队**：用户连点「生成」时第二次点击直接被忽略，不排队、不取消、
 不提示。理由是这些操作对同一份输入文件做的是同一件事，排队只会让用户以为程序
@@ -41,6 +41,7 @@ from .build_config_from_ui import (
     write_temp_css,
 )
 from .fonts import actual_family, font
+from .mainthread import MainThread
 from .metrics import s
 from .settings import Settings, load_settings, save_settings
 from .tabs.basic import BasicTab
@@ -69,6 +70,9 @@ class App(ttk.Frame):
         self._debounce_id: str | None = None
         self._toc_entries: list[dict] = []
         self._scan_running = False
+        #: 后台线程 → 主线程的唯一通道。必须在控件建好前就绪：控件构造过程里就
+        #: 可能触发一次后台任务。
+        self.main = MainThread(root)
         #: 界面还没建完时不响应「用户改了设置」。建控件本身就会触发 on_change
         #: （控件把变量填成缺省值 → trace 回调），那时 `self.status` 还不存在。
         self._ready = False
@@ -263,11 +267,11 @@ class App(ttk.Frame):
                 lines, used = pipeline.read_input(resolved)
                 tree, stats = pipeline.scan_toc(lines, resolved)
                 entries = to_json(tree, resolved.toc_depth)
-                self.status.on_main(
+                self.main.post(
                     lambda: self._scan_done(entries, stats, used, resolved.title)
                 )
             except (ValueError, OSError) as exc:
-                self.status.on_main(lambda e=exc: self._scan_failed(e))
+                self.main.post(lambda e=exc: self._scan_failed(e))
 
         self._run(work)
 
@@ -320,12 +324,12 @@ class App(ttk.Frame):
             try:
                 book = pipeline.read_book(cfg)
                 target = pipeline.write_epub(book)
-                self.status.on_main(lambda t=target: self._generate_ok(t))
+                self.main.post(lambda t=target: self._generate_ok(t))
             except (ValueError, OSError) as exc:
-                self.status.on_main(lambda e=exc: self._generate_failed(e))
+                self.main.post(lambda e=exc: self._generate_failed(e))
             finally:
                 # 临时 CSS 用完就删。它是每次生成新建的，不留会堆在 temp 里
-                self.status.on_main(self._cleanup_temp_css)
+                self.main.post(self._cleanup_temp_css)
 
         self._run(work)
 
@@ -450,7 +454,7 @@ class App(ttk.Frame):
             try:
                 work()
             except Exception as exc:  # noqa: BLE001 —— 后台线程不能把异常弹到 Tk
-                self.status.on_main(lambda e=exc: self.status.fail(f"出错了：{e}"))
+                self.main.post(lambda e=exc: self.status.fail(f"出错了：{e}"))
 
         threading.Thread(target=guarded, daemon=True).start()
 
@@ -458,6 +462,10 @@ class App(ttk.Frame):
         if self.status.busy:
             if not messagebox.askyesno("还在生成", "正在生成中，确定退出？", parent=self.root):
                 return
+        # 先停轮询：后台线程可能还在往队列里塞（daemon 线程随进程退出，
+        # 但它仍可能在 root.destroy() 之后再 post 一次，那次 post 只是入队，
+        # 没人执行 —— 排干净比留着强）。
+        self.main.stop()
         self._cleanup_temp_css()
         self._save_settings()
         self.root.destroy()
