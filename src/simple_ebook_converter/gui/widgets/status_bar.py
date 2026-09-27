@@ -18,11 +18,16 @@ from ..theme import COLORS
 
 
 class StatusBar(ttk.Frame):
-    """底部状态栏。`set_text()` 任何时候都能用，`begin()` 之后会顺带转进度条。"""
+    """底部状态栏。`set_text()` 任何时候都能用，`begin()` 之后会顺带转进度条。
 
-    def __init__(self, master: tk.Misc, **kwargs) -> None:
+    `on_busy_change(busy)` 在忙状态**每次翻转**后调用。App 用它统一刷新控件
+    可用性 —— 比在 `begin/ok/fail` 的每个调用点都记得手动刷一次可靠。
+    """
+
+    def __init__(self, master: tk.Misc, *, on_busy_change=None, **kwargs) -> None:
         super().__init__(master, **kwargs)
         self._busy = False
+        self._on_busy_change = on_busy_change
 
         self.bar = ttk.Progressbar(self, mode="determinate", length=s(160))
         self.bar.pack(side="left")
@@ -48,6 +53,7 @@ class StatusBar(ttk.Frame):
     def begin(self, message: str = "处理中…") -> None:
         """进入忙状态：进度条转起来，状态栏变忙。**`busy` 期间按钮应为 disabled。**"""
         self._busy = True
+        self._notify_busy()
         self.bar.configure(mode="indeterminate")
         self.bar.start(12)  # ms，12~15 是「明显在动但不闪」的区间
         self.set_text(message)
@@ -65,6 +71,11 @@ class StatusBar(ttk.Frame):
 
     def _finish(self) -> None:
         self._busy = False
+        self._notify_busy()
         self.bar.stop()
         self.bar.configure(mode="determinate", value=0)
         self.text.configure(foreground="")
+
+    def _notify_busy(self) -> None:
+        if self._on_busy_change is not None:
+            self._on_busy_change(self._busy)

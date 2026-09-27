@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import tkinter as tk
+
 import pytest
 from tkinter import ttk
 
@@ -670,6 +672,51 @@ def test_app_empty_state_disables_actions(tk_root, monkeypatch) -> None:
     app.tabs["basic"].set_input("")
     tk_root.update()
     assert str(app.btn_generate.cget("state")) == "disabled"
+    app.destroy()
+
+
+def test_app_freezes_and_restores_left_pane_exactly(tk_root, monkeypatch) -> None:
+    """忙时冻住左栏，解冻要**原样还原**，不能一律设回 normal。
+
+    一律 normal 会把 readonly 的下拉变成可编辑文本框，也会放开 CSS 在 none 模式下
+    本该禁用的路径/文本。所以断言冻结前后每个控件的 state 完全一致。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as app_settings
+
+    monkeypatch.setattr(app_settings, "load_settings", lambda: app_settings.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: app_settings.Settings())
+
+    app = app_mod.App(tk_root)
+    tk_root.update()
+
+    def snapshot():
+        found = {}
+
+        def walk(w):
+            if isinstance(
+                w,
+                (ttk.Button, ttk.Checkbutton, ttk.Radiobutton, ttk.Spinbox, ttk.Entry,
+                 ttk.Combobox, tk.Text),
+            ):
+                found[str(w)] = (w.winfo_class(), str(w.cget("state")))
+            for c in w.winfo_children():
+                walk(c)
+
+        walk(app._left_pane)
+        return found
+
+    before = snapshot()
+    assert any(cls == "TCombobox" and st == "readonly" for cls, st in before.values())
+
+    app.status.begin("模拟忙碌")  # 触发 on_busy_change → 冻结
+    tk_root.update()
+    during = snapshot()
+    assert all(st == "disabled" for _cls, st in during.values()), "忙时还有可用控件"
+
+    app.status.ok("收工")  # 解冻
+    tk_root.update()
+    assert snapshot() == before, "解冻没有原样还原控件状态"
     app.destroy()
 
 

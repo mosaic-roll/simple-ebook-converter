@@ -71,6 +71,8 @@ class App(ttk.Frame):
         self._debounce_id: str | None = None
         self._toc_entries: list[dict] = []
         self._scan_running = False
+        #: 忙时冻结左栏用：控件 → 冻结前的 state
+        self._frozen: dict = {}
         #: 后台线程 → 主线程的唯一通道。必须在控件建好前就绪：控件构造过程里就
         #: 可能触发一次后台任务。
         self.main = MainThread(root)
@@ -108,13 +110,14 @@ class App(ttk.Frame):
 
         left = ttk.Frame(panes)
         panes.add(left, weight=3)
+        self._left_pane = left
         self._build_left(left)
 
         right = ttk.Frame(panes)
         panes.add(right, weight=4)
         self._build_right(right)
 
-        self.status = StatusBar(self)
+        self.status = StatusBar(self, on_busy_change=lambda _busy: self._refresh_enabled())
         self.status.pack(fill="x", padx=s(8), pady=(0, s(6)))
 
     def _build_actions(self) -> None:
@@ -306,16 +309,61 @@ class App(ttk.Frame):
         self._refresh_enabled()
 
     def _refresh_enabled(self) -> None:
-        """按「有没有输入」决定哪些动作可用。
+        """按 `(有没有输入, busy)` 决定哪些控件可用。
 
         **每次都从头算，不记「上一次是什么状态」**：可用性是 `(has_input, busy)` 的
         纯函数，增量改状态迟早会在某条分支上留下残留（比如输入被清空后生成按钮
         还亮着，点下去只弹一句「缺少输入文件」）。
         """
         has_input = bool(self.tabs["basic"].input_row.get())
-        self.btn_generate.configure(state="normal" if has_input else "disabled")
+        busy = self.status.busy
+        active = has_input and not busy
+        self.btn_generate.configure(state="normal" if active else "disabled")
         # 目录面板的「重扫/导入/导出/深度/全选」在没有输入时都没意义
-        self.toc.set_enabled(has_input)
+        self.toc.set_enabled(active)
+        # 忙时冻住左栏：重扫/生成期间改识别设置没有意义，而 `_schedule_rescan`
+        # 反正也会把改动丢掉（busy 直接 return），不如让控件直接变灰说清楚。
+        self._set_pane_enabled(not busy)
+
+    def _set_pane_enabled(self, enabled: bool) -> None:
+        """冻结/解冻左栏。**解冻按冻结前记录的原状态还原，不是一律设回 normal。**
+
+        一律设回 `normal` 会把两种控件改坏：`readonly` 的下拉会变成可编辑文本框；
+        CSS 在 `none` 模式下该保持禁用的路径/文本也会被放开。所以冻结时先记下每个
+        控件的 `state`，解冻时原样写回。
+        """
+        if enabled:
+            for widget, state in self._frozen.items():
+                try:
+                    widget.configure(state=state)
+                except tk.TclError:
+                    pass  # 控件可能已经被销毁
+            self._frozen.clear()
+            return
+        if self._frozen:
+            return  # 已经冻住了：再记一次会把「已禁用」当原状态，解冻就还原不回来
+        self._collect_frozen(self._left_pane)
+
+    def _collect_frozen(self, widget: tk.Misc) -> None:
+        if isinstance(
+            widget,
+            (
+                ttk.Button,
+                ttk.Checkbutton,
+                ttk.Radiobutton,
+                ttk.Spinbox,
+                ttk.Entry,
+                ttk.Combobox,
+                tk.Text,
+            ),
+        ):
+            try:
+                self._frozen[widget] = str(widget.cget("state"))
+                widget.configure(state="disabled")
+            except tk.TclError:
+                pass
+        for child in widget.winfo_children():
+            self._collect_frozen(child)
 
     def _refresh_preview(self) -> None:
         """用 raw 阶段的替换规则刷新目录预览。"""
