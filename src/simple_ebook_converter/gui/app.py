@@ -166,7 +166,7 @@ class App(ttk.Frame):
         box.pack(fill="both", expand=True, pady=(s(4), 0))
         self.toc = TocPanel(
             box,
-            on_rescan=self.rescan,
+            on_rescan=self._rescan_clicked,
             on_import=self.import_toc,
             on_export=self.export_toc,
             on_setting_change=self._schedule_rescan,
@@ -178,8 +178,8 @@ class App(ttk.Frame):
     def _install_shortcuts(self) -> None:
         self.root.bind("<Control-o>", lambda _e: self._browse_input())
         self.root.bind("<Control-s>", lambda _e: self.generate())
-        self.root.bind("<Control-g>", lambda _e: self.rescan())
-        self.root.bind("<F5>", lambda _e: self.rescan())
+        self.root.bind("<Control-g>", lambda _e: self._rescan_clicked())
+        self.root.bind("<F5>", lambda _e: self._rescan_clicked())
 
     def _browse_input(self) -> None:
         path = filedialog.askopenfilename(
@@ -255,6 +255,24 @@ class App(ttk.Frame):
         if self._debounce_id is not None:
             self.root.after_cancel(self._debounce_id)
         self._debounce_id = self.root.after(RESCAN_DEBOUNCE_MS, self.rescan)
+
+    def _rescan_clicked(self) -> None:
+        """用户主动点「重扫」/F5/Ctrl-G 时走这里。
+
+        只有在**已经有划掉的条目**时才提示，且只说「可能被覆盖」：划掉是按
+        `起:止:raw_title` 记的，识别设置没变时重扫能原样保留；变了行号就会漂，
+        那些划掉就失效了。这里不替用户判断「这次会不会变」，那种判断做不到准，
+        做不准的提示等于误导。
+        """
+        deleted = self.toc.deleted_count()
+        if deleted and not messagebox.askyesno(
+            "重扫目录",
+            f"已有 {deleted} 个条目被划掉。重扫会重新识别目录，"
+            "如果识别设置变了，这些划掉可能失效。\n\n仍要重扫吗？",
+            parent=self.root,
+        ):
+            return
+        self.rescan()
 
     def rescan(self) -> None:
         """重扫目录。真正干活在后台线程。"""

@@ -720,6 +720,50 @@ def test_app_freezes_and_restores_left_pane_exactly(tk_root, monkeypatch) -> Non
     app.destroy()
 
 
+def test_rescan_asks_before_discarding_deletions(tk_root, monkeypatch) -> None:
+    """有划掉的条目时，主动重扫要先确认；没有时不打扰。"""
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+    app = app_mod.App(tk_root)
+
+    scans: list[bool] = []
+    monkeypatch.setattr(app_mod.App, "rescan", lambda self: scans.append(True))
+    prompts: list[bool] = []
+
+    monkeypatch.setattr(
+        app_mod.messagebox, "askyesno", lambda *a, **k: (prompts.append(True), False)[1]
+    )
+
+    # 没划掉任何东西 → 不弹窗，直接扫
+    app._rescan_clicked()
+    assert scans == [True]
+    assert prompts == []
+
+    # 划掉一条 → 弹窗；这里答「否」→ 不扫
+    entries = [
+        {"raw_title": "第一章", "level": 3, "class_name": "chapter", "lines": [1, 5]},
+        {"raw_title": "第二章", "level": 3, "class_name": "chapter", "lines": [6, 9]},
+    ]
+    app._show_entries(entries)
+    app.toc._set_deleted(app.toc.tree.get_children("")[0], True)
+    tk_root.update()
+    assert app.toc.deleted_count() == 1
+
+    scans.clear()
+    app._rescan_clicked()
+    assert prompts == [True], "有划掉的条目却没提示"
+    assert scans == [], "用户还没确认就扫了"
+
+    # 答「是」→ 扫
+    monkeypatch.setattr(app_mod.messagebox, "askyesno", lambda *a, **k: True)
+    app._rescan_clicked()
+    assert scans == [True]
+    app.destroy()
+
+
 def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> None:
     """用户自己选的 CSS 文件不能被当成临时文件删掉。"""
     import simple_ebook_converter.gui.app as app_mod
