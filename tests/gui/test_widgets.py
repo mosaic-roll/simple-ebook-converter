@@ -43,7 +43,7 @@ from simple_ebook_converter.gui.widgets.regex_entry import regex_entry
 from simple_ebook_converter.gui.widgets.replacement_editor import ReplacementEditor
 from simple_ebook_converter.gui.widgets.scroll_frame import BINDTAG, ScrollFrame
 from simple_ebook_converter.gui.widgets.status_bar import StatusBar
-from simple_ebook_converter.gui.widgets.toc_panel import RESULT, TocPanel
+from simple_ebook_converter.gui.widgets.toc_panel import CHECK, RESULT, TITLE, TocPanel
 
 
 # ---------- 字体 / 主题 ----------
@@ -379,6 +379,14 @@ def test_toc_panel_clamps_depth(tk_root) -> None:
 
 
 # ---------- 页签往返 ----------
+
+
+def test_toc_check_column_is_centered_and_narrow(tk_root) -> None:
+    """「启用」列要居中对齐、不参与拉伸，且明显窄于标题列。"""
+    panel = TocPanel(tk_root)
+    assert str(panel.tree.column(CHECK, "anchor")) == "center"
+    assert not bool(panel.tree.column(CHECK, "stretch"))
+    assert panel.tree.column(CHECK, "width") < panel.tree.column(TITLE, "width")
 
 
 def test_identify_tab_preserves_regex_whitespace(tk_root) -> None:

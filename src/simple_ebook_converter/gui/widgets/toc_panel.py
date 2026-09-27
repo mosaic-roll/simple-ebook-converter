@@ -28,9 +28,13 @@ CHECK, TITLE, RESULT = "check", "title", "result"
 
 #: 行高（设计稿像素）与三列的宽
 ROW_HEIGHT = 24
-COL_WIDTHS = {CHECK: 32, TITLE: 260, RESULT: 180}
-COL_MINWIDTHS = {CHECK: 32, TITLE: 120, RESULT: 100}
+COL_WIDTHS = {CHECK: 26, TITLE: 260, RESULT: 180}
+COL_MINWIDTHS = {CHECK: 26, TITLE: 120, RESULT: 100}
 HEADINGS = {CHECK: "启用", TITLE: "标题", RESULT: "替换后"}
+#: 勾选列居中；标题/结果左对齐
+COL_ANCHORS = {CHECK: "center", TITLE: "w", RESULT: "w"}
+#: 勾选列不吃拉伸（拉伸会让它变宽，占掉标题的位置）
+COL_STRETCH = {CHECK: False, TITLE: True, RESULT: True}
 
 #: 「已划掉」用的行 tag。不用删除线（`tag_configure(font=…)` 被忽略），用灰前景 + 空 check
 TAG_DELETED = "deleted"
@@ -110,12 +114,13 @@ class TocPanel(ttk.Frame):
             style="Toc.Treeview",
         )
         for column in (CHECK, TITLE, RESULT):
-            self.tree.heading(column, text=HEADINGS[column])
+            self.tree.heading(column, text=HEADINGS[column], anchor=COL_ANCHORS[column])
             self.tree.column(
                 column,
                 width=s(COL_WIDTHS[column]),
                 minwidth=s(COL_MINWIDTHS[column]),
-                stretch=column is not TITLE,
+                anchor=COL_ANCHORS[column],
+                stretch=COL_STRETCH[column],
             )
         # height 不设，交给 pack(expand=True)
         set_row_height("Toc.Treeview", px=ROW_HEIGHT)
