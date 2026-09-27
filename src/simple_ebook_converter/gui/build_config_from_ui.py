@@ -26,6 +26,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -144,16 +145,27 @@ class UiValues:
     rules: list[tuple[str, str, str]] = field(default_factory=list)
 
 
-def build_config_from_ui(values: UiValues, *, write_temp_css=None) -> Config:
+def build_config_from_ui(
+    values: UiValues,
+    *,
+    write_temp_css=None,
+    toc_entries: list[dict] | None = None,
+    write_temp_toc=None,
+) -> Config:
     """界面原始值 → `Config`，出错抛 `ValueError`（消息可直接展示）。
 
-    **注意临时 CSS 的生命周期**：勾了 CSS 但只改了内联文本时，这里会落一个临时
-    文件。core 读它是在生成时（工作线程），所以这个文件**不能在返回前删** ——
-    生成的收尾处负责清理（`App._cleanup_temp_css`）。
+    **注意两个临时文件的生命周期**：内联 CSS 和界面里编辑过的目录树都要先落盘
+    （core 只有文件入口，没有「一段字符串」这种入口）。core 是在工作线程里才读
+    它们的，所以**不能在返回前删** —— 生成的收尾处负责清理。
 
-    所以 `write_temp_css` 是可注入的：调用方（App）传一个自己包过的版本，把落盘
-    路径记下来，生成完才能删。不注入的话调用方拿不到那个路径，只能看着临时文件
-    一份份堆在 temp 里 —— 这就是它做成参数而不是内部细节的原因。
+    所以 `write_temp_css` / `write_temp_toc` 都是可注入的：调用方（App）传自己包
+    过的版本，把落盘路径记下来，生成完才能删。不注入的话调用方拿不到路径，只能
+    看着临时文件一份份堆在 temp 里。
+
+    `toc_entries` 给 `None` = **不用目录树文件**，让 core 从正则现场识别；给了
+    列表（含 `deleted` 标记）就写成 `cfg.toc_file`。`None` 与 `[]` 的区别是**有意
+    的**：`[]` 表示「用户把条目全删了，就要一本没目录的书」，`None` 表示「还没扫过，
+    按常规流程识别」——两者都写成空文件的话，没扫过的用户会得到一本空目录的书。
 
     这里**主动调 `validate()`**：`build_config()` 只翻译不校验（校验归
     `pipeline.resolve()`，那是工作线程里跑）。界面上一个填错的日期如果等到工作
@@ -162,7 +174,11 @@ def build_config_from_ui(values: UiValues, *, write_temp_css=None) -> Config:
     """
     if write_temp_css is None:
         write_temp_css = globals()["write_temp_css"]
+    if write_temp_toc is None:
+        write_temp_toc = globals()["write_temp_toc"]
     cfg = build_config(option_values(values, write_temp_css=write_temp_css))
+    if toc_entries is not None:
+        cfg.toc_file = write_temp_toc(toc_entries)
     cfg.validate()
     return cfg
 
@@ -255,6 +271,22 @@ def write_temp_css(text: str) -> Path:
     handle, name = tempfile.mkstemp(prefix="sec-style-", suffix=".css", text=True)
     with os.fdopen(handle, "w", encoding="utf-8") as fh:
         fh.write(text)
+    return Path(name)
+
+
+def write_temp_toc(entries: list[dict]) -> Path:
+    """把界面里编辑过的目录树写到临时文件，返回路径。
+
+    形状就是 `core.toc.to_json()` 的产出（也是 `--toc-file` 期望的形状）：
+    `raw_title` / `level` / `class_name` / `lines`，可选 `deleted`。
+    `TocPanel.toc_entries_with_flags()` 直接产出这个形状，这里不重新拼 ——
+    重拼一次就多一处能跟 core 对不上的地方。
+
+    **生命周期由调用方负责**，理由同 `write_temp_css`：core 在工作线程里才读。
+    """
+    handle, name = tempfile.mkstemp(prefix="sec-toc-", suffix=".json", text=True)
+    with os.fdopen(handle, "w", encoding="utf-8") as fh:
+        json.dump(entries, fh, ensure_ascii=False)
     return Path(name)
 
 

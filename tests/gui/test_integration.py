@@ -148,6 +148,45 @@ def test_replacement_rules_reach_the_generated_book(app, tk_root, tmp_path) -> N
     assert "第二章" in body
 
 
+def test_deleted_toc_entry_is_left_out_of_the_book(app, tk_root, tmp_path) -> None:
+    """在目录面板里划掉的条目，生成时必须真的不出现在书里。
+
+    这是右栏存在的意义。修之前 core 会现场重新识别，面板上的删除/取消勾选
+    全部白做 —— 那一栏就只是个好看的预览。
+    """
+    _prepare(app, tmp_path)
+    app.rescan()
+    _pump(tk_root, lambda: not app.status.busy)
+
+    ids = app.toc.tree.get_children("")
+    assert len(ids) == 2
+    app.toc._set_deleted(ids[0], True)  # 划掉第一章
+    tk_root.update()
+    assert app.toc.deleted_count() == 1
+
+    app.generate()
+    _pump(tk_root, lambda: not app.status.busy)
+
+    with zipfile.ZipFile(tmp_path / "book.epub") as zf:
+        body = b"".join(
+            zf.read(n) for n in zf.namelist() if n.lower().endswith((".ncx", ".xhtml", ".html"))
+        ).decode("utf-8")
+    assert "第一章" not in body, "划掉的条目标题还是进了书（面板删除在生成时被忽略）"
+    assert "第二章" in body
+
+
+def test_generate_without_scan_falls_back_to_detection(app, tk_root, tmp_path) -> None:
+    """没扫过就点生成，不能让 core 去读一个空的目录树文件（那会得到没目录的书）。"""
+    _prepare(app, tmp_path)
+    assert app._toc_entries == []  # 确实没扫过
+
+    app.generate()
+    _pump(tk_root, lambda: not app.status.busy)
+
+    with zipfile.ZipFile(tmp_path / "book.epub") as zf:
+        assert any("toc" in n.lower() for n in zf.namelist()), "现场识别没生效，目录空了"
+
+
 def test_busy_blocks_duplicate_generate(app, tk_root, tmp_path) -> None:
     """连点生成不排队，第二次直接忽略。"""
     _prepare(app, tmp_path)

@@ -39,6 +39,7 @@ from .build_config_from_ui import (
     build_config_from_ui,
     preview_replacements,
     write_temp_css,
+    write_temp_toc,
 )
 from .fonts import actual_family, font
 from .mainthread import MainThread
@@ -214,7 +215,10 @@ class App(ttk.Frame):
 
     def _load(self) -> None:
         data = load_settings()
+        # 两个临时文件的账本：内联 CSS 一份、目录树一份。只有路径，内容由
+        # build_config_from_ui 落盘；谁建的谁记，生成收尾统一删。
         self._temp_css: Path | None = None
+        self._temp_toc: Path | None = None
         self.apply_settings(data)
         self._probe_borders()
         self.v_font_note.set(f"界面字体：{actual_family('ui')}")
@@ -315,7 +319,9 @@ class App(ttk.Frame):
         """生成 EPUB。**busy 时直接返回**，不排队。"""
         if self.status.busy:
             return
-        cfg = self._try_config()
+        # **带上目录面板的编辑**（勾选/删除）。不带的话 core 会现场重新识别，
+        # 用户在右栏删掉的条目、取消的勾选全部白做 —— 那一栏就只是个预览。
+        cfg = self._try_config(include_toc=True)
         if cfg is None:
             return
         self.status.begin("正在生成…")
@@ -328,8 +334,8 @@ class App(ttk.Frame):
             except (ValueError, OSError) as exc:
                 self.main.post(lambda e=exc: self._generate_failed(e))
             finally:
-                # 临时 CSS 用完就删。它是每次生成新建的，不留会堆在 temp 里
-                self.main.post(self._cleanup_temp_css)
+                # 临时文件用完就删。它们是每次生成新建的，不留会堆在 temp 里
+                self.main.post(self._cleanup_temps)
 
         self._run(work)
 
@@ -342,13 +348,23 @@ class App(ttk.Frame):
         self.status.fail(f"生成失败：{exc}")
 
     def _cleanup_temp_css(self) -> None:
-        path, self._temp_css = self._temp_css, None
+        """丢掉临时 CSS。保留这个名字是因为它是外部（测试）看得到的契约。"""
+        self._cleanup_one("_temp_css")
+
+    def _cleanup_one(self, attr: str) -> None:
+        path = getattr(self, attr)
+        setattr(self, attr, None)
         if path is None:
             return
         try:
             Path(path).unlink(missing_ok=True)
         except OSError:
             pass  # 删不掉临时文件不是用户该操心的事
+
+    def _cleanup_temps(self) -> None:
+        """两个临时文件一起清。生成收尾和退出都走这里。"""
+        self._cleanup_temp_css()
+        self._cleanup_one("_temp_toc")
 
     # ---------- 导出 ----------
 
@@ -409,10 +425,23 @@ class App(ttk.Frame):
 
     # ---------- 配置 ----------
 
-    def _try_config(self):
-        """当前界面值 → `Config`。出错弹窗并返回 `None`（不抛出到 Tk 回调外）。"""
+    def _try_config(self, *, include_toc: bool = False):
+        """当前界面值 → `Config`。出错弹窗并返回 `None`（不抛出到 Tk 回调外）。
+
+        `include_toc=True` 才把目录面板的编辑写进 `cfg.toc_file`。**重扫必须走
+        默认的 `False`**：重扫的目的是重新识别，带上目录树文件等于告诉 core
+        「别识别，用我给的」，那就是自己扫自己，永远看不到识别设置的改动。
+        """
+        entries = None
+        if include_toc and self._toc_entries:
+            entries = self.toc.toc_entries_with_flags()
         try:
-            return build_config_from_ui(self.collect(), write_temp_css=self._track_temp_css)
+            return build_config_from_ui(
+                self.collect(),
+                write_temp_css=self._track_temp_css,
+                toc_entries=entries,
+                write_temp_toc=self._track_temp_toc,
+            )
         except ValueError as exc:
             self.status.fail(f"参数有误：{exc}")
             messagebox.showerror("参数有误", str(exc), parent=self.root)
@@ -425,9 +454,15 @@ class App(ttk.Frame):
         「模式开了且没给路径」就落文件），不删就在 temp 里一份份堆。busy 期间不排
         重扫，所以生成途中不会有人把这个路径换掉。
         """
-        self._cleanup_temp_css()
+        self._cleanup_one("_temp_css")
         self._temp_css = write_temp_css(text)
         return self._temp_css
+
+    def _track_temp_toc(self, entries: list[dict]) -> Path:
+        """同上，目录树文件的记账回调。"""
+        self._cleanup_one("_temp_toc")
+        self._temp_toc = write_temp_toc(entries)
+        return self._temp_toc
 
     def _save_settings(self) -> None:
         values = self.collect()
@@ -466,6 +501,6 @@ class App(ttk.Frame):
         # 但它仍可能在 root.destroy() 之后再 post 一次，那次 post 只是入队，
         # 没人执行 —— 排干净比留着强）。
         self.main.stop()
-        self._cleanup_temp_css()
+        self._cleanup_temps()
         self._save_settings()
         self.root.destroy()

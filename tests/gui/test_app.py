@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -18,10 +19,12 @@ from simple_ebook_converter.gui.build_config_from_ui import (
     TocSettings,
     TypographyValues,
     UiValues,
+    build_config_from_ui,
     entry_id,
     option_values,
     preview_replacements,
     write_temp_css,
+    write_temp_toc,
 )
 
 
@@ -81,6 +84,61 @@ def test_temp_css_is_written_readable_and_later_deletable() -> None:
         assert path.read_text(encoding="utf-8") == "p{color:red}"
     finally:
         path.unlink(missing_ok=True)
+
+
+# ---------- 目录树临时文件 ----------
+
+
+def test_toc_entries_become_cfg_toc_file() -> None:
+    """目录面板的编辑要落成 `cfg.toc_file`，否则右栏的勾选/删除在生成时全白做。"""
+    written: list[Path] = []
+
+    def fake_write(entries: list[dict]) -> Path:
+        path = write_temp_toc(entries)
+        written.append(path)
+        return path
+
+    entries = [
+        {"raw_title": "第一章", "level": 3, "class_name": "chapter", "lines": [1, 5]},
+        {
+            "raw_title": "第二章",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [6, 9],
+            "deleted": True,
+        },
+    ]
+    try:
+        cfg = build_config_from_ui(UiValues(), toc_entries=entries, write_temp_toc=fake_write)
+        assert cfg.toc_file is not None
+        assert json.loads(cfg.toc_file.read_text(encoding="utf-8")) == entries
+    finally:
+        for path in written:
+            path.unlink(missing_ok=True)
+
+
+def test_toc_entries_none_means_let_core_detect() -> None:
+    """`None`（还没扫过）不能写成空目录树文件，否则会得到一本没目录的书。"""
+    cfg = build_config_from_ui(UiValues(), toc_entries=None)
+    assert cfg.toc_file is None
+
+
+def test_toc_entries_empty_list_is_a_real_choice() -> None:
+    """`[]`（用户把条目全删了）与 `None`（没扫过）**不是**一件事。"""
+    written: list[Path] = []
+
+    def fake_write(entries: list[dict]) -> Path:
+        path = write_temp_toc(entries)
+        written.append(path)
+        return path
+
+    try:
+        cfg = build_config_from_ui(UiValues(), toc_entries=[], write_temp_toc=fake_write)
+        assert cfg.toc_file is not None, "空列表被当成了 None，用户的删除白做"
+        assert json.loads(cfg.toc_file.read_text(encoding="utf-8")) == []
+    finally:
+        for path in written:
+            path.unlink(missing_ok=True)
 
 
 def test_temp_css_lands_in_temp_dir() -> None:
