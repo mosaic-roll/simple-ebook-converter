@@ -106,6 +106,8 @@ class App(ttk.Frame):
 
         # 动作条在最上：生成是主要动作，放顶部比放底部好找
         self._build_actions()
+        # 状态栏铺满整宽放在最底，两栏的底边因此齐平
+        self._build_status()
 
         panes = ttk.Panedwindow(self, orient="horizontal")
         panes.pack(fill="both", expand=True, padx=s(8), pady=s(4))
@@ -120,11 +122,10 @@ class App(ttk.Frame):
         self._build_right(right)
 
     def _build_actions(self) -> None:
-        """顶部动作条：左边主操作，右边状态行。
+        """顶部动作条：左边主操作，右边亮点/暗切换。
 
-        不再放「载入内置 CSS」「导出目录 JSON」两个按钮：前者和排版页里的「载入
-        内置模板」重复，后者和目录面板工具条里的「导出」重复。状态行也从原来的
-        底部搬到这里 —— 没有进度条要显示，单独占一条底栏只为了几行字不划算。
+        状态行不在这里 —— 它铺满整宽放在**最底部**（`_build_status`），这样左右两栏
+        的底边才是齐的；目录条目数仍在右栏底部右对齐（那是目录面板的一部分）。
         """
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=s(8), pady=(s(8), s(4)))
@@ -132,14 +133,19 @@ class App(ttk.Frame):
             bar, text="生成 EPUB", command=self.generate
         )
         self.btn_generate.pack(side="left")
-        # 亮/暗切换。文字标出「点了会切到哪」，而不是当前模式
+        # 文字标出**当前**主题，和界面观感一致
         self.btn_theme = ttk.Button(bar, text=self._theme_button_text(), command=self._toggle_theme)
-        self.btn_theme.pack(side="right", padx=(s(8), 0))
+        self.btn_theme.pack(side="right")
+
+    def _build_status(self) -> None:
+        """底部状态栏：整宽一行，位于左右两栏下方。"""
+        bar = ttk.Frame(self)
+        bar.pack(side="bottom", fill="x", padx=s(8), pady=(s(2), s(6)))
         self.status = StatusBar(bar, on_busy_change=lambda _busy: self._refresh_enabled())
-        self.status.pack(side="right", fill="x", expand=True, padx=(s(12), 0))
+        self.status.pack(fill="x")
 
     def _theme_button_text(self) -> str:
-        return "浅色" if theme.mode() == theme.DARK else "深色"
+        return "浅色" if theme.mode() == theme.LIGHT else "深色"
 
     def _toggle_theme(self) -> None:
         theme.toggle(self.root)

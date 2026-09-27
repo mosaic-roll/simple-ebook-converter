@@ -97,28 +97,40 @@ class ReplacementEditor(ttk.Frame):
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
-        ttk.Button(bar, text="添加", width=8, command=self.add).pack(side="left")
-        ttk.Button(bar, text="删除", width=8, command=self.remove_selected).pack(
-            side="left", padx=(s(4), 0)
-        )
-        ttk.Button(bar, text="上移", width=8, command=lambda: self.move_selected(-1)).pack(
-            side="left", padx=(s(4), 0)
-        )
-        ttk.Button(bar, text="下移", width=8, command=lambda: self.move_selected(1)).pack(
-            side="left", padx=(s(4), 0)
-        )
-        ttk.Button(bar, text="导入", width=8, command=self.import_json).pack(
-            side="left", padx=(s(12), 0)
-        )
-        ttk.Button(bar, text="导出", width=8, command=self.export_json).pack(
-            side="left", padx=(s(4), 0)
-        )
-        # 阶段说明常驻：html 阶段的行为和 raw 差很多，值得常驻而不是塞进帮助
-        ttk.Label(
+        # 按钮分两行：六个一行在窄栏里放不下，最右边的「导出」会被挤出可视区
+        row1 = ttk.Frame(bar)
+        row1.pack(fill="x")
+        for text, command in (
+            ("添加", self.add),
+            ("删除", self.remove_selected),
+            ("上移", lambda: self.move_selected(-1)),
+            ("下移", lambda: self.move_selected(1)),
+        ):
+            ttk.Button(row1, text=text, width=6, command=command).pack(
+                side="left", padx=(0, s(4))
+            )
+
+        row2 = ttk.Frame(bar)
+        row2.pack(fill="x", pady=(s(4), 0))
+        for text, command in (("导入", self.import_json), ("导出", self.export_json)):
+            ttk.Button(row2, text=text, width=6, command=command).pack(
+                side="left", padx=(0, s(4))
+            )
+
+        # 阶段说明常驻：html 阶段的行为和 raw 差很多，值得常驻而不是塞进帮助。
+        # 独占一行并按可用宽度折行，免得在窄栏里把整行撑出可视区。
+        self._stage_hint = ttk.Label(
             bar,
             text="「HTML」阶段匹配转义后的标题，可塞 <span> 之类标签",
-        ).pack(side="left", padx=(s(12), 0))
+        )
+        self._stage_hint.pack(anchor="w", fill="x", pady=(s(4), 0))
+        self._stage_hint.bind("<Configure>", self._wrap_stage_hint)
+
         self.hint.pack(anchor="w", pady=(s(4), 0))
+
+    def _wrap_stage_hint(self, event: tk.Event) -> None:
+        if event.width and self._stage_hint.cget("wraplength") != event.width:
+            self._stage_hint.configure(wraplength=event.width)
 
     # ---------- 值 ----------
 
@@ -180,9 +192,9 @@ class ReplacementEditor(ttk.Frame):
         if not 0 <= target < len(iids):
             return False
         moved = iids[index]
-        self.tree.detach(moved)
-        # insert 的位置按「插入到兄弟中的第几个」计，detach 之后要减一才落在原位
-        self.tree.insert("", target - (1 if delta < 0 else 0), iid=moved)
+        # 用 `Treeview.move()`，不要 detach + insert：detach 后 item id 仍在，
+        # 再用同一个 id insert 会抛 `Item X already exists`，行就「消失」了。
+        self.tree.move(moved, "", target)
         self.tree.selection_set(moved)
         self.tree.see(moved)
         self._changed()

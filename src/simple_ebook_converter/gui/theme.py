@@ -25,7 +25,7 @@ from collections.abc import Callable
 
 import sv_ttk
 
-from .fonts import SMALL_SIZE, TITLE_SIZE, UI_SIZE, actual_family, font
+from .fonts import TITLE_SIZE, UI_SIZE, actual_family, font
 
 #: 支持的 sv_ttk 主题
 LIGHT = "light"
@@ -58,7 +58,8 @@ _SV_FONTS: dict[str, tuple[int, str]] = {
     "SunValleyBodyFont": (UI_SIZE, ""),
     "SunValleyBodyStrongFont": (UI_SIZE, "bold"),
     "SunValleyBodyLargeFont": (TITLE_SIZE, ""),
-    "SunValleyCaptionFont": (SMALL_SIZE, ""),
+    # 表头（Treeview Heading）与分组框标题都用它；原先比正文还小，调到和正文一致
+    "SunValleyCaptionFont": (UI_SIZE, ""),
 }
 
 #: 当前模式。由 `apply()` / `set_mode()` 维护，`colors()` 据此取色。

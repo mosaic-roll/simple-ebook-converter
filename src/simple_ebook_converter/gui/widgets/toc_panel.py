@@ -72,23 +72,28 @@ class TocPanel(ttk.Frame):
     # ---------- 布局 ----------
 
     def _build_toolbar(self) -> None:
+        # 两行：一行放不下的控件在窄栏里会被挤出右边缘，分两行留出余量。
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(0, s(4)))
+
+        row1 = ttk.Frame(bar)
+        row1.pack(fill="x")
         for text, command in (("重扫", self.on_rescan), ("导入", self.on_import), ("导出", self.on_export)):
-            ttk.Button(bar, text=text, command=command or (lambda: None)).pack(side="left")
-
+            ttk.Button(row1, text=text, command=command or (lambda: None)).pack(
+                side="left", padx=(0, s(4))
+            )
         self.v_all = tk.BooleanVar(value=False)
-        self.cb_all = ttk.Checkbutton(bar, text="全部启用", variable=self.v_all, command=self._toggle_all)
-        self.cb_all.pack(side="left", padx=(s(12), 0))
+        self.cb_all = ttk.Checkbutton(
+            row1, text="全部启用", variable=self.v_all, command=self._toggle_all
+        )
+        self.cb_all.pack(side="left", padx=(s(8), 0))
 
-        # 目录深度 / 书页含目录放工具条**右侧**（原先在面板底部）。移到这里后目录
-        # 面板底部只剩表格本身，左右两栏的底边就齐了。
-        right = ttk.Frame(bar)
-        right.pack(side="right")
-        ttk.Label(right, text="目录深度").pack(side="left")
+        row2 = ttk.Frame(bar)
+        row2.pack(fill="x", pady=(s(4), 0))
+        ttk.Label(row2, text="目录深度").pack(side="left")
         self.v_depth = tk.IntVar(value=6)
         ttk.Spinbox(
-            right,
+            row2,
             from_=DEPTH_RANGE[0],
             to=DEPTH_RANGE[1],
             width=4,
@@ -98,7 +103,7 @@ class TocPanel(ttk.Frame):
 
         self.v_in_spine = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            right, text="书页含目录", variable=self.v_in_spine, command=self._settings_changed
+            row2, text="书页含目录", variable=self.v_in_spine, command=self._settings_changed
         ).pack(side="left")
 
     def _build_tree(self) -> None:

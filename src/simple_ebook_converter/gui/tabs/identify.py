@@ -46,6 +46,13 @@ class IdentifyTab(ttk.Frame):
     ) -> None:
         super().__init__(master, **kwargs)
         self.on_change = on_change
+        #: 建立界面期间挂起：子控件初始化时的 `_changed` 不是用户改动
+        self._suspend = True
+        #: 有没有尚未应用的改动。改动只置脏，点「应用」才真正重扫目录
+        self._dirty = False
+        #: 未应用提示文字。**建得早**：子控件（额外层级编辑器）构造时就会触发
+        #: `_changed`，那时若还没这个变量就会 AttributeError。
+        self.v_dirty = tk.StringVar(value="")
 
         wrap = ScrollFrame(self)
         wrap.pack(fill="both", expand=True)
@@ -93,6 +100,16 @@ class IdentifyTab(ttk.Frame):
         ttk.Entry(bottom, textvariable=self._preface, width=16).pack(side="left", padx=(s(4), 0))
         self._preface.trace_add("write", lambda *_: self._changed())
 
+        # 识别设置**不即时重扫**：改一条正则就整本重读一遍代价太大。攒到点「应用」
+        # 再扫，旁边一行字提示还有未应用的改动。
+        actions = ttk.Frame(body)
+        actions.pack(fill="x", pady=(s(10), 0))
+        # 按钮先占右边：提示文字可长可短，别把按钮挤出可视区
+        self.btn_apply = ttk.Button(actions, text="应用", command=self._apply)
+        self.btn_apply.pack(side="right")
+        ttk.Label(actions, textvariable=self.v_dirty).pack(side="left")
+
+        self._suspend = False
         wrap.retag_all()
 
     # ---------- 值 ----------
@@ -106,22 +123,27 @@ class IdentifyTab(ttk.Frame):
         )
 
     def set(self, values: IdentifyValues) -> None:
-        for name, (enabled, pattern) in self._levels.items():
-            given = values.levels.get(name)
-            if given is None:
-                # 跟随 core 缺省：勾上、框里显示缺省正则，**但标记为未动过**。
-                # 框里看得见的内容只是给人参考，不该被当成用户填的值发出去。
-                enabled.set(True)
-                pattern.set(str(option_default(_option(name))))
-                self._touched[name] = False
-            else:
-                # 非空 = 启用（用户显式给了正则）；空串 = 显式关闭
-                enabled.set(bool(given))
-                pattern.set(given)
-                self._touched[name] = True
-        self.extra.set([dict(row) for row in values.level_rows])
-        self._max_len.set(values.max_title_len)
-        self._preface.set(values.preface_title)
+        self._suspend = True
+        try:
+            for name, (enabled, pattern) in self._levels.items():
+                given = values.levels.get(name)
+                if given is None:
+                    # 跟随 core 缺省：勾上、框里显示缺省正则，**但标记为未动过**。
+                    # 框里看得见的内容只是给人参考，不该被当成用户填的值发出去。
+                    enabled.set(True)
+                    pattern.set(str(option_default(_option(name))))
+                    self._touched[name] = False
+                else:
+                    # 非空 = 启用（用户显式给了正则）；空串 = 显式关闭
+                    enabled.set(bool(given))
+                    pattern.set(given)
+                    self._touched[name] = True
+            self.extra.set([dict(row) for row in values.level_rows])
+            self._max_len.set(values.max_title_len)
+            self._preface.set(values.preface_title)
+        finally:
+            self._suspend = False
+        self._clear_dirty()
 
     def _levels_state(self) -> dict[str, str | None]:
         """收集三态。
@@ -157,7 +179,7 @@ class IdentifyTab(ttk.Frame):
     def _level_row(
         self, parent: ttk.Frame, name: str, label: str, row: int
     ) -> tuple[tk.BooleanVar, tk.StringVar]:
-        """一行：启用勾选 + 正则框 + 恢复缺省。返回 (启用变量, 正则变量)。"""
+        """一行：启用勾选 + 正则框 + 恢复默认。返回 (启用变量, 正则变量)。"""
         frame = ttk.Frame(parent)
         frame.grid(row=row, column=0, sticky="ew", pady=(0, s(4)))
         parent.columnconfigure(0, weight=1)
@@ -170,16 +192,18 @@ class IdentifyTab(ttk.Frame):
         box.pack(side="left")
 
         pattern = tk.StringVar(value=default)
+        # **先放「恢复默认」再放正则框**：正则框 `fill=x, expand`，pack 会把空间
+        # 优先给它、把后放的控件挤出可视区。按钮先占住右边，框再吃剩下的，
+        # 窄窗口下按钮才不会被挤没。
+        ttk.Button(
+            frame,
+            text="恢复默认",
+            width=8,
+            command=lambda n=name, v=pattern: self._restore_default(n, v),
+        ).pack(side="right")
         entry = regex_entry(frame, textvariable=pattern, width=40)
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), s(4)))
         pattern.trace_add("write", lambda *_, n=name: self._on_pattern(n))
-
-        ttk.Button(
-            frame,
-            text="恢复缺省",
-            width=8,
-            command=lambda n=name, v=pattern: self._restore_default(n, v),
-        ).pack(side="left")
         return enabled, pattern
 
     def _on_pattern(self, name: str) -> None:
@@ -188,7 +212,7 @@ class IdentifyTab(ttk.Frame):
         self._changed()
 
     def _restore_default(self, name: str, var: tk.StringVar) -> None:
-        """「恢复缺省」：填回 core 缺省并**标记为未动过**。
+        """「恢复默认」：填回 core 缺省并**标记为未动过**。
 
         填回内容 + 清除 touched 两件事必须一起做，否则框里显示的是缺省正则、
         发出去的却还是用户之前那条 —— 看着对、跑起来是另一回事。
@@ -209,6 +233,19 @@ class IdentifyTab(ttk.Frame):
         self._changed()
 
     def _changed(self) -> None:
+        """控件改了：只置脏，不重扫。真正重扫在 `_apply()`。"""
+        if self._suspend:
+            return
+        self._dirty = True
+        self.v_dirty.set("识别设置已改动，点「应用」重新识别目录")
+
+    def _clear_dirty(self) -> None:
+        self._dirty = False
+        self.v_dirty.set("")
+
+    def _apply(self) -> None:
+        """用户点「应用」：把当前设置交给外部（重扫目录）。"""
+        self._clear_dirty()
         if self.on_change is not None:
             self.on_change()
 

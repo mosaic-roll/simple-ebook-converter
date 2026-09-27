@@ -320,6 +320,45 @@ def test_replacement_editor_move_requires_selection(tk_root) -> None:
     assert ed.move_selected(-1) is False, "没选中就不该动"
 
 
+def test_replacement_editor_move_up_down_keeps_all_rows(tk_root) -> None:
+    """上移/下移只换顺序，**绝不能把行弄丢**。
+
+    旧实现是 `detach` 再 `insert(iid=…)`，而 detach 后 id 仍在，insert 同一个 id
+    会抛 `Item X already exists`，行就此「消失」。
+    """
+    ed = ReplacementEditor(tk_root)
+    ed.set_rows([("a", "1", "原文"), ("b", "2", "原文"), ("c", "3", "原文")])
+    order = ed.tree.get_children()
+
+    ed.tree.selection_set(order[1])  # b
+    assert ed.move_selected(-1) is True
+    assert [ed.tree.set(i, "find") for i in ed.tree.get_children()] == ["b", "a", "c"]
+    assert len(ed.tree.get_children()) == 3
+
+    ed.tree.selection_set(ed.tree.get_children()[2])  # c
+    assert ed.move_selected(-1) is True
+    assert [ed.tree.set(i, "find") for i in ed.tree.get_children()] == ["b", "c", "a"]
+    assert len(ed.tree.get_children()) == 3
+
+    ed.tree.selection_set(ed.tree.get_children()[-1])  # a（已在末尾）
+    assert ed.move_selected(1) is False, "已在末尾不能再下移"
+
+
+def test_identify_tab_does_not_notify_until_apply(tk_root) -> None:
+    """改正则**不**立刻重扫；点「应用」才通知外部。"""
+    calls: list[bool] = []
+    tab = IdentifyTab(tk_root, on_change=lambda: calls.append(True))
+
+    tab._levels["chapter"][1].set("^第.章")
+    assert calls == [], "改正则触发了重扫"
+    assert tab._dirty is True, "改动没被标成待应用"
+
+    tab._apply()
+    assert calls == [True], "点应用没有通知外部"
+    assert tab._dirty is False
+
+
+
 def test_replacement_editor_stage_accepts_value_or_label(tk_root) -> None:
     """`阶段` 认取值（raw）也认标签（原文）。"""
     ed = ReplacementEditor(tk_root)

@@ -60,9 +60,6 @@ MONO_FONT = "Consolas"
 #: 会把这些字号覆盖掉。嫌界面字小就调大这一个值。
 UI_SIZE = 11
 
-#: 小一号：说明文字、状态栏、图注
-SMALL_SIZE = 10
-
 #: 面板/分组标题
 TITLE_SIZE = 12
 
