@@ -526,6 +526,20 @@ def test_typography_tab_round_trip(tk_root) -> None:
     assert got.css_path == "a.css"
 
 
+def test_typography_tab_sections_and_align_mapping(tk_root) -> None:
+    """排版页分三组；对齐下拉显示中文、取值仍给 core 的英文。"""
+    tab = TypographyTab(tk_root)
+    frames = [
+        str(w.cget("text")) for w in tab.form.winfo_children() if isinstance(w, ttk.LabelFrame)
+    ]
+    assert frames == ["段落", "对齐", "正文字体"]
+
+    control = tab.form.control("volume_align")
+    tab.form.set_value("volume_align", "center")
+    assert control.var.get() == "居中"          # 界面显示标签
+    assert tab.form.value("volume_align") == "center"  # 返回 core 取值
+
+
 def test_basic_tab_autofill_only_fills_empty_or_stale(tk_root) -> None:
     """自动填充只碰「空的」或「仍等于上次自动值」的字段（设计 §7.4）。"""
     tab = BasicTab(tk_root)

@@ -42,6 +42,17 @@ from .path_row import PathRow
 class Text:
     """单行输入。`help` 非空时在输入框**下方**显示一行说明。"""
 
+    default: str = ""
+    help: str = ""
+
+
+@dataclass(frozen=True)
+class Spin:
+    """整数微调框。取值时按 `[low, high]` 夹紧。"""
+
+    low: int = 0
+    high: int = 100
+    default: int = 0
     help: str = ""
 
 
@@ -51,14 +62,20 @@ class Path:
 
     kind: str = "output"
     hide_hint: bool = False
+    help: str = ""
 
 
 @dataclass(frozen=True)
 class Choice:
-    """只读下拉。`default` 是没指定时的初值。"""
+    """只读下拉。
+
+    `labels` 非空时：下拉里显示 `labels`，`get()` 返回对应的 `choices` 里的
+    底层值。对齐方式就是这样——界面显示「左对齐」，core 收 `left`。
+    """
 
     choices: tuple[str, ...] = ()
     default: str = ""
+    labels: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -113,7 +130,7 @@ class _TextControl(_Control):
         top = ttk.Frame(frame)
         top.pack(fill="x")
         ttk.Label(top, text=field.label, width=8).pack(side="left")
-        self._var = tk.StringVar()
+        self._var = tk.StringVar(value=spec.default)
         entry = ttk.Entry(top, textvariable=self._var)
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
         entry.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
@@ -139,21 +156,36 @@ class _TextControl(_Control):
 
 class _ChoiceControl(_Control):
     def __init__(self, parent, field: Field, spec: Choice, on_change, on_path_valid) -> None:
+        self._spec = spec
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=(s(6), 0))
         ttk.Label(row, text=field.label).pack(side="left")
-        self._var = tk.StringVar(value=spec.default)
+        self._var = tk.StringVar(value=self._display(spec.default))
         combo = ttk.Combobox(
-            row, textvariable=self._var, values=spec.choices, state="readonly", width=18
+            row,
+            textvariable=self._var,
+            values=spec.labels or spec.choices,
+            state="readonly",
+            width=18,
         )
         combo.pack(side="left", padx=(s(6), 0))
         combo.bind("<<ComboboxSelected>>", lambda _e: on_change(field.name))
 
+    def _display(self, value: str) -> str:
+        if self._spec.labels and value in self._spec.choices:
+            return self._spec.labels[self._spec.choices.index(value)]
+        return value
+
+    def _value(self, display: str) -> str:
+        if self._spec.labels and display in self._spec.labels:
+            return self._spec.choices[self._spec.labels.index(display)]
+        return display
+
     def get(self) -> str:
-        return self._var.get()
+        return self._value(self._var.get())
 
     def set(self, value) -> None:
-        self._var.set(value)
+        self._var.set(self._display(value))
 
     @property
     def widget(self) -> tk.Misc:
@@ -161,6 +193,44 @@ class _ChoiceControl(_Control):
 
     @property
     def var(self) -> tk.StringVar:
+        return self._var
+
+
+class _SpinControl(_Control):
+    def __init__(self, parent, field: Field, spec: Spin, on_change, on_path_valid) -> None:
+        frame = ttk.Frame(parent)
+        frame.pack(fill="x", pady=(0, s(4)))
+        top = ttk.Frame(frame)
+        top.pack(fill="x")
+        ttk.Label(top, text=field.label, width=8).pack(side="left")
+        self._var = tk.IntVar(value=spec.default)
+        spin = ttk.Spinbox(top, from_=spec.low, to=spec.high, width=6, textvariable=self._var)
+        spin.pack(side="left", padx=(s(6), 0))
+        # Spinbox 敲键时 `command` 不一定触发，两个都接上
+        spin.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
+        spin.configure(command=lambda: on_change(field.name))
+        self._low, self._high = spec.low, spec.high
+        if spec.help:
+            ttk.Label(frame, text=spec.help, bootstyle="secondary").pack(
+                anchor="w", padx=(s(8), 0)
+            )
+
+    def get(self) -> int:
+        try:
+            value = int(self._var.get())
+        except (tk.TclError, ValueError):
+            return self._low
+        return max(self._low, min(self._high, value))
+
+    def set(self, value) -> None:
+        self._var.set(int(value))
+
+    @property
+    def widget(self) -> tk.Misc:
+        return self._var
+
+    @property
+    def var(self) -> tk.IntVar:
         return self._var
 
 
@@ -201,6 +271,10 @@ class _PathControl(_Control):
         self._row.pack(fill="x", pady=(s(6), 0))
         if spec.hide_hint:
             self._row.hint.grid_forget()
+        if spec.help:
+            ttk.Label(parent, text=spec.help, bootstyle="secondary").pack(
+                anchor="w", pady=(0, s(2))
+            )
 
     def get(self) -> str:
         return self._row.get()
@@ -215,6 +289,7 @@ class _PathControl(_Control):
 
 _BUILDERS = {
     Text: _TextControl,
+    Spin: _SpinControl,
     Choice: _ChoiceControl,
     Check: _CheckControl,
     Path: _PathControl,
