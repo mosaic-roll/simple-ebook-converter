@@ -29,16 +29,34 @@ from __future__ import annotations
 import sys
 import tkinter as tk
 
-from . import dpi, fonts, metrics, theme
-from .app import App
-
 #: 退出码：环境跑不起来
 EXIT_NO_DISPLAY = 2
+#: 退出码：没装图形界面依赖
+EXIT_NO_GUI_DEPS = 3
 
 
 def main(argv: list[str] | None = None) -> int:
-    """GUI 入口。返回进程退出码。"""
+    """GUI 入口。返回进程退出码。
+
+    `ttkbootstrap` 是**可选**依赖（`[gui]` extra），所以这里在函数内才 import
+    `gui` 的其余模块：这样「只装了 CLI」的用户 `import` 本模块、或命令行里
+    误敲 `simple-ebook-converter` 时，拿到一句人话而不是 ImportError 栈回溯。
+    """
     del argv  # 界面没有位置参数/开关，全走设置文件
+
+    try:
+        import ttkbootstrap  # noqa: F401
+    except ImportError:
+        print(
+            "图形界面需要额外依赖 ttkbootstrap。\n"
+            '请安装：pip install "simple-ebook-converter[gui]"\n'
+            "（只用命令行的话：simple-ebook-converter-cli --help）",
+            file=sys.stderr,
+        )
+        return EXIT_NO_GUI_DEPS
+
+    from . import dpi, fonts, metrics, theme
+    from .app import App
 
     awareness = dpi.enable_dpi_awareness()
 

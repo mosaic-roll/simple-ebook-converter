@@ -20,6 +20,9 @@ from pathlib import Path
 
 import pytest
 
+# 没装 GUI 可选依赖时整文件跳过（必须在导入 GUI 模块之前）
+pytest.importorskip("ttkbootstrap")
+
 from simple_ebook_converter.core.replace import Rule
 from simple_ebook_converter.gui import dpi, fonts, metrics, theme
 from simple_ebook_converter.gui.app import App

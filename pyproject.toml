@@ -8,6 +8,13 @@ dependencies = [
     "chardet>=7.6.0",
     "click>=8.5.0",
     "ebooklib>=0.20",
+]
+
+[project.optional-dependencies]
+#: 只有图形界面需要。core 与命令行不装它也能用：
+#:   pip install simple-ebook-converter        # 仅 CLI
+#:   pip install "simple-ebook-converter[gui]" # 带图形界面
+gui = [
     "ttkbootstrap>=2.2.3",
 ]
 

@@ -315,6 +315,10 @@ dependencies = [
     { name = "chardet" },
     { name = "click" },
     { name = "ebooklib" },
+]
+
+[package.optional-dependencies]
+gui = [
     { name = "ttkbootstrap" },
 ]
 
@@ -328,8 +332,9 @@ requires-dist = [
     { name = "chardet", specifier = ">=7.6.0" },
     { name = "click", specifier = ">=8.5.0" },
     { name = "ebooklib", specifier = ">=0.20" },
-    { name = "ttkbootstrap", specifier = ">=2.2.3" },
+    { name = "ttkbootstrap", marker = "extra == 'gui'", specifier = ">=2.2.3" },
 ]
+provides-extras = ["gui"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=9.1.1" }]
