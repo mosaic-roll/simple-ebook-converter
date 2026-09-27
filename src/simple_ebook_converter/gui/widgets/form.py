@@ -135,7 +135,7 @@ class _TextControl(_Control):
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
         entry.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
         if spec.help:
-            ttk.Label(frame, text=spec.help, ).pack(
+            ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
             )
 
@@ -166,8 +166,7 @@ class _ChoiceControl(_Control):
             textvariable=self._var,
             values=spec.labels or spec.choices,
             state="readonly",
-            width=18,
-        )
+            width=18)
         combo.pack(side="left", padx=(s(6), 0))
         combo.bind("<<ComboboxSelected>>", lambda _e: on_change(field.name))
 
@@ -211,7 +210,7 @@ class _SpinControl(_Control):
         spin.configure(command=lambda: on_change(field.name))
         self._low, self._high = spec.low, spec.high
         if spec.help:
-            ttk.Label(frame, text=spec.help, ).pack(
+            ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
             )
 
@@ -241,8 +240,7 @@ class _CheckControl(_Control):
             parent,
             text=field.label,
             variable=self._var,
-            command=lambda: on_change(field.name),
-        ).pack(anchor="w", pady=(s(4), 0))
+            command=lambda: on_change(field.name)).pack(anchor="w", pady=(s(4), 0))
 
     def get(self) -> bool:
         return bool(self._var.get())
@@ -266,13 +264,12 @@ class _PathControl(_Control):
             field.label,
             kind=spec.kind,
             on_change=lambda: on_change(field.name),
-            on_valid=lambda path: on_path_valid(field.name, path),
-        )
+            on_valid=lambda path: on_path_valid(field.name, path))
         self._row.pack(fill="x", pady=(s(6), 0))
         if spec.hide_hint:
             self._row.hint.grid_forget()
         if spec.help:
-            ttk.Label(parent, text=spec.help, ).pack(
+            ttk.Label(parent, text=spec.help).pack(
                 anchor="w", pady=(0, s(2))
             )
 
@@ -311,8 +308,7 @@ class Form(ttk.Frame):
         on_change: Callable[[str], None] | None = None,
         on_path_valid: Callable[[str, object], None] | None = None,
         padding: tuple[int, int] = (0, 0),
-        **kwargs,
-    ) -> None:
+        **kwargs) -> None:
         super().__init__(master, padding=padding, **kwargs)
         self._on_change = on_change
         self._on_path_valid = on_path_valid

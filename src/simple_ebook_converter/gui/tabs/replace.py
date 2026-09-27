@@ -34,7 +34,6 @@ class ReplaceTab(ttk.Frame):
         ttk.Label(
             body,
             text="替换只作用于标题。规则按表格顺序依次执行，顺序不同结果不同。",
-            ,
         ).pack(anchor="w", pady=(0, s(8)))
         self.editor = ReplacementEditor(body, on_change=on_change)
         self.editor.pack(fill="both", expand=True)

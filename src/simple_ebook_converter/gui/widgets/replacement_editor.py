@@ -86,7 +86,7 @@ class ReplacementEditor(ttk.Frame):
         self.tree.tag_configure("bad", foreground=COLORS["error"])
         self.tree.bind("<Double-1>", self._on_edit)
         self.tree.bind("<Delete>", self._on_delete)
-        self.hint = ttk.Label(self, text="", , foreground=COLORS["error"])
+        self.hint = ttk.Label(self, text="", foreground=COLORS["error"])
 
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)
@@ -111,7 +111,6 @@ class ReplacementEditor(ttk.Frame):
         ttk.Label(
             bar,
             text="「HTML」阶段匹配转义后的标题，可塞 <span> 之类标签",
-            ,
         ).pack(side="left", padx=(s(12), 0))
         self.hint.pack(anchor="w", pady=(s(4), 0))
 

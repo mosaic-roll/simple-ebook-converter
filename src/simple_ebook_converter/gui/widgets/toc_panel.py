@@ -54,8 +54,7 @@ class TocPanel(ttk.Frame):
         on_import: Callable[[], None] | None = None,
         on_export: Callable[[], None] | None = None,
         on_setting_change: Callable[[], None] | None = None,
-        **kwargs,
-    ) -> None:
+        **kwargs) -> None:
         super().__init__(master, **kwargs)
         self.on_rescan = on_rescan
         self.on_import = on_import
@@ -94,8 +93,7 @@ class TocPanel(ttk.Frame):
             to=DEPTH_RANGE[1],
             width=4,
             textvariable=self.v_depth,
-            command=self._settings_changed,
-        ).pack(side="left", padx=(s(4), s(12)))
+            command=self._settings_changed).pack(side="left", padx=(s(4), s(12)))
         self.v_depth.trace_add("write", lambda *_: self._settings_changed())
 
         self.v_in_spine = tk.BooleanVar(value=True)
@@ -111,8 +109,7 @@ class TocPanel(ttk.Frame):
             columns=(CHECK, TITLE, RESULT),
             show="headings",
             selectmode="browse",
-            style="Toc.Treeview",
-        )
+            style="Toc.Treeview")
         for column in (CHECK, TITLE, RESULT):
             self.tree.heading(column, text=HEADINGS[column], anchor=COL_ANCHORS[column])
             self.tree.column(
@@ -120,8 +117,7 @@ class TocPanel(ttk.Frame):
                 width=s(COL_WIDTHS[column]),
                 minwidth=s(COL_MINWIDTHS[column]),
                 anchor=COL_ANCHORS[column],
-                stretch=COL_STRETCH[column],
-            )
+                stretch=COL_STRETCH[column])
         # height 不设，交给 pack(expand=True)
         set_row_height("Toc.Treeview", px=ROW_HEIGHT)
 
@@ -139,7 +135,7 @@ class TocPanel(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(4), 0))
         self.v_count = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.v_count, ).pack(side="right")
+        ttk.Label(bar, textvariable=self.v_count).pack(side="right")
 
     # ---------- 内容 ----------
 
@@ -165,8 +161,7 @@ class TocPanel(ttk.Frame):
             RESULT,
             width=s(COL_WIDTHS[RESULT]) if show else 0,
             minwidth=s(COL_MINWIDTHS[RESULT]) if show else 0,
-            stretch=show,
-        )
+            stretch=show)
         for iid in self.tree.get_children():
             entry = next((e for e in self._entries if entry_id(e) == iid), None)
             if entry is None:
@@ -219,8 +214,7 @@ class TocPanel(ttk.Frame):
             self.tree.item(
                 iid,
                 values=self._row_values(entry, iid, shown),
-                tags=(TAG_DELETED,) if deleted else (),
-            )
+                tags=(TAG_DELETED) if deleted else ())
 
     def _toggle_all(self) -> None:
         deleted = not self.v_all.get()  # 全选 = 都不划掉
@@ -238,8 +232,7 @@ class TocPanel(ttk.Frame):
         """底部的目录设置。`toc_in_spine` 是**正面表述**（core 里的键名，别写成 no_toc）。"""
         return TocSettings(
             toc_depth=_clamp_depth(self.v_depth.get()),
-            toc_in_spine=bool(self.v_in_spine.get()),
-        )
+            toc_in_spine=bool(self.v_in_spine.get()))
 
     def set_toc_settings(self, data: TocSettings) -> None:
         self.v_depth.set(_clamp_depth(data.toc_depth))

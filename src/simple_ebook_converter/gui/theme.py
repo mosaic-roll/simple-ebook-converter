@@ -20,6 +20,9 @@ DEFAULT_THEME = "light"
 _ERROR_STYLE = "Error.TEntry"
 _WARN_STYLE = "Warn.TEntry"
 
+#: 主题色（sv_ttk 提供，此处仅为类型提示）
+COLORS: dict[str, str] = {}
+
 
 def apply(root: tk.Misc) -> ttk.Style:
     """安装 sv_ttk 主题并配置校验态样式。

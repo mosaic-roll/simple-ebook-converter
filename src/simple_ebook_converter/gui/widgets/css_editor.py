@@ -44,8 +44,7 @@ class CssEditor(ttk.Frame):
         master: tk.Misc,
         *,
         on_change: Callable[[], None] | None = None,
-        **kwargs,
-    ) -> None:
+        **kwargs) -> None:
         super().__init__(master, **kwargs)
         self.on_change = on_change
         self._mode = tk.StringVar(value=CSS_NONE)
@@ -58,8 +57,7 @@ class CssEditor(ttk.Frame):
             kind="css",
             picker="css",
             with_clear=True,
-            on_change=self._changed,
-        )
+            on_change=self._changed)
         self.path_row.pack(fill="x", pady=(s(8), 0))
         self._path = self.path_row.get
 
@@ -77,8 +75,7 @@ class CssEditor(ttk.Frame):
                 text=MODE_LABELS[mode],
                 value=mode,
                 variable=self._mode,
-                command=self._on_mode,
-            ).pack(side="left", padx=(0, s(12)))
+                command=self._on_mode).pack(side="left", padx=(0, s(12)))
         self._note = ttk.Label(bar, text="", , wraplength=s(360))
         self._note.pack(side="left")
 
@@ -89,7 +86,7 @@ class CssEditor(ttk.Frame):
         ttk.Button(bar, text=LOAD_BUILTIN, command=self.load_builtin).pack(
             side="left", padx=(s(8), 0)
         )
-        self.hint = ttk.Label(bar, text="", )
+        self.hint = ttk.Label(bar, text="")
         self.hint.pack(side="left", padx=(s(8), 0))
 
         # ScrollFrame 里放 Text：CSS 普遍长于屏幕高度
@@ -101,8 +98,7 @@ class CssEditor(ttk.Frame):
             wrap="none",  # CSS 不该按宽度折行：折出来的行复制出去是坏的
             font=font("mono"),
             undo=True,
-            exportselection=True,
-        )
+            exportselection=True)
         self.text.pack(side="left", fill="both", expand=True)
         hbar = ttk.Scrollbar(wrap, orient="horizontal", command=self.text.xview)
         self.text.configure(xscrollcommand=hbar.set)
