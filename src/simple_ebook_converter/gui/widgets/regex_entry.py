@@ -21,7 +21,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from ..fonts import MONO_FONT, font
+from ..fonts import font
 
 #: X11 的 Shift 修饰键掩码
 _SHIFT_MASK = 1 << 0
@@ -36,10 +36,7 @@ def regex_entry(master: tk.Misc, **kwargs) -> ttk.Entry:
     普通滚轮绑一个「放行」处理器：它必须**返回 `None`**（而不是 `"break"`），
     Tk 才会继续把事件交给 bindtags 里的下一个处理器，也就是 ScrollFrame。
     """
-    entry = ttk.Entry(master, **kwargs)
-    mono = font(MONO_FONT)
-    if mono is not None:
-        entry.configure(font=mono)
+    entry = ttk.Entry(master, font=font("mono"), **kwargs)
     entry.configure(exportselection=True)
 
     entry.bind("<Shift-MouseWheel>", _hscroll, add="+")

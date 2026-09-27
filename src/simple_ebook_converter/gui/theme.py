@@ -12,7 +12,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from .fonts import MONO_FONT, UI_FONT, UI_SIZE, font
+from .fonts import UI_SIZE, font
 from .metrics import s
 
 #: 唯一支持边框定制的内置主题
@@ -41,17 +41,14 @@ _WARN_STYLE = "Warn.TEntry"
 def apply(root: tk.Misc) -> ttk.Style:
     """装主题 + 铺基础样式，返回配好的 `Style`。
 
-    两个前置条件由调用点保证（见 `__main__.py`）：
-
-    * `metrics.sync_scaling()` 已跑过 —— 本函数用 `s()` 定死尺寸和字号；
-    * `fonts.bind_fonts(root)` 已跑过 —— 本函数只**读** `font()`，不解析字体。
-      少了那一步 `font()` 全返回 `None`，样式静默退回 Tk 默认字体。
+    一个前置条件由调用点保证（见 `__main__.py`）：`metrics.sync_scaling()` 已跑过 ——
+    本函数用 `s()` 定死尺寸和字号。字体不依赖它（见 `fonts` 模块的说明）。
     """
     style = ttk.Style(root)
     style.theme_use(THEME)
     root.configure(background=COLORS["bg"])
 
-    ui_font = font(UI_FONT, UI_SIZE)
+    ui_font = font("ui", UI_SIZE)
     style.configure(".", font=ui_font, background=COLORS["bg"], foreground=COLORS["fg"])
     style.configure("TFrame", background=COLORS["bg"])
     style.configure("TLabel", background=COLORS["bg"], foreground=COLORS["fg"])
@@ -77,17 +74,15 @@ def apply(root: tk.Misc) -> ttk.Style:
 
     # 目录表格：独立 style 名，行高才不会波及所有 Treeview
     style.configure("Toc.Treeview", background=COLORS["bg"], fieldbackground=COLORS["bg"])
-    style.configure("Toc.Treeview.Heading", font=font(UI_FONT, UI_SIZE, "bold"))
+    style.configure("Toc.Treeview.Heading", font=font("ui", UI_SIZE, "bold"))
     style.map("Toc.Treeview", background=[("selected", COLORS["sel"])])
 
     _configure_entry_state(style, _ERROR_STYLE, COLORS["error"])
     _configure_entry_state(style, _WARN_STYLE, COLORS["warn"])
 
     # 等宽字体：正则框、CSS 文本框用
-    mono = font(MONO_FONT, UI_SIZE)
-    if mono is not None:
-        style.configure("Mono.TEntry", font=mono)
-        style.configure("Mono.Treeview", font=mono)
+    style.configure("Mono.TEntry", font=font("mono", UI_SIZE))
+    style.configure("Mono.Treeview", font=font("mono", UI_SIZE))
     return style
 
 

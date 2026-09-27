@@ -1,10 +1,28 @@
-"""字体解析：把「想要的字体名」变成「这台机器上真实存在的字体元组」。
+"""界面字体（给 Tk 用）：枚举一小批常用字体，取第一个真实存在的，都不存在就用 Tk 默认。
 
-Tk 在字体不存在时**静默回退**、不报错，表现是「等宽字体没等宽」「中文变方块」，
-很难一眼看出原因。所以在 `theme.apply()` 之前把要用的字体全部查一遍、缓存起来，
-后面各处只读 `font()`。
+**这里管的是界面本身的字形，与嵌入书里的正文字体无关** —— 后者是 `Config.font`
+指向的 ttf/otf/woff，由 core 校验扩展名并嵌入，界面只提供一个文件选择框。
 
-字号一律用**正数（磅）**：负数字号表示像素，不随 `tk scaling` 缩放，高 DPI 下不变大。
+## 为什么要自己探一次
+
+Tk 在字体名不存在时**静默回退**、不报错。后果是「想用等宽却没等宽」「中文变方块」，
+而且没有任何提示。所以启动时探一次：沿候选链取第一个真实存在的族名，探不到就用
+`TkDefaultFont` 的**实际**族名（也就是系统 UI 默认的无衬线体）。
+
+探测只在启动时跑一次并缓存 —— 不是每次建控件都查一遍。
+
+## 「主题自带字体」这件事
+
+`ttk` 确实有默认字体（named font `TkDefaultFont`），`style.configure(".")`
+不给 `font=` 时就用它。所以最省事的是**什么都不设**，让 Tk 用系统默认。之所以
+仍然显式解析，是因为：
+
+* 界面上有等宽需求（正则、规则、JSON 预览），`TkDefaultFont` 不是等宽，
+  这部分必须自己指定；
+* 统一解析后可以在状态栏/排查时报告「实际用的是哪个族名」——静默回退时无从查起。
+
+候选链刻意短：只列各平台上真正常见的几个。列几十个不会更准，只是让「实际用了哪个」
+更难预测。
 """
 
 from __future__ import annotations
@@ -12,98 +30,94 @@ from __future__ import annotations
 import tkinter as tk
 import tkinter.font as tkfont
 
-#: 界面字体与等宽字体的首选名，以及各自的回退链
+#: 界面字体的候选链，按偏好顺序。第一个真实存在的胜出。
+UI_CANDIDATES = (
+    "Segoe UI",           # Windows
+    "Microsoft YaHei UI",  # Windows 中文
+    "PingFang SC",        # macOS
+    "Noto Sans CJK SC",   # Linux 常见
+    "DejaVu Sans",        # Linux 兜底
+    "Helvetica",          # macOS 兜底
+)
+
+#: 等宽字体的候选链（正则、替换规则、JSON 预览用）
+MONO_CANDIDATES = (
+    "Consolas",           # Windows
+    "Cascadia Mono",      # Windows 新版
+    "SF Mono",            # macOS
+    "Menlo",              # macOS 兜底
+    "Noto Sans Mono",     # Linux
+    "DejaVu Sans Mono",
+    "Courier New",        # 几乎处处都有
+)
+
+#: 首选名：诊断信息与「实际族名」的键用它
 UI_FONT = "Segoe UI"
 MONO_FONT = "Consolas"
+
+#: 界面基准字号（磅）。负数表示像素、不随 tk scaling 缩放，高 DPI 下不变大，故不用
 UI_SIZE = 10
 
-#: 首选名查不到时按顺序试。键是上一环的名字，值是下一环（`None` = 到此为止）
-FALLBACKS: dict[str, str | None] = {
-    "Segoe UI": "Microsoft YaHei UI",   # Windows 中文回退
-    "Microsoft YaHei UI": "Noto Sans CJK SC",
-    "Noto Sans CJK SC": "SimHei",
-    "SimHei": "PingFang SC",            # macOS
-    "PingFang SC": "DejaVu Sans",
-    "Consolas": "Cascadia Mono",         # Windows 新版等宽
-    "Cascadia Mono": "Menlo",           # macOS 等宽
-    "Menlo": "DejaVu Sans Mono",
-    "DejaVu Sans Mono": "Courier New",
-    "Courier New": "Liberation Mono",
-}
-
-#: (family, size, weight) → 字体元组。由 `bind_fonts()` 填，之后各处只读
-_RESOLVED: dict[tuple[str, int, str], tuple] = {}
-
-#: 启动时解析出来的实际族名，状态栏/排查用。键是首选名
+#: 已解析的族名。`{候选链 id: 实际族名}`。启动时填好，之后只读
 _ACTUAL: dict[str, str] = {}
 
-
-def _walk_family(family: str, available: set[str]) -> str:
-    """沿回退链走到底，返回第一个真实存在的族名；全都不存在就返回原始首选名。"""
-    seen: set[str] = set()
-    current = family
-    while current not in available and current not in seen:
-        seen.add(current)
-        nxt = FALLBACKS.get(current)
-        if not nxt:
-            break
-        current = nxt
-    return current if current in available else family
-
-
-def _resolve(root: tk.Misc, family: str, size: int, weight: str) -> tuple:
-    """解析一个字体规格 → Tk 字体元组（带缓存）。查不到就用 Tk 的默认字体兜。"""
-    key = (family, size, weight)
-    if key in _RESOLVED:
-        return _RESOLVED[key]
-
-    try:
-        available = set(tkfont.families(root))
-    except tk.TclError:
-        available = set()
-    actual = _walk_family(family, available) if available else family
-    _ACTUAL[family] = actual
-
-    try:
-        # named font 不能配 size/weight，所以这里只用元组形式。
-        value: tuple = (actual, size, weight) if weight else (actual, size)
-        tkfont.Font(root=root, font=value)  # 试建一次：字体名不合法会抛 TclError
-    except tk.TclError:
-        value = (tkfont.nametofont("TkDefaultFont", root=root).actual("family"), size)
-    _RESOLVED[key] = value
-    return value
+#: 系统默认的**实际**族名（无衬线），作为所有候选都探不到时的兜底
+_FALLBACK = "Helvetica"
 
 
 def bind_fonts(root: tk.Misc) -> None:
-    """启动时调一次（**必须在 `theme.apply()` 之前**）。把要用的字体全部解析好。
+    """启动时调一次（**必须在 `theme.apply()` 之前**）：把两条链都探到底。
 
-    把普通与粗体两个字重都预热，因为 `theme.apply()` 里的标题样式会用粗体。
+    `theme.apply()` 只读 `font()`，不自己探测；少了这一步 `font()` 拿不到已解析的
+    族名，样式会退回 Tk 默认。
     """
-    for family in (UI_FONT, MONO_FONT):
-        _resolve(root, family, UI_SIZE, "")
-        _resolve(root, family, UI_SIZE, "bold")
+    _bind_chain(root, "ui", UI_CANDIDATES)
+    _bind_chain(root, "mono", MONO_CANDIDATES)
 
 
-def font(family: str, size: int = UI_SIZE, weight: str = "") -> tuple | None:
-    """取 `bind_fonts()` 解析好的字体元组；没绑过或字号不在预热范围里返回 `None`。
+def _bind_chain(root: tk.Misc, key: str, candidates: tuple[str, ...]) -> None:
+    available = _available(root)
+    actual = next((name for name in candidates if name in available), "")
+    if not actual:
+        actual = _default_family(root)
+    _ACTUAL[key] = actual
 
-    返回 `None` 是**故意**的：让调用方能把「没绑字体」和「拿到一个 None 字体元组」
-    区分开 —— 后者会让 Tk 画出一片空白，而前者至少能在启动时被发现。
+
+def _available(root: tk.Misc) -> set[str]:
+    """本机真实存在的族名集合；探测失败时返回空集（全部候选视为不可用）。
+
+    探不到就当全都不存在、走默认族名，而不是抛错 —— 字体解析失败不该让 GUI 起不来。
     """
-    return _RESOLVED.get((family, size, weight))
+    try:
+        return set(tkfont.families(root))
+    except tk.TclError:
+        return set()
 
 
-def actual_family(family: str) -> str:
-    """首选名对应的实际族名（回退之后的结果），没绑过就原样返回。"""
+def _default_family(root: tk.Misc) -> str:
+    """`TkDefaultFont` 的实际族名，即系统 UI 默认的无衬线体。"""
+    try:
+        return str(tkfont.nametofont("TkDefaultFont", root=root).actual("family")) or _FALLBACK
+    except (tk.TclError, KeyError):
+        return _FALLBACK
+
+
+def font(family: str = UI_FONT, size: int = UI_SIZE, weight: str = "") -> tuple:
+    """字体规格 → Tk 字体元组。
+
+    `family` 取 `"ui"` 或 `"mono"`（两条链的 id），也可以直接给族名。**必须先
+    `bind_fonts()`**，否则会拿到未经解析的名字、由 Tk 静默回退 —— 那正是本模块要
+    消除的情况。
+    """
+    actual = _ACTUAL.get(family, family)
+    return (actual, size, weight) if weight else (actual, size)
+
+
+def actual_family(family: str = "ui") -> str:
+    """实际用了哪个族名。状态栏/排查用；没绑过就原样返回。"""
     return _ACTUAL.get(family, family)
-
-
-def resolved() -> dict[tuple[str, int, str], tuple]:
-    """已解析的字体表，测试与排查用。"""
-    return dict(_RESOLVED)
 
 
 def reset() -> None:
     """清空缓存。测试用。"""
-    _RESOLVED.clear()
     _ACTUAL.clear()
