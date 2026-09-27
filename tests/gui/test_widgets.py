@@ -384,6 +384,44 @@ def test_toc_panel_clamps_depth(tk_root) -> None:
 # ---------- 页签往返 ----------
 
 
+def test_form_builder_sections_and_values(tk_root) -> None:
+    """声明式 Form：按 spec 建分节、能往返取值。"""
+    from simple_ebook_converter.gui.widgets.form import (
+        Check,
+        Choice,
+        Field,
+        Form,
+        Section,
+        Text,
+    )
+
+    form = Form(
+        tk_root,
+        (
+            Section(
+                "第一组",
+                (
+                    Field("t", "文字", Text()),
+                    Field("c", "选项", Choice(("x", "y"), default="x")),
+                    Field("b", "开关", Check(default=False)),
+                ),
+            ),
+        ),
+    )
+    form.pack()
+    tk_root.update()
+
+    frames = [str(w.cget("text")) for w in form.winfo_children() if isinstance(w, ttk.LabelFrame)]
+    assert frames == ["第一组"]
+    assert form.value("t") == ""
+    assert form.value("c") == "x"
+    assert form.value("b") is False
+
+    form.set_values({"t": "hi", "c": "y", "b": True})
+    assert form.values() == {"t": "hi", "c": "y", "b": True}
+    form.destroy()
+
+
 def test_basic_tab_groups_and_core_help(tk_root) -> None:
     """基础页分组为 文件/书籍信息/封面/清理，且日期与语言的帮助文字来自 core。"""
     from simple_ebook_converter.core.options import OPTIONS

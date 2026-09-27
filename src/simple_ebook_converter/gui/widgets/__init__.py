@@ -5,6 +5,7 @@ from __future__ import annotations
 __all__ = [
     "css_editor",
     "extra_levels",
+    "form",
     "path_entry",
     "path_row",
     "regex_entry",
