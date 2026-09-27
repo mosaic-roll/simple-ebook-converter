@@ -138,10 +138,18 @@ class App(ttk.Frame):
             ("replace", "替换", ReplaceTab),
             ("typography", "排版", TypographyTab),
         ):
-            tab = factory(notebook, on_change=self._schedule_rescan)
+            # 替换规则改动**不重扫**：替换只改写标题文字，不影响目录的识别结果，
+            # 而 entries 已经在内存里了。走 _schedule_rescan 的话，改一条规则会
+            # 把整本书重读重解析一遍，就为了重画「替换后」那一列 —— 一次按键一次
+            # 全量扫描。而且生成期间 status.busy 还会把它挡掉，那段时间改规则
+            # 预览就不动了。
+            on_change = (
+                self._refresh_preview if key == "replace" else self._schedule_rescan
+            )
+            tab = factory(notebook, on_change=on_change)
             notebook.add(tab, text=label)
             self.tabs[key] = tab
-        # 基础页换输入文件要重扫，其余页只改排版/替换，不必重扫
+        # 基础页换输入文件要重扫，其余页只改排版，不必重扫
         self.tabs["basic"].on_input_chosen = lambda _p: self.rescan()
 
     def _build_right(self, parent: ttk.Frame) -> None:

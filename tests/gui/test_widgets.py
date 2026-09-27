@@ -536,6 +536,50 @@ def test_app_tracks_temp_css_for_cleanup(tk_root, monkeypatch) -> None:
     app.destroy()
 
 
+def test_app_rule_edits_refresh_preview_without_rescan(tk_root, monkeypatch) -> None:
+    """改替换规则要立刻更新「替换后」列，且**不重扫整本书**。
+
+    替换只改写标题文字，不影响目录识别结果，entries 已经在内存里了。之前这里
+    挂的是 _schedule_rescan：改一条规则 → 300ms 后把整本书重读重解析一遍，就为了
+    重画一列显示；而且生成期间 status.busy 还会把它挡掉。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+    from simple_ebook_converter.gui.widgets.toc_panel import RESULT
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+
+    app = app_mod.App(tk_root)
+    entries = [
+        {"raw_title": "第一章 开始", "level": 3, "class_name": "chapter", "lines": [1, 2]},
+        {"raw_title": "第二章 结束", "level": 3, "class_name": "chapter", "lines": [3, 4]},
+    ]
+    app._show_entries(entries)
+    tk_root.update()
+
+    rescans: list[bool] = []
+    monkeypatch.setattr(app_mod.App, "rescan", lambda self: rescans.append(True))
+
+    # 无规则：结果列必须收掉（宽度 0）
+    assert app.toc.tree.column(RESULT, "width") == 0
+
+    app.tabs["replace"].editor.set_rows([("第一章", "Chapter One", "原文")])
+    tk_root.update()
+    assert app.toc.tree.column(RESULT, "width") > 0, "有规则了结果列还藏着"
+    shown = [app.toc.tree.set(i, RESULT) for i in app.toc.tree.get_children()]
+    assert shown[0].startswith("Chapter One")
+    assert shown[1].startswith("第二章"), "只该替换命中的那条"
+
+    # 规则清空 → 列重新收掉
+    app.tabs["replace"].editor.set_rows([])
+    tk_root.update()
+    assert app.toc.tree.column(RESULT, "width") == 0
+
+    assert not rescans, "改规则触发了整本书重扫"
+    app.destroy()
+
+
 def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> None:
     """用户自己选的 CSS 文件不能被当成临时文件删掉。"""
     import simple_ebook_converter.gui.app as app_mod
