@@ -51,7 +51,7 @@ def test_names_match_pyproject():
     assert IMPORT_NAME == "simple_ebook_converter"
     assert set(project["scripts"]) == {DIST_NAME, CLI_PROG}
     assert project["scripts"][CLI_PROG] == f"{IMPORT_NAME}.cli.cli:main"
-    assert project["scripts"][DIST_NAME] == f"{IMPORT_NAME}.gui.app:main"
+    assert project["scripts"][DIST_NAME] == f"{IMPORT_NAME}.gui.__main__:main"
 
 
 def test_all_names_are_importable():
