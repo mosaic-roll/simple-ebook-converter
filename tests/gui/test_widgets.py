@@ -644,6 +644,35 @@ def test_mainthread_survives_raising_callback(tk_root) -> None:
     assert after_boom, "前一个回调抛异常后，后面的没被执行（轮询死了）"
 
 
+def test_app_empty_state_disables_actions(tk_root, monkeypatch) -> None:
+    """没输入文件时：生成按钮 + 目录工具条都该是禁用的。
+
+    这一条防的是「按钮亮着但点下去只会弹一句缺少输入」——用户会以为程序坏了。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+
+    app = app_mod.App(tk_root)
+    tk_root.update()
+
+    assert app.tabs["basic"].input_row.get() == ""
+    assert str(app.btn_generate.cget("state")) == "disabled"
+
+    # 给了输入（哪怕还没扫）→ 生成按钮应放开
+    app.tabs["basic"].set_input("novel.txt")
+    tk_root.update()
+    assert str(app.btn_generate.cget("state")) == "normal"
+
+    # 再清空 → 重新禁用
+    app.tabs["basic"].set_input("")
+    tk_root.update()
+    assert str(app.btn_generate.cget("state")) == "disabled"
+    app.destroy()
+
+
 def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> None:
     """用户自己选的 CSS 文件不能被当成临时文件删掉。"""
     import simple_ebook_converter.gui.app as app_mod

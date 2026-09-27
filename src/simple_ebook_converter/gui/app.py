@@ -228,6 +228,9 @@ class App(ttk.Frame):
         # `if data.input:` 的话读的是个根本不存在的字段，报错还是最好的结果。
         if self.tabs["basic"].input_row.get():
             self.rescan()
+        else:
+            self._refresh_enabled()
+
     def _probe_borders(self) -> None:
         """红/黄框只 clam 支持。主题认不认 `bordercolor` 探一次，不认就只留文字提示。"""
         if border_color_supported(self.root):
@@ -241,6 +244,9 @@ class App(ttk.Frame):
         """改设置后延迟重扫。**busy 期间不排**——生成用的就是当前配置。"""
         if not self._ready:
             return  # 还在建界面：那次「改动」只是控件在填缺省值
+        # 输入/输出路径一变，动作按钮的可用性就得跟着变，不能等扫完才更新
+        # （路径刚填上、还没扫的这段时间，按钮不该是灰的）。
+        self._refresh_enabled()
         if self.status.busy:
             return
         if self._debounce_id is not None:
@@ -297,6 +303,19 @@ class App(ttk.Frame):
         self._toc_entries = list(entries)
         self.toc.set_entries(entries)
         self._refresh_preview()
+        self._refresh_enabled()
+
+    def _refresh_enabled(self) -> None:
+        """按「有没有输入」决定哪些动作可用。
+
+        **每次都从头算，不记「上一次是什么状态」**：可用性是 `(has_input, busy)` 的
+        纯函数，增量改状态迟早会在某条分支上留下残留（比如输入被清空后生成按钮
+        还亮着，点下去只弹一句「缺少输入文件」）。
+        """
+        has_input = bool(self.tabs["basic"].input_row.get())
+        self.btn_generate.configure(state="normal" if has_input else "disabled")
+        # 目录面板的「重扫/导入/导出/深度/全选」在没有输入时都没意义
+        self.toc.set_enabled(has_input)
 
     def _refresh_preview(self) -> None:
         """用 raw 阶段的替换规则刷新目录预览。"""
