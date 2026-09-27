@@ -10,6 +10,8 @@ Tk 需要一个 display。CI 上没有 display 时整个文件 skip（`conftest`
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from tkinter import ttk
 
@@ -441,3 +443,113 @@ def _opt(name: str):
     from simple_ebook_converter.core.options import OPTIONS
 
     return next(o for o in OPTIONS if o.name == name)
+
+
+# ---------- App 整体 ----------
+#
+# 这一节的理由：`App` 的问题全部出在**模块之间**（settings 的扁平结构 ↔ 页签要的
+# dataclass、控件构造顺序、临时 CSS 的归属），而前面那些测试一次只碰一个模块，
+# 结构性地看不到这类问题。下面三条是本轮实际修掉的 bug 的回归测试。
+
+
+def test_app_constructs_and_survives_settings_round_trip(tk_root, monkeypatch) -> None:
+    """建得出 + 灌得进设置。上一版挂在 `data.basic`（settings 早已改扁平）。
+
+    顺带钉住「空串 = 不设」这条约定：`Settings` 默认 `encoding=""`，灌进界面后
+    collect() 拿回的还是 `""`，因为它表示「没指定，交给 core 缺省」——不能趁
+    restore 的时候偷偷把 core 的缺省值固化进设置，那样用户在 CLI 里改的缺省
+    就再也影响不到 GUI 了。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    saved = settings_mod.Settings(encoding="gb18030", indent=4, toc_in_spine=False)
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: saved)
+    monkeypatch.setattr(app_mod, "load_settings", lambda: saved)
+    monkeypatch.setattr(app_mod, "save_settings", lambda data: None)
+
+    app = app_mod.App(tk_root)
+    tk_root.update()
+
+    got = app.collect()
+    assert got.basic.encoding == "gb18030", "扁平字段没走到界面上"
+    assert got.typography.indent == 4
+    assert got.toc.toc_in_spine is False
+
+    # 不设的字段仍是空串，不被 restore 固化成 core 缺省
+    assert got.basic.title == ""
+    app.destroy()
+
+
+def test_app_does_not_rescan_on_startup(tk_root, monkeypatch) -> None:
+    """输入路径不持久化（settings.py 的决定），所以启动不该触发重扫。
+
+    问界面而不是问设置：写 `if data.input:` 读的是个不存在的字段。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+
+    calls: list[bool] = []
+    real = app_mod.App.rescan
+
+    def spy(self) -> None:
+        calls.append(True)
+        real(self)
+
+    monkeypatch.setattr(app_mod.App, "rescan", spy)
+    app = app_mod.App(tk_root)
+    tk_root.update()
+    assert not app.tabs["basic"].input_row.get()
+    assert calls == []
+    app.destroy()
+
+
+def test_app_tracks_temp_css_for_cleanup(tk_root, monkeypatch) -> None:
+    """内联 CSS 落出来的临时文件要能被找到并删掉。
+
+    上一版 `generate()` 在 `_try_config()` 之后把 `_temp_css` 重置成 None ——
+    文件刚建好就被从账本上划掉，于是永远不删，每扫一次目录在 temp 里多一份。
+    """
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+
+    app = app_mod.App(tk_root)
+    app.tabs["typography"].css.set(CSS_APPEND, "", "h1 { color: red; }")
+
+    cfg = app._try_config()
+    assert cfg is not None
+    assert cfg.css_append is not None
+    # 账本上的路径就是 core 实际要读的那个
+    assert app._temp_css is not None
+    assert Path(app._temp_css) == Path(cfg.css_append)
+    assert Path(app._temp_css).exists()
+
+    app._cleanup_temp_css()
+    assert not Path(cfg.css_append).exists()
+    assert app._temp_css is None
+    app.destroy()
+
+
+def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> None:
+    """用户自己选的 CSS 文件不能被当成临时文件删掉。"""
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+
+    app = app_mod.App(tk_root)
+    mine = tmp_path / "mine.css"
+    mine.write_text("h1 {}", encoding="utf-8")
+    app.tabs["typography"].css.set(CSS_APPEND, str(mine))
+
+    assert app._try_config() is not None
+    app._cleanup_temp_css()
+    assert mine.exists(), "临时文件清理误伤了用户指定的 CSS"
+    app.destroy()

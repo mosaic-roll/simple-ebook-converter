@@ -40,7 +40,7 @@ from .build_config_from_ui import (
     preview_replacements,
     write_temp_css,
 )
-from .fonts import actual_family
+from .fonts import actual_family, font
 from .metrics import s
 from .settings import Settings, load_settings, save_settings
 from .tabs.basic import BasicTab
@@ -69,13 +69,23 @@ class App(ttk.Frame):
         self._debounce_id: str | None = None
         self._toc_entries: list[dict] = []
         self._scan_running = False
+        #: 界面还没建完时不响应「用户改了设置」。建控件本身就会触发 on_change
+        #: （控件把变量填成缺省值 → trace 回调），那时 `self.status` 还不存在。
+        self._ready = False
 
         self.pack(fill="both", expand=True)
         self._build()
         self._load()
 
+        # 输入/输出路径**不存**（settings.py 的决定：换一本书就该重来），所以这里
+        # 问界面而不是问设置 —— 界面才是「这次要处理哪个文件」的唯一真源。存了
+        # 也不会有值，但写成问界面的话，哪天决定存了也不用改这里。
+        if self.tabs["basic"].input_row.get():
+            self.rescan()
+        self._ready = True
         self._install_shortcuts()
-        self.protocol("WM_DELETE_WINDOW", self.quit)
+        # protocol() 是 Tk 根窗口的方法，App 只是装在上面的 Frame
+        self.root.protocol("WM_DELETE_WINDOW", self.quit)
 
     # ---------- 布局 ----------
 
@@ -135,7 +145,7 @@ class App(ttk.Frame):
         self.tabs["basic"].on_input_chosen = lambda _p: self.rescan()
 
     def _build_right(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="目录", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(parent, text="目录", font=font("ui", 11, "bold")).pack(anchor="w")
         box = ttk.Frame(parent)
         box.pack(fill="both", expand=True, pady=(s(4), 0))
         self.toc = TocPanel(
@@ -176,12 +186,19 @@ class App(ttk.Frame):
         )
 
     def apply_settings(self, data: Settings) -> None:
-        self.tabs["basic"].set(data.basic)
-        self.tabs["identify"].set(data.identify)
-        self.tabs["typography"].set(data.typography)
-        self.toc.set_toc_settings(data.toc)
-        self.tabs["replace"].set_rows(data.rules)
-        self._temp_css = data.temp_css
+        """把读回来的设置灌进界面。
+
+        走 `to_values()` 而不是直接摸 `data` 的字段：设置在磁盘上是**扁平**的
+        （能逐字段降级），而页签只认对应的 *Values。中间这层转换是 settings.py
+        的职责，App 不该知道「扁平字段 ↔ 四个 dataclass」怎么对应 ——
+        那是两个模块之间最容易悄悄脱节的地方。
+        """
+        values = data.to_values()
+        self.tabs["basic"].set(values.basic)
+        self.tabs["identify"].set(values.identify)
+        self.tabs["typography"].set(values.typography)
+        self.toc.set_toc_settings(values.toc)
+        self.tabs["replace"].set_rows(values.rules)
 
     def _load(self) -> None:
         data = load_settings()
@@ -190,9 +207,11 @@ class App(ttk.Frame):
         self._probe_borders()
         self.v_font_note.set(f"界面字体：{actual_family('ui')}")
         self.status.set_detail("就绪")
-        if data.basic.input:
+        # 输入/输出路径**不存**（settings.py 的决定：换一本书就该重来），所以这里
+        # 问界面而不是问设置 —— 界面才是「这次要处理哪个文件」的唯一真源。写
+        # `if data.input:` 的话读的是个根本不存在的字段，报错还是最好的结果。
+        if self.tabs["basic"].input_row.get():
             self.rescan()
-
     def _probe_borders(self) -> None:
         """红/黄框只 clam 支持。主题认不认 `bordercolor` 探一次，不认就只留文字提示。"""
         if border_color_supported(self.root):
@@ -204,6 +223,8 @@ class App(ttk.Frame):
 
     def _schedule_rescan(self) -> None:
         """改设置后延迟重扫。**busy 期间不排**——生成用的就是当前配置。"""
+        if not self._ready:
+            return  # 还在建界面：那次「改动」只是控件在填缺省值
         if self.status.busy:
             return
         if self._debounce_id is not None:
@@ -235,7 +256,7 @@ class App(ttk.Frame):
                 tree, stats = pipeline.scan_toc(lines, resolved)
                 entries = to_json(tree, resolved.toc_depth)
                 self.status.on_main(
-                    lambda: self._scan_done(entries, stats, used, resolved.book_title)
+                    lambda: self._scan_done(entries, stats, used, resolved.title)
                 )
             except (ValueError, OSError) as exc:
                 self.status.on_main(lambda e=exc: self._scan_failed(e))
@@ -268,8 +289,13 @@ class App(ttk.Frame):
         except ValueError:
             return  # 规则还没填完，先不刷
 
-        # 非空 dict 才显示结果列；没有规则时 set_result_column(None) 会把列收掉
-        self.toc.set_result_column(preview_replacements(self._toc_entries, rules) or None)
+        # **判据是「有没有规则」，不是「结果 dict 空不空」**：preview_replacements()
+        # 在无规则时仍会返回每条标题原样映射的 dict（空规则 = 不替换，这是它的
+        # 语义），所以 `or None` 永远为真，结果列关不掉，界面上等于凭空多一列
+        # 跟左列一模一样的文字。
+        self.toc.set_result_column(
+            preview_replacements(self._toc_entries, rules) if rules else None
+        )
 
     # ---------- 生成 ----------
 
@@ -280,7 +306,6 @@ class App(ttk.Frame):
         cfg = self._try_config()
         if cfg is None:
             return
-        self._temp_css = None
         self.status.begin("正在生成…")
 
         def work() -> None:
@@ -375,21 +400,36 @@ class App(ttk.Frame):
     def _try_config(self):
         """当前界面值 → `Config`。出错弹窗并返回 `None`（不抛出到 Tk 回调外）。"""
         try:
-            return build_config_from_ui(self.collect())
+            return build_config_from_ui(self.collect(), write_temp_css=self._track_temp_css)
         except ValueError as exc:
             self.status.fail(f"参数有误：{exc}")
             messagebox.showerror("参数有误", str(exc), parent=self.root)
             return None
 
+    def _track_temp_css(self, text: str) -> Path:
+        """`build_config_from_ui` 落临时 CSS 时的回调：记下路径，好让生成完删掉。
+
+        先删上一个：每次重扫都会重新落一份（core 读不读 CSS 它不管，只管
+        「模式开了且没给路径」就落文件），不删就在 temp 里一份份堆。busy 期间不排
+        重扫，所以生成途中不会有人把这个路径换掉。
+        """
+        self._cleanup_temp_css()
+        self._temp_css = write_temp_css(text)
+        return self._temp_css
+
     def _save_settings(self) -> None:
         values = self.collect()
-        # CSS 内联文本对应一个临时文件，存进设置的是**这次会话内**的路径。
-        # 重启后那个文件已经不在了，所以 to_values() 还原时只有路径、没有文本，
-        # 用户会看到空框而不是自己写的 CSS。这是有意的取舍：把几百行 CSS 抄进
-        # 设置文件不如提示用户用「导出内置 CSS」+ 编辑文件。
-        if values.typography.css_mode != CSS_NONE and not values.typography.css_path:
-            if values.typography.css_text.strip():
-                values.typography.css_path = str(write_temp_css(values.typography.css_text))
+        # 内联 CSS 文本**不存**。存路径是没用的：那个临时文件生成完就被删了，
+        # 下次启动设置里剩一个指向不存在文件的 css_path，PathRow 会把它标成「文件
+        # 不存在」——用户看到的是自己没做过的报错。存文本则要把几百行 CSS 塞进
+        # 设置文件。所以这种情况退回「不用外部 CSS」：状态是自洽的（不会静默拿
+        # 错样式生成），用户想留下 CSS 就用「导出内置 CSS」存成文件再选它。
+        if (
+            values.typography.css_mode != CSS_NONE
+            and not values.typography.css_path
+            and values.typography.css_text.strip()
+        ):
+            values.typography.css_mode = CSS_NONE
         save_settings(Settings.from_values(values))
 
     # ---------- 生命周期 ----------

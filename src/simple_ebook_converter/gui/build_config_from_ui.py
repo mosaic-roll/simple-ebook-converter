@@ -144,19 +144,24 @@ class UiValues:
     rules: list[tuple[str, str, str]] = field(default_factory=list)
 
 
-def build_config_from_ui(values: UiValues) -> Config:
+def build_config_from_ui(values: UiValues, *, write_temp_css=None) -> Config:
     """界面原始值 → `Config`，出错抛 `ValueError`（消息可直接展示）。
 
     **注意临时 CSS 的生命周期**：勾了 CSS 但只改了内联文本时，这里会落一个临时
     文件。core 读它是在生成时（工作线程），所以这个文件**不能在返回前删** ——
-    生成的收尾处负责清理（`App._cleanup_temp_css`）。真要拿到那个路径去跟踪，
-    调 `option_values()` 自己传 `write_temp_css`。
+    生成的收尾处负责清理（`App._cleanup_temp_css`）。
+
+    所以 `write_temp_css` 是可注入的：调用方（App）传一个自己包过的版本，把落盘
+    路径记下来，生成完才能删。不注入的话调用方拿不到那个路径，只能看着临时文件
+    一份份堆在 temp 里 —— 这就是它做成参数而不是内部细节的原因。
 
     这里**主动调 `validate()`**：`build_config()` 只翻译不校验（校验归
     `pipeline.resolve()`，那是工作线程里跑）。界面上一个填错的日期如果等到工作
     线程才报，用户看到的是「生成失败」而不是「日期格式错误」——问题定位从一行
     消息变成一段排查。同步校验能在开线程之前就拦下并弹窗。
     """
+    if write_temp_css is None:
+        write_temp_css = globals()["write_temp_css"]
     cfg = build_config(option_values(values, write_temp_css=write_temp_css))
     cfg.validate()
     return cfg

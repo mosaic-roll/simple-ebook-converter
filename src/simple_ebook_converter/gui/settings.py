@@ -32,8 +32,10 @@ LEVEL_NAMES = ("volume", "chapter", "section")
 _TYPES: dict[str, type | tuple[type, ...]] = {
     "version": int,
     "window": dict,
+    "encoding": str,
     "overwrite": bool,
     "clean": bool,
+    "date": str,
     "language": str,
     "text_cover": bool,
     "levels": dict,
@@ -67,8 +69,14 @@ class Settings:
 
     version: int = VERSION
     window: dict[str, int] = field(default_factory=lambda: {"w": 1200, "h": 800})
+    #: 源文本编码。空串 = 不指定，交给 core 缺省。
+    #: 这是**该存的**：GB18030 / UTF-8 是源文件的属性，不是「换本书就该重来」的东西，
+    #: 用户处理一批 txt 时会一直用同一个编码，每次重填纯属折磨。
+    encoding: str = ""
     overwrite: bool = True
     clean: bool = True
+    #: 书里的日期。空串 = 不写。同一本书反复改样式时它是稳定的，不该丢。
+    date: str = ""
     language: str = ""
     text_cover: bool = True
     #: 层级名 → 持久化的三态。**存字符串**，不存 `{active, regex}` 对象：
@@ -136,8 +144,10 @@ class Settings:
             values.toc,
         )
         return cls(
+            encoding=basic.encoding,
             overwrite=basic.overwrite,
             clean=basic.clean,
+            date=basic.date,
             language=basic.language,
             text_cover=basic.text_cover,
             levels=dict(identify.levels),
@@ -169,8 +179,10 @@ class Settings:
 
         return UiValues(
             basic=BasicValues(
+                encoding=self.encoding,
                 overwrite=self.overwrite,
                 clean=self.clean,
+                date=self.date,
                 language=self.language,
                 text_cover=self.text_cover,
             ),

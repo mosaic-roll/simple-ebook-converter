@@ -22,14 +22,18 @@ from simple_ebook_converter.gui import dpi, fonts, metrics, theme
 @pytest.fixture(scope="session")
 def tk_root() -> Iterator[tk.Tk]:
     """建好并配好主题的根窗口。跳过的前提是这台机器有 display。"""
+    # DPI 感知必须在 `tk.Tk()` **之前**设：Tk 在建根窗口时读一次系统缩放并按它
+    # 缓存字体度量，之后再设就只影响之后新建的窗口，根窗口上的字号还是按旧缩放
+    # 算的。顺序和 `__main__.main()` 保持一致 —— 测试里换一套顺序，等于测的是
+    # 一套正式程序不走的初始化路径。
     try:
+        awareness = dpi.enable_dpi_awareness()
         root = tk.Tk()
     except tk.TclError as exc:
         pytest.skip(f"没有可用的 display，跳过 GUI 测试：{exc}")
 
     root.withdraw()  # 别在跑测试时弹出一个真窗口
     try:
-        awareness = dpi.enable_dpi_awareness()
         metrics.sync_scaling(root, awareness)
         metrics.capture_scaling(root)
         fonts.bind_fonts(root)

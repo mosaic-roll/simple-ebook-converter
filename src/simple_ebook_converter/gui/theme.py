@@ -41,8 +41,12 @@ _WARN_STYLE = "Warn.TEntry"
 def apply(root: tk.Misc) -> ttk.Style:
     """装主题 + 铺基础样式，返回配好的 `Style`。
 
-    一个前置条件由调用点保证（见 `__main__.py`）：`metrics.sync_scaling()` 已跑过 ——
-    本函数用 `s()` 定死尺寸和字号。字体不依赖它（见 `fonts` 模块的说明）。
+    两个前置条件由调用点保证（见 `__main__.py`）：
+
+    - `metrics.sync_scaling()` 已跑过 —— 本函数用 `s()` 定死尺寸和字号。
+    - `fonts.bind_fonts(root)` 已跑过 —— 本函数取 `font("ui")` / `font("mono")`
+      来配主题字体。没跑不会崩（`font()` 拿不到缓存就用候选链头一个），但整套界面
+      会用同一个字体名，和 fonts 的探测结果对不上。
     """
     style = ttk.Style(root)
     style.theme_use(THEME)
