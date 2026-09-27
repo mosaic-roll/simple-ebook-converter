@@ -17,6 +17,13 @@ from ..widgets.path_row import PathRow
 from ..widgets.scroll_frame import ScrollFrame
 
 
+def _help(name: str) -> str:
+    """取 core 里该选项的帮助文字。界面不另抄一份说明，避免和 CLI `--help` 分叉。"""
+    from ...core.options import OPTIONS
+
+    return next(opt for opt in OPTIONS if opt.name == name).help
+
+
 class BasicTab(ttk.Frame):
     """基础设置。`get()` 收成一个 `BasicValues`。"""
 
@@ -43,8 +50,13 @@ class BasicTab(ttk.Frame):
         body = ttk.Frame(wrap.inner, padding=(s(12), s(12)))
         body.pack(fill="both", expand=True)
 
+        # 分组（文件 / 书籍信息 / 封面 / 清理）：每个开关都放进它管的那一组里，
+        # 而不是散在组之间用空行隔开 —— 「覆盖已有文件」属于输出，「文字封面页」
+        # 属于封面，放在各自组的末尾才看得出归属。
+        files = ttk.LabelFrame(body, text="文件", padding=(s(8), s(6)))
+        files.pack(fill="x")
         self.input_row = PathRow(
-            body, "输入文件", kind="input", on_change=self._changed, on_valid=self._input_valid
+            files, "输入文件", kind="input", on_change=self._changed, on_valid=self._input_valid
         )
         self.input_row.pack(fill="x")
         self.input_row.hint.grid_forget()  # 输入行有专用提示，不重复占位
@@ -52,43 +64,46 @@ class BasicTab(ttk.Frame):
         # 编码候选取自 core 的 ENCODING_CHOICES（首项就是 auto），不另抄一份。
         # 默认就选 `auto`（不是空串）：空白下拉看着像「没检测到」而不是「自动检测」。
         self._encoding = self._choice_row(
-            body, "编码", ENCODING_CHOICES, "自动检测",
+            files, "编码", ENCODING_CHOICES, "自动检测",
             key="encoding", default=AUTO_ENCODING,
         )
         self.out_row = PathRow(
-            body, "输出文件", kind="output", on_change=lambda: self._field_changed("out")
+            files, "输出文件", kind="output", on_change=lambda: self._field_changed("out")
         )
-        self.out_row.pack(fill="x", pady=(s(10), 0))
-
+        self.out_row.pack(fill="x", pady=(s(6), 0))
         self.v_overwrite = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            body, text="覆盖已有文件", variable=self.v_overwrite, command=self._changed
-        ).pack(anchor="w", pady=(s(6), 0))
+            files, text="覆盖已有文件", variable=self.v_overwrite, command=self._changed
+        ).pack(anchor="w", pady=(s(4), 0))
 
         meta = ttk.LabelFrame(body, text="书籍信息", padding=(s(8), s(6)))
-        meta.pack(fill="x", pady=(s(12), 0))
+        meta.pack(fill="x", pady=(s(10), 0))
         # 属性名与 BasicValues 的字段一一对应，get()/set() 直接引用
-        self._title = self._text_row(meta, "书名", 0, key="title")
-        self._author = self._text_row(meta, "作者", 1, key="author")
-        # 日期/语言没有 core 来源，不参与自动填充，故没有 key
-        self._date = self._text_row(meta, "出版日期", 2, "2024-05-13")
-        self._language = self._text_row(meta, "语言", 3, "zh")
+        self._title = self._text_row(meta, "书名", key="title")
+        self._author = self._text_row(meta, "作者", key="author")
+        # 日期/语言没有 core 来源，不参与自动填充，故没有 key；帮助文字取自 core
+        self._date = self._text_row(meta, "出版日期", help_text=_help("date"))
+        self._language = self._text_row(meta, "语言", help_text=_help("language"))
 
+        cover = ttk.LabelFrame(body, text="封面", padding=(s(8), s(6)))
+        cover.pack(fill="x", pady=(s(10), 0))
         self.cover_row = PathRow(
-            body, "封面图", kind="image", picker="image",
+            cover, "封面图", kind="image", picker="image",
             on_change=lambda: self._field_changed("cover"),
         )
-        self.cover_row.pack(fill="x", pady=(s(10), 0))
-
+        self.cover_row.pack(fill="x")
         self.v_text_cover = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            body, text="无封面图时生成文字封面页", variable=self.v_text_cover, command=self._changed
-        ).pack(anchor="w")
+            cover, text="无封面图时生成文字封面页", variable=self.v_text_cover, command=self._changed
+        ).pack(anchor="w", pady=(s(4), 0))
 
+        clean = ttk.LabelFrame(body, text="清理", padding=(s(8), s(6)))
+        clean.pack(fill="x", pady=(s(10), 0))
         self.v_clean = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            body, text="清理文本（去段首段尾空格、删空行）", variable=self.v_clean, command=self._changed
-        ).pack(anchor="w", pady=(s(6), 0))
+            clean, text="清理文本（去段首段尾空格、删空行）",
+            variable=self.v_clean, command=self._changed,
+        ).pack(anchor="w")
 
         wrap.retag_all()
 
@@ -216,23 +231,28 @@ class BasicTab(ttk.Frame):
     # ---------- 内部 ----------
 
     def _text_row(
-        self, parent: ttk.Frame, label: str, row: int, hint: str = "", *, key: str | None = None
+        self, parent: ttk.Frame, label: str, *, key: str | None = None, help_text: str = ""
     ) -> tk.StringVar:
-        """一行标签 + Entry。返回其 StringVar。
+        """一行「标签 + Entry」，帮助文字另起一行放在**输入框下方**。
 
         `key` 给了才参与自动填充的 dirty 判断：用户敲键即算「动过」。
+        帮助文字单占一行而不是挤在右边：右边那种写法在窄窗口里会被顶出去，而且
+        长一点的说明（比如日期格式）根本放不下。
         """
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=(0, s(4)))
+        frame = ttk.Frame(parent)
+        frame.pack(fill="x", pady=(0, s(4)))
+        top = ttk.Frame(frame)
+        top.pack(fill="x")
+        ttk.Label(top, text=label, width=8).pack(side="left")
         var = tk.StringVar()
-        entry = ttk.Entry(parent, textvariable=var, width=32)
-        entry.grid(row=row, column=1, sticky="ew", padx=(s(6), 0), pady=(0, s(4)))
+        entry = ttk.Entry(top, textvariable=var)
+        entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
         notify = (lambda: self._field_changed(key)) if key else self._changed
         entry.bind("<KeyRelease>", lambda _e: notify(), add="+")
-        if hint:
-            ttk.Label(parent, text=hint, bootstyle="secondary").grid(
-                row=row, column=2, sticky="w", padx=(s(6), 0)
+        if help_text:
+            ttk.Label(frame, text=help_text, bootstyle="secondary").pack(
+                anchor="w", padx=(s(8), 0)
             )
-        parent.columnconfigure(1, weight=1)
         return var
 
     def _choice_row(

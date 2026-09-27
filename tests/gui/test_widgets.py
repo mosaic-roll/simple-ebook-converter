@@ -381,6 +381,32 @@ def test_toc_panel_clamps_depth(tk_root) -> None:
 # ---------- 页签往返 ----------
 
 
+def test_basic_tab_groups_and_core_help(tk_root) -> None:
+    """基础页分组为 文件/书籍信息/封面/清理，且日期与语言的帮助文字来自 core。"""
+    from simple_ebook_converter.core.options import OPTIONS
+
+    def help_of(name: str) -> str:
+        return next(o for o in OPTIONS if o.name == name).help
+
+    tab = BasicTab(tk_root)
+    frames: list[str] = []
+    labels: list[str] = []
+
+    def walk(w) -> None:
+        if isinstance(w, ttk.LabelFrame):
+            frames.append(str(w.cget("text")))
+        elif isinstance(w, ttk.Label):
+            labels.append(str(w.cget("text")))
+        for child in w.winfo_children():
+            walk(child)
+
+    walk(tab)
+    assert frames == ["文件", "书籍信息", "封面", "清理"]
+    # 帮助文字必须**逐字**等于 core 的，界面不另写一份（否则迟早和 CLI 分叉）
+    assert help_of("date") in labels
+    assert help_of("language") in labels
+
+
 def test_toc_check_column_is_centered_and_narrow(tk_root) -> None:
     """「启用」列要居中对齐、不参与拉伸，且明显窄于标题列。"""
     panel = TocPanel(tk_root)
