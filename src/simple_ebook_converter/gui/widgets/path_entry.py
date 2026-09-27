@@ -1,16 +1,17 @@
-"""路径输入框：`ttk.Entry` 子类 + 即时校验 + 红/黄框。
+"""路径输入框：`ttk.Entry` 子类 + 即时校验 + 红色/橙色提示。
 
 校验分两级，**分工明确**：
 
-* **即时提示**（本类）：填完失焦后立刻给反馈，红框/黄框 + 一行提示文字。这是
-  「我刚才填的东西对不对」，错了用户还能改。
+* **即时提示**（本类）：填完失焦后立刻给反馈，一行提示文字（红=错误、橙=警告）。
+  这是「我刚才填的东西对不对」，错了用户还能改。
 * **权威判定**：`core.options._path()` —— 它在 `build_config()` 里跑，路径不存在
   会抛 `ValueError`。生成按钮走的是那条路。
 
-所以这里的检查**不替代** core，只是提前告诉用户。**黄框不拦生成**：输出目录
+所以这里的检查**不替代** core，只是提前告诉用户。**橙色警告不拦生成**：输出目录
 不存在是可以的，生成时会建目录（`pipeline.write_epub` 里的 `mkdir(parents=True)`）。
 
-校验态用提示文字的颜色表示：红色错误、橙色警告（sv_ttk 不暴露输入框边框色）。
+校验态用提示文字的颜色表示（sv_ttk 不暴露输入框边框色），颜色取自 `theme.colors()`，
+亮暗主题各一套。
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import tkinter.ttk as ttk
+
+from .. import theme
 
 
 #: 校验结论
@@ -48,6 +51,7 @@ class PathEntry(ttk.Entry):
         self.hint = ttk.Label(master, text="", wraplength=0)
         self.bind("<KeyRelease>", self._on_key_release, add="+")
         self.bind("<FocusOut>", self._on_focus_out, add="+")
+        theme.on_colors_changed(self, self._apply_colors)
 
     # ---------- 校验 ----------
 
@@ -62,13 +66,16 @@ class PathEntry(ttk.Entry):
     def set_state(self, state: str, message: str = "") -> None:
         """设置校验态。`state` 是 `OK` / `ERROR` / `WARN`。"""
         self._state = state
-        # sv_ttk 不提供自定义边框色，用文字提示代替
-        if state == ERROR:
-            self.hint.configure(text=message, foreground="#c62828")
-        elif state == WARN:
-            self.hint.configure(text=message, foreground="#b26a00")
-        else:
-            self.hint.configure(text=message, foreground="")
+        self._apply_colors()
+        self.hint.configure(text=message)
+
+    def _apply_colors(self) -> None:
+        # sv_ttk 不给输入框边框色，只能用提示文字的颜色表达校验态
+        palette = theme.colors()
+        color = {"error": palette["error"], "warn": palette["warn"]}.get(
+            self._state, palette["fg"]
+        )
+        self.hint.configure(foreground=color)
 
     def clear_message(self) -> None:
         self.hint.configure(text="")

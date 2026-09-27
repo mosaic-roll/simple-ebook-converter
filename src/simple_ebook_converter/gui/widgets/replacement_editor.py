@@ -18,6 +18,7 @@ from collections.abc import Callable
 import tkinter.ttk as ttk
 
 from ...core.replace import STAGE_LABELS, STAGES, Rule, rules_from_rows, rules_to_json
+from .. import theme
 from ..fonts import font
 from ..metrics import s, set_row_height
 
@@ -82,10 +83,16 @@ class ReplacementEditor(ttk.Frame):
         self.tree.pack(side="left", fill="both", expand=True)
         vbar.pack(side="right", fill="y")
 
-        self.tree.tag_configure("bad", foreground="#c62828")
         self.tree.bind("<Double-1>", self._on_edit)
         self.tree.bind("<Delete>", self._on_delete)
-        self.hint = ttk.Label(self, text="", foreground="#c62828")
+        self.hint = ttk.Label(self, text="")
+        theme.on_colors_changed(self.tree, self._apply_tree_colors)
+        theme.on_colors_changed(
+            self.hint, lambda: self.hint.configure(foreground=theme.colors()["error"])
+        )
+
+    def _apply_tree_colors(self) -> None:
+        self.tree.tag_configure("bad", foreground=theme.colors()["error"])
 
     def _build_toolbar(self) -> None:
         bar = ttk.Frame(self)

@@ -33,6 +33,7 @@ from ..core import pipeline
 from ..core.levels import build_levels
 from ..core.replace import rules_to_json
 from ..core.toc import to_json
+from . import theme
 from .build_config_from_ui import (
     CSS_NONE,
     TocSettings,
@@ -42,7 +43,7 @@ from .build_config_from_ui import (
     write_temp_css,
     write_temp_toc,
 )
-from .fonts import font
+from .fonts import TITLE_SIZE, font
 from .mainthread import MainThread
 from .metrics import s
 from .settings import Settings, load_settings, save_settings
@@ -131,8 +132,18 @@ class App(ttk.Frame):
             bar, text="生成 EPUB", command=self.generate
         )
         self.btn_generate.pack(side="left")
+        # 亮/暗切换。文字标出「点了会切到哪」，而不是当前模式
+        self.btn_theme = ttk.Button(bar, text=self._theme_button_text(), command=self._toggle_theme)
+        self.btn_theme.pack(side="right", padx=(s(8), 0))
         self.status = StatusBar(bar, on_busy_change=lambda _busy: self._refresh_enabled())
         self.status.pack(side="right", fill="x", expand=True, padx=(s(12), 0))
+
+    def _theme_button_text(self) -> str:
+        return "浅色" if theme.mode() == theme.DARK else "深色"
+
+    def _toggle_theme(self) -> None:
+        theme.toggle(self.root)
+        self.btn_theme.configure(text=self._theme_button_text())
 
     def _build_left(self, parent: ttk.Frame) -> None:
         notebook = ttk.Notebook(parent)
@@ -159,7 +170,7 @@ class App(ttk.Frame):
         self.tabs["basic"].on_input_chosen = lambda _p: self.rescan()
 
     def _build_right(self, parent: ttk.Frame) -> None:
-        ttk.Label(parent, text="目录", font=font("ui", 11, "bold")).pack(anchor="w")
+        ttk.Label(parent, text="目录", font=font("ui", TITLE_SIZE, "bold")).pack(anchor="w")
         box = ttk.Frame(parent)
         box.pack(fill="both", expand=True, pady=(s(4), 0))
         self.toc = TocPanel(

@@ -15,6 +15,7 @@ import tkinter as tk
 from collections.abc import Callable
 import tkinter.ttk as ttk
 
+from .. import theme
 from ..metrics import s
 from .regex_entry import regex_entry
 
@@ -63,8 +64,11 @@ class ExtraLevelsEditor(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
         ttk.Button(bar, text="添加", command=self.add, width=8).pack(side="left")
-        self.v_hint = ttk.Label(bar, text="", foreground="#c62828")
+        self.v_hint = ttk.Label(bar, text="")
         self.v_hint.pack(side="left", padx=(s(8), 0))
+        theme.on_colors_changed(
+            self.v_hint, lambda: self.v_hint.configure(foreground=theme.colors()["error"])
+        )
 
     # ---------- 值 ----------
 

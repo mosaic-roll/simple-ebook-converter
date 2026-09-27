@@ -73,8 +73,52 @@ def test_theme_uses_sv_ttk(tk_root) -> None:
     from simple_ebook_converter.gui import theme as theme_mod
 
     fonts.bind_fonts(tk_root)
-    style = theme.apply(tk_root)
-    assert style.theme_use() == theme_mod.THEME
+    try:
+        style = theme.apply(tk_root)
+        assert style.theme_use() == "sun-valley-light"
+        assert theme_mod.mode() == theme_mod.LIGHT
+    finally:
+        theme_mod.set_mode(theme_mod.LIGHT, tk_root)
+
+
+def test_theme_switches_palette_between_light_and_dark(tk_root) -> None:
+    """亮/暗各有一套语义色，且切换真的换到 sun-valley-dark。"""
+    from simple_ebook_converter.gui import theme as theme_mod
+
+    fonts.bind_fonts(tk_root)
+    try:
+        theme_mod.set_mode(theme_mod.LIGHT, tk_root)
+        light = dict(theme_mod.colors())
+        assert light["error"] != theme_mod._PALETTES[theme_mod.DARK]["error"]
+
+        theme_mod.set_mode(theme_mod.DARK, tk_root)
+        assert theme_mod.mode() == theme_mod.DARK
+        assert theme_mod.colors() == theme_mod._PALETTES[theme_mod.DARK]
+        assert theme_mod.colors()["error"] != light["error"]
+
+        assert theme_mod.toggle(tk_root) == theme_mod.LIGHT
+    finally:
+        theme_mod.set_mode(theme_mod.LIGHT, tk_root)
+
+
+def test_theme_fires_colors_changed(tk_root) -> None:
+    """`on_colors_changed` 注册时立刻跑一次，切主题时再跑。"""
+    from simple_ebook_converter.gui import theme as theme_mod
+
+    fonts.bind_fonts(tk_root)
+    calls: list[str] = []
+    frame = ttk.Frame(tk_root)
+    try:
+        theme_mod.set_mode(theme_mod.LIGHT, tk_root)
+        theme_mod.on_colors_changed(frame, lambda: calls.append(theme_mod.mode()))
+
+        assert calls == [theme_mod.LIGHT]
+        theme_mod.toggle(tk_root)
+        tk_root.update()  # `<<ThemeChanged>>` 是排队事件，要跑一次事件循环才会送达
+        assert calls == [theme_mod.LIGHT, theme_mod.DARK]
+    finally:
+        frame.destroy()
+        theme_mod.set_mode(theme_mod.LIGHT, tk_root)
 
 
 def test_theme_configures_mono_fonts(tk_root) -> None:

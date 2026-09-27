@@ -16,6 +16,8 @@ import tkinter as tk
 
 import tkinter.ttk as ttk
 
+from .. import theme
+
 
 class StatusBar(ttk.Frame):
     """顶部右侧的一行状态文字。"""
@@ -23,9 +25,11 @@ class StatusBar(ttk.Frame):
     def __init__(self, master: tk.Misc, *, on_busy_change=None, **kwargs) -> None:
         super().__init__(master, **kwargs)
         self._busy = False
+        self._error = False
         self._on_busy_change = on_busy_change
         self.text = ttk.Label(self, text="", anchor="e")
         self.text.pack(side="right", fill="x", expand=True)
+        theme.on_colors_changed(self, self._apply_colors)
 
     # ---------- 状态 ----------
 
@@ -44,14 +48,20 @@ class StatusBar(ttk.Frame):
 
     def ok(self, message: str = "") -> None:
         self._finish()
-        self.text.configure()
+        self._error = False
+        self._apply_colors()
         self.set_text(message)
 
     def fail(self, message: str) -> None:
         """出错：状态文字转成危险色。消息本身已含原因，这里不再重复。"""
         self._finish()
-        self.text.configure(foreground="#c62828")
+        self._error = True
+        self._apply_colors()
         self.set_text(message)
+
+    def _apply_colors(self) -> None:
+        color = theme.colors()["error"] if self._error else theme.colors()["fg"]
+        self.text.configure(foreground=color)
 
     def _finish(self) -> None:
         self._busy = False

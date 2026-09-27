@@ -13,6 +13,7 @@ from __future__ import annotations
 import tkinter as tk
 import tkinter.ttk as ttk
 
+from .. import theme
 from ..metrics import s
 
 #: 自定义 bindtag 名。所有 ScrollFrame 共用同一个（class binding 是全局的），
@@ -36,12 +37,14 @@ class ScrollFrame(ttk.Frame):
             self,
             highlightthickness=0,
             borderwidth=0,
-            background="#ffffff",
+            background=theme.colors()["bg"],
             height=s(MIN_HEIGHT),
         )
         self.vbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self._on_yscroll)
         self.inner = ttk.Frame(self.canvas)
+        # Canvas 不跟随 sv_ttk 主题，底色得自己换
+        theme.on_colors_changed(self, self._apply_colors)
 
         # 内层跟随视口宽度（内容只跟着宽走，高度由内容决定）
         self._win = self.canvas.create_window((0, 0), window=self.inner, anchor="nw")
@@ -52,6 +55,9 @@ class ScrollFrame(ttk.Frame):
         self._enable_wheel()
 
     # ---------- 布局 ----------
+
+    def _apply_colors(self) -> None:
+        self.canvas.configure(background=theme.colors()["bg"])
 
     def _on_inner_configure(self, _event: tk.Event) -> None:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))

@@ -19,6 +19,7 @@ import tkinter as tk
 from collections.abc import Callable
 import tkinter.ttk as ttk
 
+from .. import theme
 from ..build_config_from_ui import TocSettings, entry_id
 from ..metrics import s, set_row_height
 
@@ -125,9 +126,12 @@ class TocPanel(ttk.Frame):
         self.tree.pack(side="left", fill="both", expand=True)
         vbar.pack(side="right", fill="y")
 
-        self.tree.tag_configure(TAG_DELETED, foreground="#9a9a9a")
+        theme.on_colors_changed(self.tree, self._apply_colors)
         self.tree.bind("<Button-1>", self._on_click)
         self.set_result_column(None)  # 初始没有替换规则 → 结果列隐藏
+
+    def _apply_colors(self) -> None:
+        self.tree.tag_configure(TAG_DELETED, foreground=theme.colors()["muted"])
 
     def _build_count(self) -> None:
         """底部一行：右对齐的「N 个标题」。"""

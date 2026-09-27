@@ -55,8 +55,16 @@ MONO_CANDIDATES = (
 UI_FONT = "Segoe UI"
 MONO_FONT = "Consolas"
 
-#: 界面基准字号（磅）。负数表示像素、不随 tk scaling 缩放，高 DPI 下不变大，故不用
-UI_SIZE = 10
+#: 界面基准字号（磅）。**正数表示磅**，会随 `tk scaling` 缩放，高 DPI 下字体跟着变大。
+#: sv_ttk 自带字体用的是负数字号（像素），高 DPI 下不缩放、偏小，所以 `theme.apply()`
+#: 会把这些字号覆盖掉。嫌界面字小就调大这一个值。
+UI_SIZE = 11
+
+#: 小一号：说明文字、状态栏、图注
+SMALL_SIZE = 10
+
+#: 面板/分组标题
+TITLE_SIZE = 12
 
 #: 已解析的族名。`{候选链 id: 实际族名}`。启动时填好，之后只读
 _ACTUAL: dict[str, str] = {}
