@@ -10,7 +10,7 @@
 所以这里的检查**不替代** core，只是提前告诉用户。**黄框不拦生成**：输出目录
 不存在是可以的，生成时会建目录（`pipeline.write_epub` 里的 `mkdir(parents=True)`）。
 
-校验态用 theme.py 配置的 `Error.TEntry` / `Warn.TEntry` style。
+校验态用提示文字的颜色表示：红色错误、橙色警告（sv_ttk 不暴露输入框边框色）。
 """
 
 from __future__ import annotations
@@ -20,8 +20,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import tkinter.ttk as ttk
-
-from ..theme import apply  # noqa: F401 - 确保主题被安装
 
 
 #: 校验结论

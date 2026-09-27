@@ -68,8 +68,8 @@ def test_font_returns_tuple_not_none(tk_root) -> None:
     assert fonts.font("mono")[0]
 
 
-def test_theme_uses_ttkbootstrap(tk_root) -> None:
-    """主题走 ttkbootstrap，不再自己配一堆 `TButton`/`TLabel`。"""
+def test_theme_uses_sv_ttk(tk_root) -> None:
+    """主题走 sv_ttk，不再自己配一堆 `TButton`/`TLabel`。"""
     from simple_ebook_converter.gui import theme as theme_mod
 
     fonts.bind_fonts(tk_root)
