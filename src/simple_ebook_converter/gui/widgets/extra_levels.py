@@ -16,7 +16,6 @@ from collections.abc import Callable
 import tkinter.ttk as ttk
 
 from ..metrics import s
-from ..theme import COLORS
 from .regex_entry import regex_entry
 
 #: 层级选择器，可选 `.class`

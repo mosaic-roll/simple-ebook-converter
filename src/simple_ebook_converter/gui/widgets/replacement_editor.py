@@ -20,7 +20,6 @@ import tkinter.ttk as ttk
 from ...core.replace import STAGE_LABELS, STAGES, Rule, rules_from_rows, rules_to_json
 from ..fonts import font
 from ..metrics import s, set_row_height
-from ..theme import COLORS
 
 #: 三列
 FIND, REPL, STAGE = "find", "replace", "stage"

@@ -21,7 +21,6 @@ import tkinter.ttk as ttk
 
 from ..build_config_from_ui import TocSettings, entry_id
 from ..metrics import s, set_row_height
-from ..theme import COLORS
 
 #: 三列
 CHECK, TITLE, RESULT = "check", "title", "result"
