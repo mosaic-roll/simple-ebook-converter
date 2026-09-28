@@ -27,6 +27,7 @@ from ..widgets.extra_levels import ExtraLevelsEditor
 from ..widgets.form import Field, Form, Section, Spin, Text
 from ..widgets.regex_entry import regex_entry
 from ..widgets.scroll_frame import ScrollFrame
+from ..widgets.button_row import ButtonRow
 
 #: (选项名, 中文名) —— class 名就是选项名（core 的约定）
 _TITLES = tuple((name, label) for _level, name, label, _pattern in LEVEL_PRESETS)
@@ -101,8 +102,10 @@ class IdentifyTab(ttk.Frame):
         # 按钮先占右边：提示文字可长可短，别把按钮挤出可视区
         actions = ttk.Frame(body)
         actions.pack(fill="x", pady=(s(10), 0))
-        self.btn_apply = ttk.Button(actions, text="应用", command=self._apply)
-        self.btn_apply.pack(side="right")
+        row = ButtonRow(actions)
+        row.pack(side="right")
+        row.add_spacer_expand()
+        self.btn_apply = row.add("应用", self._apply)
         ttk.Label(actions, textvariable=self.v_dirty).pack(side="left")
 
         self._suspend = False
@@ -176,26 +179,25 @@ class IdentifyTab(ttk.Frame):
         frame = ttk.Frame(parent)
         frame.grid(row=row, column=0, sticky="ew", pady=(0, s(4)))
         parent.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=1)
 
         default = str(option_default(_option(name)))
         enabled = tk.BooleanVar(value=bool(default))
         box = ttk.Checkbutton(
             frame, text=label, variable=enabled, command=lambda n=name: self._on_toggle(n)
         )
-        box.pack(side="left")
+        box.grid(row=0, column=0, sticky="w")
 
         pattern = tk.StringVar(value=default)
         # **先放「恢复默认」再放正则框**：正则框 `fill=x, expand`，pack 会把空间
         # 优先给它、把后放的控件挤出可视区。按钮先占住右边，框再吃剩下的，
-        # 窄窗口下按钮才不会被挤没。
-        ttk.Button(
-            frame,
-            text="恢复默认",
-            width=8,
-            command=lambda n=name, v=pattern: self._restore_default(n, v),
-        ).pack(side="right")
+        # 窄窗口下按钮才不会被挤没。改用 ButtonRow + spacer 保持同样的效果。
+        btns = ButtonRow(frame)
+        btns.grid(row=0, column=2, sticky="e", padx=(s(6), 0))
+        btns.add_spacer_expand()
+        btns.add("恢复默认", lambda n=name, v=pattern: self._restore_default(n, v), width=8)
         entry = regex_entry(frame, textvariable=pattern, width=40)
-        entry.pack(side="left", fill="x", expand=True, padx=(s(6), s(4)))
+        entry.grid(row=0, column=1, sticky="ew", padx=(s(6), s(4)))
         pattern.trace_add("write", lambda *_, n=name: self._on_pattern(n))
         return enabled, pattern
 
