@@ -86,6 +86,19 @@ class Check:
 
 
 @dataclass(frozen=True)
+class Custom:
+    """任意复合控件：`build(parent)` 返回一个控件，原样摆进表单。
+
+    复合组件（内置层级、额外层级、动作条）**内部自有布局**，页面用 `Custom` 声明
+    它们即可，不必把 `pack`/`grid` 漏到页面代码里。
+    """
+
+    build: "Callable[[tk.Misc], tk.Misc]"
+    expand: bool = False
+    help: str = ""
+
+
+@dataclass(frozen=True)
 class Field:
     """一个字段：`name` 是取值用的键，`label` 是界面文字。"""
 
@@ -96,10 +109,15 @@ class Field:
 
 @dataclass(frozen=True)
 class Section:
-    """一组字段，渲染成一个 `LabelFrame`。"""
+    """一组字段，渲染成一个 `LabelFrame`（`boxed=False` 时只用一个无边框 Frame）。
+
+    `expand=True` 让该分节吃掉正文方向的剩余空间（如额外层级那种可变高区域）。
+    """
 
     title: str
     fields: tuple[Field, ...]
+    expand: bool = False
+    boxed: bool = True
 
 
 # ---------- 构建出来的控件（有状态） ----------
@@ -293,12 +311,35 @@ class _PathControl(_Control):
         return self._row
 
 
+class _CustomControl(_Control):
+    """`Custom`：把一个复合组件原样摆进表单。不参与取值/设值（由页面自己持有引用）。"""
+
+    def __init__(self, parent, field: Field, spec: Custom, on_change, on_path_valid) -> None:
+        self._widget = spec.build(parent)
+        self._widget.pack(
+            fill="both" if spec.expand else "x", expand=spec.expand
+        )
+        if spec.help:
+            ttk.Label(parent, text=spec.help).pack(anchor="w", pady=(0, s(2)))
+
+    def get(self):  # noqa: ANN201 - 复合控件没有统一的标量值
+        return None
+
+    def set(self, value) -> None:  # noqa: ANN001
+        pass
+
+    @property
+    def widget(self) -> tk.Misc:
+        return self._widget
+
+
 _BUILDERS = {
     Text: _TextControl,
     Spin: _SpinControl,
     Choice: _ChoiceControl,
     Check: _CheckControl,
     Path: _PathControl,
+    Custom: _CustomControl,
 }
 
 
@@ -325,8 +366,15 @@ class Form(ttk.Frame):
 
         first = True
         for section in spec:
-            box = ttk.LabelFrame(self, text=section.title, padding=(s(8), s(6)))
-            box.pack(fill="x", pady=(0 if first else s(10), 0))
+            if section.boxed:
+                box = ttk.LabelFrame(self, text=section.title, padding=(s(8), s(6)))
+            else:
+                box = ttk.Frame(self)
+            box.pack(
+                fill="both" if section.expand else "x",
+                expand=section.expand,
+                pady=(0 if first else s(10), 0),
+            )
             first = False
             for field in section.fields:
                 builder = _BUILDERS[type(field.control)]

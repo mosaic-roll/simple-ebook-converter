@@ -1135,3 +1135,28 @@ def test_scroll_frame_auto_tags_dynamically_added_widget(tk_root) -> None:
     tk_root.update()
     tk_root.update_idletasks()
     assert BINDTAG in late.bindtags()
+
+
+# ---------- 第三档：识别页声明式布局 ----------
+
+
+def test_identify_tab_declares_sections_via_form(tk_root) -> None:
+    """识别页用声明式 Form 声明四块；复合块走 Custom，页面不再手写层级行布局。
+
+    三行内置层级（原先的 grid）现在归 `BuiltinLevelsEditor`，页面只声明「有一个
+    内置层级块」。
+    """
+    from simple_ebook_converter.gui.widgets.builtin_levels import BuiltinLevelsEditor
+
+    tab = IdentifyTab(tk_root)
+    boxed = [
+        str(w.cget("text"))
+        for w in tab.form.winfo_children()
+        if isinstance(w, ttk.LabelFrame)
+    ]
+    assert boxed == ["内置层级", "额外层级", "识别设置"]
+    # 动作条是 boxed=False 的无边框分节
+    assert any(not isinstance(w, ttk.LabelFrame) for w in tab.form.winfo_children())
+    assert isinstance(tab.builtin, BuiltinLevelsEditor)
+    assert tab.btn_apply is not None
+    tab.destroy()

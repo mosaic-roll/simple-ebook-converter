@@ -25,7 +25,7 @@ from ..build_config_from_ui import IdentifyValues
 from ..metrics import s
 from ..widgets.builtin_levels import BuiltinLevelsEditor
 from ..widgets.extra_levels import ExtraLevelsEditor
-from ..widgets.form import Field, Form, Section, Spin, Text
+from ..widgets.form import Custom, Field, Form, Section, Spin, Text
 from ..widgets.scroll_frame import ScrollFrame
 from ..widgets.button_row import ButtonRow
 
@@ -58,61 +58,73 @@ class IdentifyTab(ttk.Frame):
 
         wrap = ScrollFrame(self)
         wrap.pack(fill="both", expand=True)
-        body = ttk.Frame(wrap.inner, padding=(s(12), s(12)))
-        body.pack(fill="both", expand=True)
 
-        box = ttk.LabelFrame(body, text="内置层级", padding=(s(8), s(6)))
-        box.pack(fill="x")
-        # 三行内置层级的布局与三态规则在组件里（这里是页面，不再写 grid）
+        # **这一页长什么样，看这张表就够了。** 复合块（内置层级 / 额外层级 / 动作条）
+        # 用 Custom 声明，内部布局归各自组件，页面不再写 pack/grid。
+        self.form = Form(
+            wrap.inner,
+            (
+                Section("内置层级", (
+                    Field("builtin", "", Custom(self._build_builtin)),
+                )),
+                Section("额外层级", (
+                    Field("extra", "", Custom(self._build_extra, expand=True)),
+                ), expand=True),
+                Section("识别设置", (
+                    Field("max_title_len", "标题最长字数",
+                          Spin(MAX_LEN_RANGE[0], MAX_LEN_RANGE[1], default=6)),
+                    Field("preface_title", "前言标题", Text()),
+                )),
+                Section("", (
+                    Field("actions", "", Custom(self._build_actions)),
+                ), boxed=False),
+            ),
+            on_change=self._changed,
+            padding=(s(12), s(12)),
+        )
+        self.form.pack(fill="both", expand=True)
+        self._max_len = self.form.control("max_title_len").var
+        self._preface = self.form.control("preface_title").var
+
+        self._suspend = False
+
+    # ---------- 复合块（声明式 Form 的 Custom 字段） ----------
+
+    def _build_builtin(self, parent: tk.Misc) -> ttk.Frame:
+        """三行内置层级。布局与三态规则在 `BuiltinLevelsEditor` 里。"""
         self.builtin = BuiltinLevelsEditor(
-            box,
+            parent,
             titles=_TITLES,
             default_of=lambda name: option_default(_option(name)),
             on_change=self._changed,
             # 勾选变化要让额外层级的冲突判断重算
             on_toggle=self._on_levels_toggled,
         )
-        self.builtin.pack(fill="x")
         #: 对外仍暴露这两个映射（测试与冲突判断在用）
         self._levels = self.builtin.levels
         self._touched = self.builtin.touched
+        return self.builtin
 
-        extra = ttk.LabelFrame(body, text="额外层级", padding=(s(8), s(6)))
-        extra.pack(fill="both", expand=True, pady=(s(12), 0))
+    def _build_extra(self, parent: tk.Misc) -> ttk.Frame:
+        """额外层级编辑器。冲突判断要看内置层级是否启用。"""
         self.extra = ExtraLevelsEditor(
-            extra,
+            parent,
             on_change=self._changed,
-            # 冲突判断要看内置层级当前是否启用
             is_builtin_enabled=lambda name: self._levels[name][0].get(),
         )
         # 内部状态变了要让编辑器重算（它问 is_builtin_enabled 才知道冲突）
         self.revalidate_extra = self.extra._revalidate
+        return self.extra
 
-        # 识别设置：**不即时重扫**，攒到点「应用」再扫。
-        # 底部用声明式 Form 声明，`on_change` 统一触发 `_changed`。
-        self.form = Form(
-            body,
-            (Section("识别设置", (
-                Field("max_title_len", "标题最长字数", Spin(MAX_LEN_RANGE[0], MAX_LEN_RANGE[1], default=6)),
-                Field("preface_title", "前言标题", Text()),
-            ),),),
-            on_change=self._changed,
-            padding=(s(8), 0),
-        )
-        self.form.pack(fill="x", pady=(s(10), 0))
-        self._max_len = self.form.control("max_title_len").var
-        self._preface = self.form.control("preface_title").var
-
-        # 按钮先占右边：提示文字可长可短，别把按钮挤出可视区
-        actions = ttk.Frame(body)
-        actions.pack(fill="x", pady=(s(10), 0))
+    def _build_actions(self, parent: tk.Misc) -> ttk.Frame:
+        """底部动作条：提示在左，「应用」在右（按钮先占右边，免得被文字挤掉）。"""
+        actions = ttk.Frame(parent)
         row = ButtonRow(actions)
         row.pack(side="right")
         row.add_spacer_expand()
         self.btn_apply = row.add("应用", self._apply)
         ttk.Label(actions, textvariable=self.v_dirty).pack(side="left")
-
-        self._suspend = False
+        return actions
 
     # ---------- 值 ----------
 
