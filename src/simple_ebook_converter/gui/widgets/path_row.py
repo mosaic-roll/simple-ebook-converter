@@ -1,13 +1,14 @@
 """一行「标签 + 路径框 + 浏览/清除按钮」。
 
-新增的行必须接上 `on_change` 并调 `ScrollFrame.retag_all()`（见
-`extra_levels.add()` 一类的动态增删），否则新增行既不触发重扫、滚轮也失效。
+新增的行必须接上 `on_change`（见 `extra_levels.add()` 一类的动态增删），否则新增行
+不触发重扫。滚轮 bindtag 由外层 `ScrollFrame` 自动补，不必手动。
 """
 
 from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
 
 import tkinter.ttk as ttk
@@ -65,11 +66,11 @@ class PathRow(ttk.Frame):
         # hint 挂在 entry 上，外部要提示文案时不必摸两层
         self.hint = self.entry.hint
 
-        buttons = ButtonRow(self)
-        buttons.add("浏览", self.browse, width=6)
+        self._buttons = ButtonRow(self)
+        self._buttons.add("浏览", self.browse, width=6)
         if with_clear:
-            buttons.add("清除", self.clear, width=6)
-        buttons.grid(row=0, column=2, sticky="w", padx=(s(4), 0))
+            self._buttons.add("清除", self.clear, width=6)
+        self._buttons.grid(row=0, column=2, sticky="w", padx=(s(4), 0))
 
         # 提示文字在整行下面，跨三列
         self.hint.grid(row=1, column=0, columnspan=3, sticky="w")
@@ -89,6 +90,27 @@ class PathRow(ttk.Frame):
 
     def set_state(self, state: str, message: str = "") -> None:
         self.entry.set_state(state, message)
+
+    def set_enabled(self, enabled: bool) -> None:
+        """启用/禁用整行：输入框 + 浏览/清除按钮**都要**跟着变。
+
+        调用方不要自己去遍历本行的子控件找按钮 —— 按钮在 `ButtonRow` 里，
+        直接子控件里只有个 Frame，遍历会漏（`CssEditor` 曾因此漏禁用）。"""
+        state = "normal" if enabled else "disabled"
+        try:
+            self.entry.configure(state=state)
+        except tk.TclError:
+            pass
+        self._set_buttons_enabled(self._buttons, state)
+
+    def _set_buttons_enabled(self, widget: tk.Misc, state: str) -> None:
+        if isinstance(widget, ttk.Button):
+            try:
+                widget.configure(state=state)
+            except tk.TclError:
+                pass
+        for child in widget.winfo_children():
+            self._set_buttons_enabled(child, state)
 
     # ---------- 事件 ----------
 

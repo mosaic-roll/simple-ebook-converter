@@ -106,7 +106,6 @@ class CssEditor(ttk.Frame):
         self.text.configure(xscrollcommand=hbar.set)
         hbar.pack(fill="x")
         self.text.bind("<FocusOut>", lambda _e: self._changed(), add="+")
-        wrap.retag_all()  # Text 是后建的，得补 bindtag 才能滚
 
     # ---------- 模式 ----------
 
@@ -116,14 +115,12 @@ class CssEditor(ttk.Frame):
 
     def _apply_enabled(self) -> None:
         mode = self._mode.get()
-        # none 模式下路径与文本都失效：留着可编辑只会让人填了不生效的值
+        # none 模式下路径与文本都失效：留着可编辑只会让人填了不生效的值。
+        # 路径行整行（含浏览/清除按钮）交给 PathRow.set_enabled 递归处理 ——
+        # 自己遍历 winfo_children 只会看到包按钮的 ButtonRow，漏掉真正的按钮。
         editable = mode != CSS_NONE
-        state = "normal" if editable else "disabled"
-        self.path_row.entry.configure(state=state)
-        for widget in self.path_row.winfo_children():
-            if isinstance(widget, ttk.Button):
-                widget.configure(state=state)
-        self.text.configure(state=state)
+        self.path_row.set_enabled(editable)
+        self.text.configure(state="normal" if editable else "disabled")
         self._note.configure(text=MODE_LABELS[mode] if mode != CSS_NONE else "")
 
     # ---------- 值 ----------
