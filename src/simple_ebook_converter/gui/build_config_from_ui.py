@@ -141,8 +141,8 @@ class UiValues:
     identify: IdentifyValues = field(default_factory=IdentifyValues)
     typography: TypographyValues = field(default_factory=TypographyValues)
     toc: TocSettings = field(default_factory=TocSettings)
-    #: `(查找, 替换为, 阶段)` 三元组列表；阶段可以是 core 的中文标签
-    rules: list[tuple[str, str, str]] = field(default_factory=list)
+    #: `(查找, 替换为, 阶段标签, 是否启用)` 四元组列表；阶段可以是 core 的中文标签
+    rules: list[tuple[str, str, str, bool]] = field(default_factory=list)
 
 
 def build_config_from_ui(
@@ -222,7 +222,11 @@ def option_values(values: UiValues, *, write_temp_css=None) -> dict[str, Any]:
     # ---- 替换 ----
     # core 只认一段 JSON 文本（`replace_json`），表格只是这个界面上的写法。
     # 空规则就不写这个键，免得覆盖掉别处可能给的值。
-    if rules := rules_from_rows(values.rules):
+    if values.rules:
+        rules: list[Rule] = [
+            Rule(pattern=row[0], replace=row[1], stage=row[2], enabled=bool(row[3]) if len(row) >= 4 else True)
+            for row in values.rules
+        ]
         out["replace_json"] = rules_to_json(rules)
 
     # ---- 排版 ----

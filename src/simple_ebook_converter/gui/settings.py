@@ -100,8 +100,8 @@ class Settings:
     toc_depth: int = 6
     #: 正面表述。core 里是 `toc_in_spine`，不是 `no_toc`
     toc_in_spine: bool = True
-    #: `(查找, 替换为, 阶段标签)` 三元组列表
-    replacements: list[list[str]] = field(default_factory=list)
+    #: `(查找, 替换为, 阶段标签, 是否启用)` 四元组列表
+    replacements: list[list[str | bool]] = field(default_factory=list)
 
     def to_json(self) -> str:
         return json.dumps(asdict_shallow(self), ensure_ascii=False, indent=2)
