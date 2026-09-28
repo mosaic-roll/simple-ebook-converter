@@ -67,6 +67,8 @@ class TocPanel(ttk.Frame):
         #: 条目 id → 是否划掉。重扫后按 id 复原勾选（`entry_id` = 起:止:raw_title）
         self._deleted: dict[str, bool] = {}
         self._entries: list[dict] = []
+        #: iid → 条目。`set_entries` 时建一次，避免每次刷新/全选都线性搜 `_entries`
+        self._by_iid: dict[str, dict] = {}
 
         self._build_toolbar()
         self._build_tree()
@@ -130,9 +132,9 @@ class TocPanel(ttk.Frame):
     def set_entries(self, entries: list[dict]) -> None:
         """填入新的目录条目。**已划掉的 id 会跨这次重扫保留。**"""
         self._entries = list(entries)
+        self._by_iid = {entry_id(entry): entry for entry in self._entries}
         self.tree.delete(*self.tree.get_children())
-        for entry in self._entries:
-            iid = entry_id(entry)
+        for iid, entry in self._by_iid.items():
             self.tree.insert("", "end", iid=iid, values=self._row_values(entry, iid))
 
     def set_result_column(self, values: dict[str, str] | None) -> None:
@@ -151,7 +153,7 @@ class TocPanel(ttk.Frame):
             minwidth=s(COL_MINWIDTHS[RESULT]) if show else 0,
             stretch=show)
         for iid in self.tree.get_children():
-            entry = next((e for e in self._entries if entry_id(e) == iid), None)
+            entry = self._by_iid.get(iid)
             if entry is None:
                 continue
             shown = values.get(iid, "") if values else ""
@@ -195,7 +197,7 @@ class TocPanel(ttk.Frame):
 
     def _set_deleted(self, iid: str, deleted: bool) -> None:
         self._deleted[iid] = deleted
-        entry = next((e for e in self._entries if entry_id(e) == iid), None)
+        entry = self._by_iid.get(iid)
         if entry is not None:
             # 保留「替换后」原文，不重复缩进：上一次切换后树里存的值已经带缩进了，
             # 直接传给 _row_values 会再叠一层，每点一次就缩进翻倍。
