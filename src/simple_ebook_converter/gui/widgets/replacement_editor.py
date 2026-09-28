@@ -74,9 +74,7 @@ class ReplacementEditor(ttk.Frame):
         self.tree.bind("<Delete>", self._on_delete)
         self.hint = ttk.Label(self, text="")
         theme.on_colors_changed(self.tree, self._apply_tree_colors)
-        theme.on_colors_changed(
-            self.hint, lambda: self.hint.configure(foreground=theme.colors()["error"])
-        )
+        theme.error_label(self.hint)
 
     def _apply_tree_colors(self) -> None:
         self.tree.tag_configure("bad", foreground=theme.colors()["error"])
@@ -86,6 +84,7 @@ class ReplacementEditor(ttk.Frame):
         bar.pack(fill="x", pady=(s(6), 0))
         # 按钮分两行：六个一行在窄栏里放不下，最右边的「导出」会被挤出可视区
         row1 = ButtonRow(bar)
+        row1.pack(fill="x")
         row1.add_many([
             ("添加", self.add),
             ("删除", self.remove_selected),
@@ -93,7 +92,8 @@ class ReplacementEditor(ttk.Frame):
             ("下移", lambda: self.move_selected(1)),
         ])
 
-        row2 = ButtonRow(bar, pack_kw={"pady": (s(4), 0)})
+        row2 = ButtonRow(bar)
+        row2.pack(fill="x", pady=(s(4), 0))
         row2.add_many([("导入", self.import_json), ("导出", self.export_json)])
 
         # 阶段说明常驻：html 阶段的行为和 raw 差很多，值得常驻而不是塞进帮助。

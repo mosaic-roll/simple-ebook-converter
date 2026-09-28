@@ -105,6 +105,17 @@ def toggle(root: tk.Misc | None = None) -> str:
     return new
 
 
+def error_label(widget: tk.Misc) -> tk.Misc:
+    """给 `widget`（通常是 `ttk.Label`）挂上主题感知的错误色。
+
+    等价于：
+    ``theme.on_colors_changed(widget, lambda: widget.configure(foreground=theme.colors()["error"]))``
+    """
+    widget.configure(foreground=colors()["error"])
+    on_colors_changed(widget, lambda: widget.configure(foreground=colors()["error"]))
+    return widget
+
+
 def on_colors_changed(widget: tk.Misc, callback: Callable[[], None]) -> None:
     """主题切换时重跑 `callback`，并**立即先跑一次**。
 

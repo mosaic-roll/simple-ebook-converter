@@ -13,12 +13,14 @@ from ..metrics import s
 
 
 class ButtonRow(ttk.Frame):
-    """工具条内的一行按钮。按钮通过 ``add()`` 或 ``add_many()`` 逐个/批量加入。"""
+    """工具条内的一行按钮。按钮通过 ``add()`` 或 ``add_many()`` 逐个/批量加入。
 
-    def __init__(self, parent: tk.Misc, *, pack_kw: dict | None = None, **kwargs) -> None:
+    **不自带 pack/grid** —— 调用方负责布局（`pack` 或 `grid`），
+    以兼容 `PathRow` 这类用 grid 的容器。
+    """
+
+    def __init__(self, parent: tk.Misc, **kwargs) -> None:
         super().__init__(parent, **kwargs)
-        self._pack_kw = pack_kw or {}
-        self.pack(fill="x", **self._pack_kw)
 
     def add(self, text: str, command=None, **kw) -> ttk.Button:
         btn = ttk.Button(self, text=text, command=command, **kw)

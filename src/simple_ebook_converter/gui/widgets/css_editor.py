@@ -18,6 +18,7 @@ import tkinter.ttk as ttk
 from ..build_config_from_ui import CSS_APPEND, CSS_MODES, CSS_NONE, CSS_OVERRIDE
 from ..fonts import font
 from ..metrics import s
+from .button_row import ButtonRow
 from .path_row import PathRow
 from .scroll_frame import ScrollFrame
 
@@ -82,12 +83,11 @@ class CssEditor(ttk.Frame):
     def _build_text(self) -> None:
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(8), 0))
-        ttk.Label(bar, text="内联编辑").pack(side="left")
-        ttk.Button(bar, text=LOAD_BUILTIN, command=self.load_builtin).pack(
-            side="left", padx=(s(8), 0)
-        )
-        self.hint = ttk.Label(bar, text="")
-        self.hint.pack(side="left", padx=(s(8), 0))
+        row = ButtonRow(bar)
+        row.pack(fill="x")
+        row.add_label("内联编辑")
+        row.add(LOAD_BUILTIN, self.load_builtin)
+        self.hint = row.add_label("")
 
         # ScrollFrame 里放 Text：CSS 普遍长于屏幕高度
         wrap = ScrollFrame(self)

@@ -79,6 +79,7 @@ class TocPanel(ttk.Frame):
         bar.pack(fill="x", pady=(0, s(4)))
 
         row1 = ButtonRow(bar)
+        row1.pack(fill="x")
         row1.add_many([("重扫", self.on_rescan), ("导入", self.on_import), ("导出", self.on_export)])
         self.v_all = tk.BooleanVar(value=False)
         ttk.Checkbutton(

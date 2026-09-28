@@ -18,6 +18,7 @@ import tkinter.ttk as ttk
 from .. import theme
 from ..metrics import s
 from .regex_entry import regex_entry
+from .button_row import ButtonRow
 
 #: 层级选择器，可选 `.class`
 _SELECTOR_RE = re.compile(r"^h([1-6])$")
@@ -63,12 +64,11 @@ class ExtraLevelsEditor(ttk.Frame):
     def _build_buttons(self) -> None:
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
-        ttk.Button(bar, text="添加", command=self.add, width=8).pack(side="left")
-        self.v_hint = ttk.Label(bar, text="")
-        self.v_hint.pack(side="left", padx=(s(8), 0))
-        theme.on_colors_changed(
-            self.v_hint, lambda: self.v_hint.configure(foreground=theme.colors()["error"])
-        )
+        row = ButtonRow(bar)
+        row.pack(fill="x")
+        row.add("添加", self.add, width=8)
+        self.v_hint = row.add_label("")
+        theme.error_label(self.v_hint)
 
     # ---------- 值 ----------
 

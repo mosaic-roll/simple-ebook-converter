@@ -13,6 +13,7 @@ from tkinter import filedialog
 import tkinter.ttk as ttk
 
 from ..metrics import s
+from .button_row import ButtonRow
 from .path_entry import PathEntry
 
 #: 路径对话框的过滤器
@@ -64,13 +65,11 @@ class PathRow(ttk.Frame):
         # hint 挂在 entry 上，外部要提示文案时不必摸两层
         self.hint = self.entry.hint
 
-        buttons = ttk.Frame(self)
-        buttons.grid(row=0, column=2, sticky="w", padx=(s(4), 0))
-        ttk.Button(buttons, text="浏览", command=self.browse, width=6).pack(side="left")
+        buttons = ButtonRow(self)
+        buttons.add("浏览", self.browse, width=6)
         if with_clear:
-            ttk.Button(buttons, text="清除", command=self.clear, width=6).pack(
-                side="left", padx=(s(4), 0)
-            )
+            buttons.add("清除", self.clear, width=6)
+        buttons.grid(row=0, column=2, sticky="w", padx=(s(4), 0))
 
         # 提示文字在整行下面，跨三列
         self.hint.grid(row=1, column=0, columnspan=3, sticky="w")
