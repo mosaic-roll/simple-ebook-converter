@@ -51,6 +51,10 @@ class CssEditor(ttk.Frame):
         super().__init__(master, **kwargs)
         self.on_change = on_change
         self._mode = tk.StringVar(value=CSS_NONE)
+        #: 上次已提交的模式 / 文本。失焦、点单选只在**真的变了**时通知，
+        #: 否则点一下别处就触发一次重扫，界面闪烁。
+        self._committed_mode = CSS_NONE
+        self._committed_text = ""
 
         self._build_modes()
 
@@ -102,15 +106,44 @@ class CssEditor(ttk.Frame):
             undo=True,
             exportselection=True)
         self.text.pack(side="left", fill="both", expand=True)
-        hbar = ttk.Scrollbar(wrap, orient="horizontal", command=self.text.xview)
-        self.text.configure(xscrollcommand=hbar.set)
-        hbar.pack(fill="x")
-        self.text.bind("<FocusOut>", lambda _e: self._changed(), add="+")
+        # 不放横向滚动条：它和外层 ScrollFrame 的排布打架，露在边上还点不动。
+        # 长行改走 Shift+滚轮横移（与正则框一致），仍然可达。
+        self.text.bind("<Shift-MouseWheel>", self._hscroll, add="+")
+        self.text.bind("<Shift-Button-4>", self._hscroll, add="+")
+        self.text.bind("<Shift-Button-5>", self._hscroll, add="+")
+        self.text.bind("<FocusOut>", self._on_text_focus_out, add="+")
+        self._committed_text = self.text.get("1.0", "end-1c")
+
+    def _on_text_focus_out(self, _event: tk.Event) -> None:
+        text = self.text.get("1.0", "end-1c")
+        if text == self._committed_text:
+            return
+        self._committed_text = text
+        self._changed()
+
+    @staticmethod
+    def _hscroll(event: tk.Event) -> str:
+        """`Shift+滚轮` 横向滚动（`wrap="none"` 时长行靠这个看）。"""
+        num = getattr(event, "num", None)
+        if num == 4:
+            delta = 1
+        elif num == 5:
+            delta = -1
+        else:
+            raw = int(getattr(event, "delta", 0) or 0)
+            delta = 1 if raw > 0 else (-1 if raw < 0 else 0)
+        if delta:
+            event.widget.xview_scroll(-delta, "units")
+        return "break"
 
     # ---------- 模式 ----------
 
     def _on_mode(self) -> None:
         self._apply_enabled()
+        mode = self._mode.get()
+        if mode == self._committed_mode:
+            return  # 点了已选中的模式，不算改动
+        self._committed_mode = mode
         self._changed()
 
     def _apply_enabled(self) -> None:
@@ -136,6 +169,9 @@ class CssEditor(ttk.Frame):
         self._apply_enabled()
         self.path_row.set(path)
         self._set_text(text)
+        # 程序化设值算「已提交」，之后失焦不该再报改动
+        self._committed_mode = self._mode.get()
+        self._committed_text = self.text.get("1.0", "end-1c")
 
     def _set_text(self, text: str) -> None:
         """写文本框，必要时临时放开。
@@ -151,6 +187,8 @@ class CssEditor(ttk.Frame):
             self.text.insert("1.0", text)
         if was == "disabled":
             self.text.configure(state=was)
+        # 程序化写入算「已提交」，之后失焦不该再报一次改动
+        self._committed_text = self.text.get("1.0", "end-1c")
 
     def load_builtin(self) -> str:
         """把内置 CSS 模板填进编辑框，作进一步改的起点。
