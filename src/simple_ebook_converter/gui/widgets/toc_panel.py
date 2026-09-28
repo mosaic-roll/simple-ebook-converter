@@ -199,10 +199,14 @@ class TocPanel(ttk.Frame):
         self._deleted[iid] = deleted
         entry = next((e for e in self._entries if entry_id(e) == iid), None)
         if entry is not None:
+            # 保留「替换后」原文，不重复缩进：上一次切换后树里存的值已经带缩进了，
+            # 直接传给 _row_values 会再叠一层，每点一次就缩进翻倍。
             shown = self.tree.set(iid, RESULT)
+            indent = " " * (2 * max(0, entry.get("level", 1) - 1))
+            raw_shown = shown[len(indent):] if shown.startswith(indent) else shown
             self.tree.item(
                 iid,
-                values=self._row_values(entry, iid, shown),
+                values=self._row_values(entry, iid, raw_shown),
                 tags=(TAG_DELETED) if deleted else ())
 
     def _toggle_all(self) -> None:
