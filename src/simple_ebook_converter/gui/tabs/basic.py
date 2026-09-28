@@ -13,6 +13,7 @@ from dataclasses import asdict
 import tkinter.ttk as ttk
 
 from ...core.encoding import AUTO_ENCODING, ENCODING_CHOICES
+from ...core.options import OPTIONS
 from ..build_config_from_ui import BasicValues
 from ..metrics import s
 from ..widgets.form import Check, Choice, Field, Form, Path, Section, Text
@@ -24,8 +25,6 @@ _AUTOFILL_KEYS = ("out", "encoding", "title", "author", "cover")
 
 def _help(name: str) -> str:
     """取 core 里该选项的帮助文字。界面不另抄一份说明，避免和 CLI `--help` 分叉。"""
-    from ...core.options import OPTIONS
-
     return next(opt for opt in OPTIONS if opt.name == name).help
 
 

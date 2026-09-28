@@ -22,6 +22,8 @@ Tk **不是线程安全的**：任何控件只能在主线程上碰。读文件�
 
 from __future__ import annotations
 
+import json
+import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -498,8 +500,6 @@ class App(ttk.Frame):
         if not path:
             return ""
         try:
-            import json
-
             entries = self.toc.toc_entries_with_flags()
             Path(path).write_text(
                 json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -518,8 +518,6 @@ class App(ttk.Frame):
         if not path:
             return 0
         try:
-            import json
-
             data = json.loads(Path(path).read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             messagebox.showerror("导入失败", str(exc), parent=self.root)
@@ -598,8 +596,6 @@ class App(ttk.Frame):
 
     def _run(self, work) -> None:
         """在工作线程里跑 `work`，异常不许穿出来。"""
-        import threading
-
         def guarded() -> None:
             try:
                 work()

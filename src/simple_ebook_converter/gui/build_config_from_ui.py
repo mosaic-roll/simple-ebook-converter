@@ -35,7 +35,7 @@ from typing import Any
 
 from ..core.config import Config
 from ..core.options import build_config
-from ..core.replace import Rule, rules_to_json
+from ..core.replace import Rule, replacers_by_stage, rules_to_json
 
 #: CSS 模式：单一枚举，与 webview 版一致（不拆成两个字段）
 CSS_NONE, CSS_APPEND, CSS_OVERRIDE = "none", "append", "override"
@@ -334,7 +334,5 @@ def preview_replacements(entries: list[dict], rules: list[Rule]) -> dict[str, st
     预览只体现 `raw` 阶段：`html` 阶段是要塞标签给阅读器渲染的，在纯文本目录里
     没有意义（与 `gui设计webview版.md` 一致）。
     """
-    from ..core.replace import replacers_by_stage
-
     raw, _ = replacers_by_stage(rules)
     return {entry_id(e): raw.text(e.get("raw_title", "")) for e in entries}

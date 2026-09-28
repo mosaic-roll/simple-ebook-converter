@@ -13,9 +13,17 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
+
+from .build_config_from_ui import (
+    BasicValues,
+    IdentifyValues,
+    TocSettings,
+    TypographyValues,
+    UiValues,
+)
 
 #: 配置版本。结构变了就 +1，旧文件按缺省处理而不是硬读
 VERSION = 1
@@ -169,14 +177,6 @@ class Settings:
 
     def to_values(self):
         """`Settings` → `UiValues`。没存的字段（输入/输出路径等）留空。"""
-        from .build_config_from_ui import (
-            BasicValues,
-            IdentifyValues,
-            TocSettings,
-            TypographyValues,
-            UiValues,
-        )
-
         return UiValues(
             basic=BasicValues(
                 encoding=self.encoding,
@@ -282,8 +282,6 @@ def _level_pattern(value: Any) -> str | None:
 
 def asdict_shallow(settings: Settings) -> dict[str, Any]:
     """`dataclasses.asdict` 的一层版本。`levels` 已经是 `{str: str|None}`，不需要递归。"""
-    from dataclasses import fields
-
     return {f.name: getattr(settings, f.name) for f in fields(settings)}
 
 

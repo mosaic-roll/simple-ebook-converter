@@ -20,7 +20,7 @@ from collections.abc import Callable
 import tkinter.ttk as ttk
 
 from ...core.config import LEVEL_PRESETS
-from ...core.options import option_default
+from ...core.options import OPTIONS, option_default
 from ..build_config_from_ui import IdentifyValues
 from ..metrics import s
 from ..widgets.extra_levels import ExtraLevelsEditor
@@ -251,8 +251,6 @@ def _option(name: str):
     本地薄封装：core 把这个查找函数写成下划线私有的，GUI 侧有四五处要查，
     在这里聚成一个公开名字比逐处 import 私有名更清楚。
     """
-    from ...core.options import OPTIONS
-
     return next(opt for opt in OPTIONS if opt.name == name)
 
 

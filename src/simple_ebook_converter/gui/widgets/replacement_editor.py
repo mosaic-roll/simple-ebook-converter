@@ -12,9 +12,17 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
+from tkinter import filedialog
 import tkinter.ttk as ttk
 
-from ...core.replace import STAGE_LABELS, STAGES, Rule, rules_from_rows, rules_to_json
+from ...core.replace import (
+    STAGE_LABELS,
+    STAGES,
+    Rule,
+    check_stage,
+    rules_from_json,
+    rules_to_json,
+)
 from .. import theme
 from ..fonts import font
 from ..metrics import s
@@ -132,8 +140,6 @@ class ReplacementEditor(ttk.Frame):
 
     def get_rules(self) -> list[Rule]:
         """当前启用的规则（已解析、已校验）。"""
-        from ...core.replace import check_stage
-
         return [
             Rule(pattern=r[0], replace=r[1], stage=check_stage(r[2], f"规则「{r[0]}」"), enabled=r[3])
             for r in self.get_rows()
@@ -155,8 +161,6 @@ class ReplacementEditor(ttk.Frame):
 
     def set_json(self, text: str) -> None:
         """用一段 core 格式的 JSON 覆盖全部行；不合法抛 `ValueError`（消息可展示）。"""
-        from ..core.replace import rules_from_json
-
         self.set_rows([(r.pattern, r.replace, r.stage, r.enabled) for r in rules_from_json(text)])
 
     # ---------- 增删改 ----------
@@ -277,10 +281,6 @@ class ReplacementEditor(ttk.Frame):
 
     def import_json(self) -> int:
         """读一个 core 格式的 JSON 规则文件。失败只提示、不清空已有规则。"""
-        from tkinter import filedialog
-
-        from ..core.pipeline import read_input  # noqa: F401  仅为统一错误类型
-
         path = filedialog.askopenfilename(
             title="导入替换规则", filetypes=[("JSON", "*.json"), ("所有文件", "*.*")]
         )
@@ -296,8 +296,6 @@ class ReplacementEditor(ttk.Frame):
 
     def export_json(self) -> str:
         """把当前规则写成 JSON 文本并弹保存框。取消返回空串。"""
-        from tkinter import filedialog
-
         path = filedialog.asksaveasfilename(
             title="导出替换规则",
             defaultextension=".json",

@@ -15,6 +15,8 @@ import tkinter as tk
 from collections.abc import Callable
 import tkinter.ttk as ttk
 
+from ...core.builder import builtin_css
+from ...core.config import DEFAULTS
 from ..build_config_from_ui import CSS_APPEND, CSS_MODES, CSS_NONE, CSS_OVERRIDE
 from ..fonts import font
 from ..metrics import s
@@ -159,9 +161,6 @@ class CssEditor(ttk.Frame):
         用 core 的 `builtin_css()` 而不是打包资源里的静态副本：改了内置模板之后
         这里自动跟着变，不会出现「导出的模板和实际生成用的不是一份」。
         """
-        from ...core.builder import builtin_css
-        from ...core.config import DEFAULTS
-
         self._set_text(builtin_css(DEFAULTS))
         self.hint.configure(text=f"已载入内置模板；{LOAD_BUILTIN} 不会自动切换模式")
         self._changed()
