@@ -106,7 +106,12 @@ class Section:
 
 
 class _Control:
-    """控件的统一取值接口。`widget` / `var` 让调用方能拿到具体控件。"""
+    """控件的统一取值接口。
+
+    `widget` **一律返回真实的 ttk 控件**（`ttk.Entry` / `Combobox` / `Spinbox` /
+    `Checkbutton` / `PathRow`），`var` 才返回 Tk 变量。之前 `widget` 对文本类返回的
+    是 `StringVar`，同一个属性两种含义，调用方无法预期。
+    """
 
     def get(self):  # noqa: ANN201 - 子类各自返回 str / bool
         raise NotImplementedError
@@ -134,6 +139,7 @@ class _TextControl(_Control):
         entry = ttk.Entry(top, textvariable=self._var)
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
         entry.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
+        self._widget = entry
         if spec.help:
             ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
@@ -147,7 +153,7 @@ class _TextControl(_Control):
 
     @property
     def widget(self) -> tk.Misc:
-        return self._var
+        return self._widget
 
     @property
     def var(self) -> tk.StringVar:
@@ -169,6 +175,7 @@ class _ChoiceControl(_Control):
             width=18)
         combo.pack(side="left", padx=(s(6), 0))
         combo.bind("<<ComboboxSelected>>", lambda _e: on_change(field.name))
+        self._widget = combo
 
     def _display(self, value: str) -> str:
         if self._spec.labels and value in self._spec.choices:
@@ -188,7 +195,7 @@ class _ChoiceControl(_Control):
 
     @property
     def widget(self) -> tk.Misc:
-        return self._var
+        return self._widget
 
     @property
     def var(self) -> tk.StringVar:
@@ -208,6 +215,7 @@ class _SpinControl(_Control):
         # Spinbox 敲键时 `command` 不一定触发，两个都接上
         spin.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
         spin.configure(command=lambda: on_change(field.name))
+        self._widget = spin
         self._low, self._high = spec.low, spec.high
         if spec.help:
             ttk.Label(frame, text=spec.help).pack(
@@ -226,7 +234,7 @@ class _SpinControl(_Control):
 
     @property
     def widget(self) -> tk.Misc:
-        return self._var
+        return self._widget
 
     @property
     def var(self) -> tk.IntVar:
@@ -236,11 +244,12 @@ class _SpinControl(_Control):
 class _CheckControl(_Control):
     def __init__(self, parent, field: Field, spec: Check, on_change, on_path_valid) -> None:
         self._var = tk.BooleanVar(value=spec.default)
-        ttk.Checkbutton(
+        self._widget = ttk.Checkbutton(
             parent,
             text=field.label,
             variable=self._var,
-            command=lambda: on_change(field.name)).pack(anchor="w", pady=(s(4), 0))
+            command=lambda: on_change(field.name))
+        self._widget.pack(anchor="w", pady=(s(4), 0))
 
     def get(self) -> bool:
         return bool(self._var.get())
@@ -250,7 +259,7 @@ class _CheckControl(_Control):
 
     @property
     def widget(self) -> tk.Misc:
-        return self._var
+        return self._widget
 
     @property
     def var(self) -> tk.BooleanVar:
