@@ -1013,3 +1013,125 @@ def test_app_never_deletes_user_chosen_css(tk_root, monkeypatch, tmp_path) -> No
     app._cleanup_temp_css()
     assert mine.exists(), "临时文件清理误伤了用户指定的 CSS"
     app.destroy()
+
+
+# ---------- 第一档 bug 回归（文档 §5） ----------
+
+
+def _delete_buttons(editor) -> list:
+    """`ExtraLevelsEditor` 每行的删除按钮，按行序。"""
+    result = []
+    for row in editor.rows:
+        for child in row["frame"].winfo_children():
+            if isinstance(child, ttk.Button):
+                result.append(child)
+    return result
+
+
+def test_extra_levels_delete_buttons_target_their_own_row(tk_root) -> None:
+    """§5.1 删除按钮按稳定 id 定位，删掉前面的行后仍删自己那一行。
+
+    旧实现把序号闭包进回调（`lambda i=index`），删掉一行后其余行序号漂移，
+    再点不是删错行就是点不动。
+    """
+    ed = ExtraLevelsEditor(tk_root)
+    ed.set([
+        {"h": "h1", "class_name": "", "regex": "^a"},
+        {"h": "h2", "class_name": "", "regex": "^b"},
+        {"h": "h3", "class_name": "", "regex": "^c"},
+    ])
+    buttons = _delete_buttons(ed)
+    assert len(buttons) == 3
+
+    buttons[0].invoke()  # 删第一行
+    assert ed.get_specs() == ["h2:^b", "h3:^c"]
+
+    # 原第二行的按钮现在必须删「^b」，而不是按旧序号删掉「^c」
+    buttons[1].invoke()
+    assert ed.get_specs() == ["h3:^c"]
+
+
+def test_path_row_set_enabled_disables_entry_and_buttons(tk_root) -> None:
+    """§5.2 PathRow 能递归禁用整行（入口 + 浏览/清除按钮）。"""
+    from simple_ebook_converter.gui.widgets.path_row import PathRow
+
+    row = PathRow(tk_root, "文件")
+    row.set_enabled(False)
+    assert str(row.entry.cget("state")) == "disabled"
+    btns = [c for c in row._buttons.winfo_children() if isinstance(c, ttk.Button)]
+    assert btns and all(str(b.cget("state")) == "disabled" for b in btns)
+
+    row.set_enabled(True)
+    assert str(row.entry.cget("state")) == "normal"
+    assert all(str(b.cget("state")) == "normal" for b in btns)
+
+
+def test_css_editor_none_mode_disables_path_buttons(tk_root) -> None:
+    """§5.2 `none` 模式下浏览/清除按钮要真的禁用，不是只灰了入口。"""
+    ed = CssEditor(tk_root)
+
+    def path_buttons() -> list:
+        found = []
+
+        def walk(w) -> None:
+            if isinstance(w, ttk.Button):
+                found.append(w)
+            for child in w.winfo_children():
+                walk(child)
+
+        walk(ed.path_row)
+        return found
+
+    buttons = path_buttons()
+    assert buttons, "路径行应有浏览/清除按钮"
+    assert all(str(b.cget("state")) == "disabled" for b in buttons), "none 模式下按钮没禁用"
+
+    ed.set(CSS_APPEND, "a.css")
+    assert all(str(b.cget("state")) == "normal" for b in path_buttons())
+
+
+def test_form_widget_returns_real_widget(tk_root) -> None:
+    """§5.3 `widget` 给真实 ttk 控件，Tk 变量走 `var`。"""
+    from simple_ebook_converter.gui.widgets.form import (
+        Check,
+        Choice,
+        Field,
+        Form,
+        Section,
+        Spin,
+        Text,
+    )
+
+    form = Form(
+        tk_root,
+        (
+            Section("组", (
+                Field("t", "文字", Text()),
+                Field("c", "选项", Choice(("x", "y"), default="x")),
+                Field("n", "数字", Spin(0, 9, default=1)),
+                Field("b", "开关", Check(default=False)),
+            )),
+        ),
+    )
+    form.pack()
+    for name in ("t", "c", "n", "b"):
+        assert isinstance(form.control(name).widget, tk.Misc), name
+    assert isinstance(form.control("t").widget, ttk.Entry)
+    assert isinstance(form.control("c").widget, ttk.Combobox)
+    assert isinstance(form.control("n").widget, ttk.Spinbox)
+    assert isinstance(form.control("b").widget, ttk.Checkbutton)
+    # 变量仍能从 `var` 拿到
+    assert isinstance(form.control("t").var, tk.StringVar)
+    form.destroy()
+
+
+def test_scroll_frame_auto_tags_dynamically_added_widget(tk_root) -> None:
+    """§5.4 动态新增控件由 ScrollFrame 自动补 bindtag，调用方不必手动 retag。"""
+    sf = ScrollFrame(tk_root)
+    sf.pack()
+    tk_root.update()
+    late = ttk.Entry(sf.inner)
+    late.pack()
+    tk_root.update()
+    tk_root.update_idletasks()
+    assert BINDTAG in late.bindtags()
