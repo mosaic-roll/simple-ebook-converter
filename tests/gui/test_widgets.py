@@ -801,7 +801,7 @@ def test_app_rule_edits_refresh_preview_without_rescan(tk_root, monkeypatch) -> 
     app.tabs["replace"].editor.set_rows([("第一章", "Chapter One", "原文")])
     tk_root.update()
     assert app.toc.tree.column(RESULT, "width") > 0, "有规则了结果列还藏着"
-    shown = [app.toc.tree.set(i, RESULT) for i in app.toc.tree.get_children()]
+    shown = [app.toc.tree.set(i, RESULT).strip() for i in app.toc.tree.get_children()]
     assert shown[0].startswith("Chapter One")
     assert shown[1].startswith("第二章"), "只该替换命中的那条"
 

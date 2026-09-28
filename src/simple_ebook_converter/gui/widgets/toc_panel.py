@@ -179,8 +179,9 @@ class TocPanel(ttk.Frame):
         deleted = self._deleted.get(iid, False)
         # 已划掉：灰前景 + check 列留空（用空格而不是「□」，少一个字符就不用担心字形）
         mark = "  " if deleted else "√"
-        title = " " * (2 * max(0, entry.get("level", 1) - 1)) + entry.get("raw_title", "")
-        return (mark, title, shown)
+        indent = " " * (2 * max(0, entry.get("level", 1) - 1))
+        raw_title = entry.get("raw_title", "")
+        return (mark, indent + raw_title, indent + shown)
 
     def _on_click(self, event: tk.Event) -> None:
         """点 `check` 列切换启用；点别处就是普通选中。"""
