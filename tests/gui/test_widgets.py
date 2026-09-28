@@ -1270,6 +1270,22 @@ def test_basic_and_typography_changes_do_not_rescan(tk_root, monkeypatch) -> Non
     app.destroy()
 
 
+def test_set_input_schedules_rescan(tk_root, monkeypatch) -> None:
+    """换输入文件后要自动识别一次目录（区别于失焦：换文件是明确动作）。"""
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+    app = app_mod.App(tk_root)
+    tk_root.update()
+    assert app._debounce_id is None
+
+    app.tabs["basic"].set_input("novel.txt")
+    assert app._debounce_id is not None, "换文件没有自动排重扫"
+    app.destroy()
+
+
 def test_identify_apply_schedules_rescan(tk_root, monkeypatch) -> None:
     """识别页点「应用」才排重扫（识别设置是唯一需要重扫的用户动作之一）。"""
     import simple_ebook_converter.gui.app as app_mod

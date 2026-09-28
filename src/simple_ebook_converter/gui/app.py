@@ -207,8 +207,8 @@ class App(ttk.Frame):
             title="选择输入文件", filetypes=[("文本", "*.txt"), ("所有文件", "*.*")]
         )
         if path:
+            # `set_input` 会经 `on_input_chosen` 触发一次自动重扫
             self.tabs["basic"].set_input(path)
-            self.rescan()
 
     # ---------- 值 ----------
 
@@ -334,8 +334,14 @@ class App(ttk.Frame):
             self._autofill(resolved, used)
 
     def _rescan_input(self, path: str) -> None:
-        """输入文件确定后标记为「输入触发」重扫，由调用方执行 rescan()。"""
+        """输入文件**真的换了**：自动识别一次目录。
+
+        换文件是明确动作（选文件 / 改路径后确认），和「点到别处失焦」不是一回事 ——
+        前者要自动扫，后者不扫。只有 `BasicTab` 在输入路径变化时才会调到这里。
+        """
+        del path  # 具体路径由界面持有，这里只关心「变了」
         self.tabs["basic"]._rescan_for_input = True
+        self._schedule_rescan()
 
     def _autofill(self, resolved, used: str) -> None:
         """扫完按设计 §7.4 填输出路径/编码/书名/作者/封面。

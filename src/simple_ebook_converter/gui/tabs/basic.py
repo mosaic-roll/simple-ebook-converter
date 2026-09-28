@@ -185,6 +185,9 @@ class BasicTab(ttk.Frame):
         self._last_input = path
         self._rescan_for_input = True
         self._changed()
+        # 换文件要自动识别一次目录
+        if self.on_input_chosen is not None:
+            self.on_input_chosen(path)
 
     # ---------- 内部 ----------
 
