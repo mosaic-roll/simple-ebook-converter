@@ -1160,3 +1160,127 @@ def test_identify_tab_declares_sections_via_form(tk_root) -> None:
     assert isinstance(tab.builtin, BuiltinLevelsEditor)
     assert tab.btn_apply is not None
     tab.destroy()
+
+
+# ---------- 原有问题修复 ----------
+
+
+def test_css_editor_has_no_horizontal_scrollbar(tk_root) -> None:
+    """内联编辑区不该有横向滚动条（它和外层 ScrollFrame 打架，点不动）。"""
+    ed = CssEditor(tk_root)
+
+    def scrollbars(w):
+        found = []
+        if isinstance(w, ttk.Scrollbar):
+            found.append(str(w.cget("orient")))
+        for child in w.winfo_children():
+            found.extend(scrollbars(child))
+        return found
+
+    assert "horizontal" not in scrollbars(ed)
+
+
+def test_css_editor_text_commits_only_when_changed(tk_root) -> None:
+    """CSS 文本失焦只在内容变了时通知（否则点别处就重扫、闪烁）。"""
+    ed = CssEditor(tk_root)
+    calls: list[bool] = []
+    ed.on_change = lambda: calls.append(True)
+    ed.set(CSS_APPEND, "a.css", "h1 {}")
+    ed._on_text_focus_out(None)
+    assert calls == []
+    ed.text.insert("end", " /* x */")
+    ed._on_text_focus_out(None)
+    assert calls == [True]
+
+
+def test_replacement_editor_stage_column_is_editable(tk_root) -> None:
+    """「阶段」列可双击开下拉（曾在 `_on_edit` 被当成不可编辑列跳过）。"""
+    from simple_ebook_converter.gui.widgets.replacement_editor import (
+        EDITABLE_COLUMNS,
+        STAGE,
+    )
+
+    assert EDITABLE_COLUMNS.get("#4") == STAGE
+    assert "#1" not in EDITABLE_COLUMNS, "启用列不该开编辑框（单击切换）"
+
+
+def test_toc_panel_title_and_result_equal_width(tk_root) -> None:
+    """「标题」与「替换后」应等宽（原来结果列过窄）。"""
+    entry = {"raw_title": "第一章", "level": 3, "lines": [1, 9]}
+    panel = TocPanel(tk_root)
+    panel.set_entries([entry])
+    panel.set_result_column({entry_id(entry): "Chapter 1"})
+    assert panel.tree.column(TITLE, "width") == panel.tree.column(RESULT, "width")
+
+
+def test_form_text_control_commits_only_when_changed(tk_root) -> None:
+    """失焦只在值变了时提交；没变不通知（否则点到别处就重扫、闪烁）。"""
+    from simple_ebook_converter.gui.widgets.form import Field, Form, Section, Text
+
+    calls: list[str] = []
+    form = Form(
+        tk_root,
+        (Section("g", (Field("t", "文字", Text(default="a")),)),),
+        on_change=lambda name: calls.append(name),
+    )
+    ctrl = form.control("t")
+    ctrl._commit()
+    assert calls == []
+    ctrl.var.set("b")
+    ctrl._commit()
+    assert calls == ["t"]
+    ctrl._commit()  # 再提交一次不重复
+    assert calls == ["t"]
+
+
+def test_path_entry_notifies_only_when_changed(tk_root) -> None:
+    """PathEntry 失焦只在内容变了时通知（校验仍照做）。"""
+    calls: list[bool] = []
+    entry = PathEntry(tk_root, kind="input", on_change=lambda: calls.append(True))
+    entry.insert(0, "a")
+    entry._on_focus_in(None)
+    entry._on_focus_out(None)
+    assert calls == []
+    entry.insert(tk.END, "b")
+    entry._on_focus_out(None)
+    assert calls == [True]
+
+
+def test_basic_and_typography_changes_do_not_rescan(tk_root, monkeypatch) -> None:
+    """改基础/排版字段只刷新按钮，**不重扫目录**（重扫只由用户动作触发）。"""
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+    app = app_mod.App(tk_root)
+    tk_root.update()
+
+    rescans: list[bool] = []
+    monkeypatch.setattr(app_mod.App, "rescan", lambda self: rescans.append(True))
+
+    app.tabs["basic"]._title.set("新书名")
+    app.tabs["basic"]._field_changed("title")
+    app.tabs["typography"].form.set_value("line_height", "2.0")
+    app.tabs["typography"]._changed()
+    tk_root.update()
+
+    assert rescans == []
+    assert app._debounce_id is None, "字段改动不该排重扫"
+    app.destroy()
+
+
+def test_identify_apply_schedules_rescan(tk_root, monkeypatch) -> None:
+    """识别页点「应用」才排重扫（识别设置是唯一需要重扫的用户动作之一）。"""
+    import simple_ebook_converter.gui.app as app_mod
+    import simple_ebook_converter.gui.settings as settings_mod
+
+    monkeypatch.setattr(settings_mod, "load_settings", lambda: settings_mod.Settings())
+    monkeypatch.setattr(app_mod, "load_settings", lambda: settings_mod.Settings())
+    app = app_mod.App(tk_root)
+    tk_root.update()
+    assert app._debounce_id is None
+
+    app.tabs["identify"]._apply()
+    assert app._debounce_id is not None
+    app.destroy()
