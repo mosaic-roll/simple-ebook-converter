@@ -23,10 +23,9 @@ from ...core.config import LEVEL_PRESETS
 from ...core.options import OPTIONS, option_default
 from ..build_config_from_ui import IdentifyValues
 from ..metrics import s
-from ..models import levels_state
+from ..widgets.builtin_levels import BuiltinLevelsEditor
 from ..widgets.extra_levels import ExtraLevelsEditor
 from ..widgets.form import Field, Form, Section, Spin, Text
-from ..widgets.regex_entry import regex_entry
 from ..widgets.scroll_frame import ScrollFrame
 from ..widgets.button_row import ButtonRow
 
@@ -64,15 +63,19 @@ class IdentifyTab(ttk.Frame):
 
         box = ttk.LabelFrame(body, text="内置层级", padding=(s(8), s(6)))
         box.pack(fill="x")
-        #: 选项名 → (启用勾选的 BooleanVar, 正则框的 StringVar)
-        self._levels: dict[str, tuple[tk.BooleanVar, tk.StringVar]] = {}
-        #: 选项名 → 用户动过没有。三态里的 `None` 靠它，不能从控件状态推
-        self._touched: dict[str, bool] = {}
-        for index, (name, label) in enumerate(_TITLES):
-            self._levels[name] = self._level_row(box, name, label, index)
-            # 初始都算「没动过」。不预置的话，没调过 `set()` 就 `get()` 会 KeyError
-            # （App 里 `set()` 先跑所以看不出来，但控件不该依赖调用顺序）。
-            self._touched[name] = False
+        # 三行内置层级的布局与三态规则在组件里（这里是页面，不再写 grid）
+        self.builtin = BuiltinLevelsEditor(
+            box,
+            titles=_TITLES,
+            default_of=lambda name: option_default(_option(name)),
+            on_change=self._changed,
+            # 勾选变化要让额外层级的冲突判断重算
+            on_toggle=self._on_levels_toggled,
+        )
+        self.builtin.pack(fill="x")
+        #: 对外仍暴露这两个映射（测试与冲突判断在用）
+        self._levels = self.builtin.levels
+        self._touched = self.builtin.touched
 
         extra = ttk.LabelFrame(body, text="额外层级", padding=(s(8), s(6)))
         extra.pack(fill="both", expand=True, pady=(s(12), 0))
@@ -115,7 +118,7 @@ class IdentifyTab(ttk.Frame):
 
     def get(self) -> IdentifyValues:
         return IdentifyValues(
-            levels=self._levels_state(),
+            levels=self.builtin.state(),
             level_rows=self.extra.get(),
             max_title_len=_clamp(self.form.value("max_title_len"), *MAX_LEN_RANGE),
             preface_title=self.form.value("preface_title").strip(),
@@ -124,13 +127,7 @@ class IdentifyTab(ttk.Frame):
     def set(self, values: IdentifyValues) -> None:
         self._suspend = True
         try:
-            for name, (enabled, pattern) in self._levels.items():
-                given = values.levels.get(name)
-                default = str(option_default(_option(name)))
-                on, text, touched = levels_state.from_saved(given, default)
-                enabled.set(on)
-                pattern.set(text)
-                self._touched[name] = touched
+            self.builtin.set_state(values.levels)
             self.extra.set([dict(row) for row in values.level_rows])
             self.form.set_value("max_title_len", values.max_title_len)
             self.form.set_value("preface_title", values.preface_title)
@@ -138,85 +135,11 @@ class IdentifyTab(ttk.Frame):
             self._suspend = False
         self._clear_dirty()
 
-    def _levels_state(self) -> dict[str, str | None]:
-        """收集三态。
-
-        `None`（未动过）**不能**从「勾选框 + 文本框」的状态推出来 —— 框里总有内容，
-        哪怕是 core 缺省正则。必须另记一个「用户动过没有」的标记，否则每次 `get()`
-        都会发出去一个显式正则，core 的缺省从此再也改不动。
-
-        * 未动过 → `None`：不发这个键，core 用 `option_default`
-        * 取消勾选 → `""`：显式关闭
-        * 动过且框里有内容 → 该正则
-        * 动过但框被清空 → `""`（空正则在 core 里就是不启用）
-
-        **正则原样收，不做 `strip`**：首尾空格在正则里是有意义的（比如要匹配段首的
-        空白、或故意匹配行尾空格）。core 的 `parse_level_spec()` 也只在 `:` 之前
-        `strip`，冒号之后整段保留。
-        """
-        return {
-            name: levels_state.to_saved(
-                enabled.get(), self._touched[name], pattern.get()
-            )
-            for name, (enabled, pattern) in self._levels.items()
-        }
-
     # ---------- 内部 ----------
 
-    def _level_row(
-        self, parent: ttk.Frame, name: str, label: str, row: int
-    ) -> tuple[tk.BooleanVar, tk.StringVar]:
-        """一行：启用勾选 + 正则框 + 恢复默认。返回 (启用变量, 正则变量)。"""
-        frame = ttk.Frame(parent)
-        frame.grid(row=row, column=0, sticky="ew", pady=(0, s(4)))
-        parent.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=1)
-
-        default = str(option_default(_option(name)))
-        enabled = tk.BooleanVar(value=bool(default))
-        box = ttk.Checkbutton(
-            frame, text=label, variable=enabled, command=lambda n=name: self._on_toggle(n)
-        )
-        box.grid(row=0, column=0, sticky="w")
-
-        pattern = tk.StringVar(value=default)
-        # **先放「恢复默认」再放正则框**：正则框 `fill=x, expand`，pack 会把空间
-        # 优先给它、把后放的控件挤出可视区。按钮先占住右边，框再吃剩下的，
-        # 窄窗口下按钮才不会被挤没。改用 ButtonRow + spacer 保持同样的效果。
-        btns = ButtonRow(frame)
-        btns.grid(row=0, column=2, sticky="e", padx=(s(6), 0))
-        btns.add_spacer_expand()
-        btns.add("恢复默认", lambda n=name, v=pattern: self._restore_default(n, v), width=8)
-        entry = regex_entry(frame, textvariable=pattern, width=40)
-        entry.grid(row=0, column=1, sticky="ew", padx=(s(6), s(4)))
-        pattern.trace_add("write", lambda *_, n=name: self._on_pattern(n))
-        return enabled, pattern
-
-    def _on_pattern(self, name: str) -> None:
-        """正则框内容变了 → 算「用户动过」。`set()` 也会触发，故那里先重置标记。"""
-        self._touched[name] = True
-        self._changed()
-
-    def _restore_default(self, name: str, var: tk.StringVar) -> None:
-        """「恢复默认」：填回 core 缺省并**标记为未动过**。
-
-        填回内容 + 清除 touched 两件事必须一起做，否则框里显示的是缺省正则、
-        发出去的却还是用户之前那条 —— 看着对、跑起来是另一回事。
-        """
-        var.set(str(option_default(_option(name))))
-        self._touched[name] = False
-        self._on_toggle(name)
-
-    def _on_toggle(self, name: str | None = None) -> None:
-        """勾选状态变化：让额外层级的冲突判断跟着重算。
-
-        勾选也是「动过」——用户主动关掉一条层级，和它一直用着缺省是两回事。
-        但 `_restore_default()` 会在填回缺省后调到这里，所以那里已先把 touched 清了。
-        """
-        if name is not None and self._levels[name][0].get():
-            self._touched[name] = True
+    def _on_levels_toggled(self) -> None:
+        """内置层级勾选变化 → 额外层级的冲突判断要重算。"""
         self.revalidate_extra()
-        self._changed()
 
     def _changed(self) -> None:
         """控件改了：只置脏，不重扫。真正重扫在 `_apply()`。"""
