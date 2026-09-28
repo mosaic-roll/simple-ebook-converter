@@ -24,6 +24,7 @@ from ...core.options import option_default
 from ..build_config_from_ui import IdentifyValues
 from ..metrics import s
 from ..widgets.extra_levels import ExtraLevelsEditor
+from ..widgets.form import Field, Form, Section, Spin, Text
 from ..widgets.regex_entry import regex_entry
 from ..widgets.scroll_frame import ScrollFrame
 
@@ -82,29 +83,24 @@ class IdentifyTab(ttk.Frame):
         # 内部状态变了要让编辑器重算（它问 is_builtin_enabled 才知道冲突）
         self.revalidate_extra = self.extra._revalidate
 
-        bottom = ttk.Frame(body)
-        bottom.pack(fill="x", pady=(s(10), 0))
-        ttk.Label(bottom, text="标题最长字数").pack(side="left")
-        self._max_len = tk.IntVar(value=option_default(_option("max_title_len")))
-        ttk.Spinbox(
-            bottom,
-            from_=MAX_LEN_RANGE[0],
-            to=MAX_LEN_RANGE[1],
-            width=5,
-            textvariable=self._max_len,
-            command=self._changed,
-        ).pack(side="left", padx=(s(4), s(12)))
-        self._max_len.trace_add("write", lambda *_: self._changed())
-        ttk.Label(bottom, text="前言标题").pack(side="left")
-        self._preface = tk.StringVar(value=option_default(_option("preface_title")))
-        ttk.Entry(bottom, textvariable=self._preface, width=16).pack(side="left", padx=(s(4), 0))
-        self._preface.trace_add("write", lambda *_: self._changed())
+        # 识别设置：**不即时重扫**，攒到点「应用」再扫。
+        # 底部用声明式 Form 声明，`on_change` 统一触发 `_changed`。
+        self.form = Form(
+            body,
+            (Section("识别设置", (
+                Field("max_title_len", "标题最长字数", Spin(MAX_LEN_RANGE[0], MAX_LEN_RANGE[1], default=6)),
+                Field("preface_title", "前言标题", Text()),
+            ),),),
+            on_change=self._changed,
+            padding=(s(8), 0),
+        )
+        self.form.pack(fill="x", pady=(s(10), 0))
+        self._max_len = self.form.control("max_title_len").var
+        self._preface = self.form.control("preface_title").var
 
-        # 识别设置**不即时重扫**：改一条正则就整本重读一遍代价太大。攒到点「应用」
-        # 再扫，旁边一行字提示还有未应用的改动。
+        # 按钮先占右边：提示文字可长可短，别把按钮挤出可视区
         actions = ttk.Frame(body)
         actions.pack(fill="x", pady=(s(10), 0))
-        # 按钮先占右边：提示文字可长可短，别把按钮挤出可视区
         self.btn_apply = ttk.Button(actions, text="应用", command=self._apply)
         self.btn_apply.pack(side="right")
         ttk.Label(actions, textvariable=self.v_dirty).pack(side="left")
@@ -118,8 +114,8 @@ class IdentifyTab(ttk.Frame):
         return IdentifyValues(
             levels=self._levels_state(),
             level_rows=self.extra.get(),
-            max_title_len=_clamp(self._max_len.get(), *MAX_LEN_RANGE),
-            preface_title=self._preface.get().strip(),
+            max_title_len=_clamp(self.form.value("max_title_len"), *MAX_LEN_RANGE),
+            preface_title=self.form.value("preface_title").strip(),
         )
 
     def set(self, values: IdentifyValues) -> None:
@@ -128,19 +124,16 @@ class IdentifyTab(ttk.Frame):
             for name, (enabled, pattern) in self._levels.items():
                 given = values.levels.get(name)
                 if given is None:
-                    # 跟随 core 缺省：勾上、框里显示缺省正则，**但标记为未动过**。
-                    # 框里看得见的内容只是给人参考，不该被当成用户填的值发出去。
                     enabled.set(True)
                     pattern.set(str(option_default(_option(name))))
                     self._touched[name] = False
                 else:
-                    # 非空 = 启用（用户显式给了正则）；空串 = 显式关闭
                     enabled.set(bool(given))
                     pattern.set(given)
                     self._touched[name] = True
             self.extra.set([dict(row) for row in values.level_rows])
-            self._max_len.set(values.max_title_len)
-            self._preface.set(values.preface_title)
+            self.form.set_value("max_title_len", values.max_title_len)
+            self.form.set_value("preface_title", values.preface_title)
         finally:
             self._suspend = False
         self._clear_dirty()

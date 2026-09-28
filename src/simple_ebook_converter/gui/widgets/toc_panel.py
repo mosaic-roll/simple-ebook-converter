@@ -21,7 +21,9 @@ import tkinter.ttk as ttk
 
 from .. import theme
 from ..build_config_from_ui import TocSettings, entry_id
-from ..metrics import s, set_row_height
+from ..metrics import s
+from .button_row import ButtonRow
+from .treeview import build_treeview
 
 #: 三列
 CHECK, TITLE, RESULT = "check", "title", "result"
@@ -76,18 +78,14 @@ class TocPanel(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(0, s(4)))
 
-        row1 = ttk.Frame(bar)
-        row1.pack(fill="x")
-        for text, command in (("重扫", self.on_rescan), ("导入", self.on_import), ("导出", self.on_export)):
-            ttk.Button(row1, text=text, command=command or (lambda: None)).pack(
-                side="left", padx=(0, s(4))
-            )
+        row1 = ButtonRow(bar)
+        row1.add_many([("重扫", self.on_rescan), ("导入", self.on_import), ("导出", self.on_export)])
         self.v_all = tk.BooleanVar(value=False)
-        self.cb_all = ttk.Checkbutton(
+        ttk.Checkbutton(
             row1, text="全部启用", variable=self.v_all, command=self._toggle_all
-        )
-        self.cb_all.pack(side="left", padx=(s(8), 0))
+        ).pack(side="left", padx=(s(8), 0))
 
+        # 目录深度 + 书页含目录：非按钮控件，另起一行
         row2 = ttk.Frame(bar)
         row2.pack(fill="x", pady=(s(4), 0))
         ttk.Label(row2, text="目录深度").pack(side="left")
@@ -107,30 +105,17 @@ class TocPanel(ttk.Frame):
         ).pack(side="left")
 
     def _build_tree(self) -> None:
-        wrap = ttk.Frame(self)
-        wrap.pack(fill="both", expand=True)
-        self.tree = ttk.Treeview(
-            wrap,
+        self.tree, vbar, _wrap = build_treeview(
+            self,
             columns=(CHECK, TITLE, RESULT),
-            show="headings",
-            selectmode="browse",
-            style="Toc.Treeview")
-        for column in (CHECK, TITLE, RESULT):
-            self.tree.heading(column, text=HEADINGS[column], anchor=COL_HEADING_ANCHORS[column])
-            self.tree.column(
-                column,
-                width=s(COL_WIDTHS[column]),
-                minwidth=s(COL_MINWIDTHS[column]),
-                anchor=COL_ANCHORS[column],
-                stretch=COL_STRETCH[column])
-        # height 不设，交给 pack(expand=True)
-        set_row_height("Toc.Treeview", px=ROW_HEIGHT)
-
-        vbar = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vbar.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vbar.pack(side="right", fill="y")
-
+            headings=HEADINGS,
+            widths=COL_WIDTHS,
+            minwidths=COL_MINWIDTHS,
+            style="Toc.Treeview",
+            row_height=ROW_HEIGHT,
+            anchors=COL_ANCHORS,
+            stretches=COL_STRETCH,
+        )
         theme.on_colors_changed(self.tree, self._apply_colors)
         self.tree.bind("<Button-1>", self._on_click)
         self.set_result_column(None)  # 初始没有替换规则 → 结果列隐藏

@@ -151,7 +151,7 @@ class ExtraLevelsEditor(ttk.Frame):
 
         for var in (v_h, v_class):
             var.trace_add("write", lambda *_: self._changed())
-        v_regex.bind("<KeyRelease>", lambda _e: self._changed(), add="+")
+        v_regex.bind("<FocusOut>", lambda _e: self._changed(), add="+")
         self._changed()
 
     # ---------- 校验 ----------

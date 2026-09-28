@@ -20,7 +20,9 @@ import tkinter.ttk as ttk
 from ...core.replace import STAGE_LABELS, STAGES, Rule, rules_from_rows, rules_to_json
 from .. import theme
 from ..fonts import font
-from ..metrics import s, set_row_height
+from ..metrics import s
+from .button_row import ButtonRow
+from .treeview import build_treeview
 
 #: 三列
 FIND, REPL, STAGE = "find", "replace", "stage"
@@ -58,31 +60,16 @@ class ReplacementEditor(ttk.Frame):
     # ---------- 布局 ----------
 
     def _build_tree(self) -> None:
-        wrap = ttk.Frame(self)
-        wrap.pack(fill="both", expand=True)
-        self.tree = ttk.Treeview(
-            wrap,
+        self.tree, vbar, _wrap = build_treeview(
+            self,
             columns=(FIND, REPL, STAGE),
-            show="headings",
-            selectmode="browse",
+            headings=HEADINGS,
+            widths=COL_WIDTHS,
+            minwidths=COL_MINWIDTHS,
             style="Mono.Treeview",
+            row_height=ROW_HEIGHT,
+            stretches={FIND: True, REPL: True, STAGE: True},
         )
-        for column in (FIND, REPL, STAGE):
-            self.tree.heading(column, text=HEADINGS[column])
-            # 全部可拉伸，但「查找」给足初宽 —— 规则里最长的通常是它
-            self.tree.column(
-                column,
-                width=s(COL_WIDTHS[column]),
-                minwidth=s(COL_MINWIDTHS[column]),
-                stretch=True,
-            )
-        set_row_height("Mono.Treeview", px=ROW_HEIGHT)
-
-        vbar = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vbar.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vbar.pack(side="right", fill="y")
-
         self.tree.bind("<Double-1>", self._on_edit)
         self.tree.bind("<Delete>", self._on_delete)
         self.hint = ttk.Label(self, text="")
@@ -98,24 +85,16 @@ class ReplacementEditor(ttk.Frame):
         bar = ttk.Frame(self)
         bar.pack(fill="x", pady=(s(6), 0))
         # 按钮分两行：六个一行在窄栏里放不下，最右边的「导出」会被挤出可视区
-        row1 = ttk.Frame(bar)
-        row1.pack(fill="x")
-        for text, command in (
+        row1 = ButtonRow(bar)
+        row1.add_many([
             ("添加", self.add),
             ("删除", self.remove_selected),
             ("上移", lambda: self.move_selected(-1)),
             ("下移", lambda: self.move_selected(1)),
-        ):
-            ttk.Button(row1, text=text, width=6, command=command).pack(
-                side="left", padx=(0, s(4))
-            )
+        ])
 
-        row2 = ttk.Frame(bar)
-        row2.pack(fill="x", pady=(s(4), 0))
-        for text, command in (("导入", self.import_json), ("导出", self.export_json)):
-            ttk.Button(row2, text=text, width=6, command=command).pack(
-                side="left", padx=(0, s(4))
-            )
+        row2 = ButtonRow(bar, pack_kw={"pady": (s(4), 0)})
+        row2.add_many([("导入", self.import_json), ("导出", self.export_json)])
 
         # 阶段说明常驻：html 阶段的行为和 raw 差很多，值得常驻而不是塞进帮助。
         # 独占一行并按可用宽度折行，免得在窄栏里把整行撑出可视区。
