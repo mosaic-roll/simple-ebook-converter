@@ -17,6 +17,7 @@ import tkinter.ttk as ttk
 
 from .. import theme
 from ..metrics import s
+from ..models.table_model import TableModel
 from .regex_entry import regex_entry
 from .button_row import ButtonRow
 
@@ -51,10 +52,8 @@ class ExtraLevelsEditor(ttk.Frame):
         #: 判断某个内置层级当前是否启用（`is_builtin_enabled("volume")`）
         self._is_enabled = is_builtin_enabled or (lambda _name: True)
 
-        self.rows: list[dict] = []
-        #: 行 id 计数器。删除按钮按 id 定位行，**不能**闭包序号：删掉一行后其余行
-        #: 的序号会漂，旧按钮就会删错行。
-        self._next_id = 0
+        #: 行集合。行带稳定 id，删除按钮按 id 定位，不闭包序号（见 TableModel）。
+        self._model = TableModel()
         ttk.Label(self, text=_HINT, wraplength=s(420)).pack(
             anchor="w", pady=(0, s(4)
             )
@@ -63,6 +62,11 @@ class ExtraLevelsEditor(ttk.Frame):
         self.body.pack(fill="x")
         self._build_buttons()
         self._changed()
+
+    @property
+    def rows(self) -> list[dict]:
+        """当前行列表（只读语义：增删请走 `add` / `remove`）。"""
+        return self._model.rows
 
     def _build_buttons(self) -> None:
         bar = ttk.Frame(self)
@@ -100,7 +104,7 @@ class ExtraLevelsEditor(ttk.Frame):
     def set(self, rows: list[dict]) -> None:
         for row in self.rows:
             row["frame"].destroy()
-        self.rows.clear()
+        self._model.clear()
         for data in rows[:MAX_ROWS]:
             self._append(data.get("h", "h5"), data.get("class_name", ""), data.get("regex", ""))
         self._changed()
@@ -119,17 +123,18 @@ class ExtraLevelsEditor(ttk.Frame):
 
     def remove(self, row_id: int) -> None:
         """按稳定 id 删行。**不要按序号** —— 删掉一行后其余行的序号就漂了。"""
-        for index, row in enumerate(self.rows):
-            if row["id"] == row_id:
-                self.rows.pop(index)["frame"].destroy()
-                self._changed()
-                return
+        row = self._model.get(row_id)
+        if row is None:
+            return
+        row["frame"].destroy()
+        self._model.remove(row_id)
+        self._changed()
 
     def _append(self, level: str, class_name: str, regex: str) -> None:
+        # 先建行（拿到稳定 id），再建控件：删除按钮的回调要能引用到 id
+        row = self._model.new()
         frame = ttk.Frame(self.body)
         frame.pack(fill="x", pady=(0, s(4)))
-        row_id = self._next_id
-        self._next_id += 1
 
         v_h = tk.StringVar(value=level)
         v_class = tk.StringVar(value=class_name)
@@ -144,18 +149,16 @@ class ExtraLevelsEditor(ttk.Frame):
         e_class = ttk.Entry(frame, textvariable=v_class, width=14)
         e_class.pack(side="left", padx=(0, s(4)))
         ttk.Button(
-            frame, text="删除", width=6, command=lambda rid=row_id: self.remove(rid)
+            frame, text="删除", width=6, command=lambda rid=row["id"]: self.remove(rid)
         ).pack(side="left")
 
-        row = {
-            "id": row_id,
+        row.update({
             "frame": frame,
             "h": v_h,
             "class_name": v_class,
             "regex_box": v_regex,
             "class_box": e_class,
-        }
-        self.rows.append(row)
+        })
 
         for var in (v_h, v_class):
             var.trace_add("write", lambda *_: self._changed())
