@@ -106,19 +106,19 @@ def rules_from_rows(rows: Iterable[Sequence[str] | Rule]) -> list[Rule]:
     return rules
 
 
-def rules_from_source(
-    json_text: str | None = None,
-    file: str | Path | None = None,
-) -> list[Rule]:
-    """从 JSON 文本或 JSON 文件读规则，两者只能给一处，都不给返回空列表。"""
-    if json_text and file:
-        raise ValueError("替换规则只能给一处：JSON 文本或 JSON 文件，不能同时给两处")
-    if file:
-        try:
-            json_text = Path(file).read_text(encoding="utf-8")
-        except OSError as e:
-            raise ValueError(f"无法读取替换规则文件：{e}") from e
-    return rules_from_json(json_text) if json_text else []
+def rules_from_file(path: str | Path | None) -> list[Rule]:
+    """从 JSON 文件读规则；路径为空返回空列表，读不出或格式非法抛 `ValueError`。
+
+    CLI 与 GUI 都只经文件这一条路（GUI 把表格落成临时文件），命令行不再收内联 JSON，
+    免得在 shell 里跟一层转义搏斗。
+    """
+    if not path:
+        return []
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as e:
+        raise ValueError(f"无法读取替换规则文件：{e}") from e
+    return rules_from_json(text) if text.strip() else []
 
 
 def rules_to_json(rules: Iterable[Rule]) -> str:

@@ -4,7 +4,7 @@
 
 - `name` 就是 `Config` 的字段名，取值类型与缺省值按字段注解取；名字不是 `Config`
   字段的选项不进 `Config`，值在前端收集后合成（`--volume/--chapter/--section/--level`
-  合成 `levels`，`--replace-json/--replace-file` 合成 `replacements`，`--no-volume`
+  合成 `levels`，`--replace-rules` 合成 `replacements`，`--no-volume`
   表示无卷模式）；
 - `negative` 的选项命令行写 `--no-<name>`，界面按正面说法显示，两个前端收上来的值
   都已经是 `Config` 的正面语义，`build_config()` 因此不必认识 `--no-xxx`；
@@ -22,7 +22,7 @@ from typing import Any, get_args, get_type_hints
 from .config import ALIGN_CHOICES, DEFAULTS, Config, LEVEL_PRESETS
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
-from .replace import rules_from_source
+from .replace import rules_from_file
 from .toc import FORMATS
 
 
@@ -130,11 +130,9 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 清理与替换 ----
     Option("clean", "清理文本", "去掉段首段尾空格并删除空行（默认清理）", "清理与替换", negative=True),
     Option(
-        "replace_json", "替换规则", "一段 JSON 替换规则（有序列表），与 --replace-file 二选一",
-        "清理与替换",
-    ),
-    Option(
-        "replace_file", "替换规则文件", "从 JSON 文件读取替换规则，与 --replace-json 二选一",
+        "replace_rules", "替换规则文件",
+        "从 JSON 文件读取替换规则（一个有序列表）；"
+        "每条含 pattern / replace / stage（raw|html）/ enabled",
         "清理与替换", value_type=Path,
     ),
     # ---- 排版 ----
@@ -208,9 +206,8 @@ def build_config(values: Mapping[str, Any]) -> Config:
         values["volume"] = ""  # --no-volume only wins when --volume is not given
     return Config(
         levels=build_levels(_level_specs(values)),
-        replacements=rules_from_source(
-            _text(values.get("replace_json")),
-            _path(_option("replace_file"), values.get("replace_file")),
+        replacements=rules_from_file(
+            _path(_option("replace_rules"), values.get("replace_rules"))
         ),
         **{opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS if opt.in_config},
     )

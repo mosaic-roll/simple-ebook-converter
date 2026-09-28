@@ -20,6 +20,13 @@ def _write_sample(tmp_path, name="novel.txt", text=None):
     return p
 
 
+def _write_rules(tmp_path, rules, name="rules.json"):
+    """把替换规则写成一个 JSON 文件；命令行只认文件，不收内联 JSON。"""
+    p = tmp_path / name
+    p.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+    return p
+
+
 def test_convert_default(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src)])
@@ -50,6 +57,7 @@ def test_convert_no_overwrite_refuses(tmp_path):
 
 def test_convert_metadata_and_replace(tmp_path):
     src = _write_sample(tmp_path, text="#第1章 开头\n# 这里有个#号\n正文段落\n")
+    rules = _write_rules(tmp_path, [{"pattern": r"^#\s*", "replace": ""}])
     result = CliRunner().invoke(
         convert,
         [
@@ -59,39 +67,30 @@ def test_convert_metadata_and_replace(tmp_path):
             "张三",
             "--chapter",
             r"^#.*",
-            "--replace-json",
-            json.dumps([{"pattern": r"^#\s*", "replace": ""}]),
+            "--replace-rules",
+            str(rules),
             str(src),
         ],
     )
     assert result.exit_code == 0, result.output
 
 
-def test_convert_replace_json_and_file_conflict(tmp_path):
-    src = _write_sample(tmp_path)
-    rf = tmp_path / "rules.json"
-    rf.write_text("[]", encoding="utf-8")
-    result = CliRunner().invoke(
-        convert, [str(src), "--replace-json", "[]", "--replace-file", str(rf)]
-    )
-    assert result.exit_code != 0
-    assert "只能给一处" in result.output
-
-
 def test_replace_applies_to_title_and_toc(tmp_path):
     src = _write_sample(tmp_path, text="#第1章 开头\n第一段正文\n")
+    rules = _write_rules(
+        tmp_path,
+        [
+            {"pattern": r"^#\s*第", "replace": "章节 "},
+            {"pattern": r"#", "replace": ""},
+        ],
+    )
     result = CliRunner().invoke(
         convert,
         [
             "--chapter",
             r"^#.*",
-            "--replace-json",
-            json.dumps(
-                [
-                    {"pattern": r"^#\s*第", "replace": "章节 "},
-                    {"pattern": r"#", "replace": ""},
-                ]
-            ),
+            "--replace-rules",
+            str(rules),
             str(src),
         ],
     )
@@ -120,13 +119,14 @@ def _nav_and_page(tmp_path: Path) -> tuple[str, str]:
 def test_replace_only_touches_the_title(tmp_path):
     """替换只作用于标题；正文里的同一串不受影响。"""
     src = _write_sample(tmp_path, text="#第1章 开头\n正文里有第1章\n")
+    rules = _write_rules(tmp_path, [{"pattern": "第1章", "replace": "首章"}])
     result = CliRunner().invoke(
         convert,
         [
             "--chapter",
             r"^#.*",
-            "--replace-json",
-            json.dumps([{"pattern": "第1章", "replace": "首章"}]),
+            "--replace-rules",
+            str(rules),
             str(src),
         ],
     )
@@ -139,21 +139,23 @@ def test_replace_only_touches_the_title(tmp_path):
 def test_replace_html_stage_injects_markup(tmp_path):
     """`stage=html` 在转义后匹配，替换结果原样进书页标题；目录仍是纯文本。"""
     src = _write_sample(tmp_path, text="#第1章 开头\n正文\n")
+    rules = _write_rules(
+        tmp_path,
+        [
+            {
+                "pattern": r"第(\d+)章",
+                "replace": r'第<span class="num">\1</span>章',
+                "stage": "html",
+            }
+        ],
+    )
     result = CliRunner().invoke(
         convert,
         [
             "--chapter",
             r"^#.*",
-            "--replace-json",
-            json.dumps(
-                [
-                    {
-                        "pattern": r"第(\d+)章",
-                        "replace": r'第<span class="num">\1</span>章',
-                        "stage": "html",
-                    }
-                ]
-            ),
+            "--replace-rules",
+            str(rules),
             str(src),
         ],
     )
@@ -166,10 +168,8 @@ def test_replace_html_stage_injects_markup(tmp_path):
 
 def test_replace_rejects_unknown_stage(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(
-        convert,
-        [str(src), "--replace-json", json.dumps([{"pattern": "a", "stage": "chapter"}])],
-    )
+    rules = _write_rules(tmp_path, [{"pattern": "a", "stage": "chapter"}])
+    result = CliRunner().invoke(convert, [str(src), "--replace-rules", str(rules)])
     assert result.exit_code != 0
     assert "阶段只能是" in result.output
 
@@ -334,14 +334,10 @@ def test_toc_json(tmp_path):
 
 def test_toc_replace_applies_to_text(tmp_path):
     src = _write_sample(tmp_path)
+    rules = _write_rules(tmp_path, [{"pattern": r"第一章", "replace": "第1章"}])
     result = CliRunner().invoke(
         convert,
-        [
-            str(src),
-            "--toc-only",
-            "--replace-json",
-            json.dumps([{"pattern": r"第一章", "replace": "第1章"}]),
-        ],
+        [str(src), "--toc-only", "--replace-rules", str(rules)],
     )
     assert result.exit_code == 0
     assert "第1章 开端" in result.output
@@ -351,13 +347,14 @@ def test_toc_replace_applies_to_text(tmp_path):
 def test_toc_json_stores_raw_title_only(tmp_path):
     """目录树 JSON 只存原始标题，替换效果不在导出里（组装阶段才做替换）。"""
     src = _write_sample(tmp_path)
+    rules = _write_rules(tmp_path, [{"pattern": r"卷", "replace": "部"}])
     result = CliRunner().invoke(
         convert,
         [
             str(src),
             "--toc-only",
-            "--replace-json",
-            json.dumps([{"pattern": r"卷", "replace": "部"}]),
+            "--replace-rules",
+            str(rules),
             "--toc-format",
             "json",
         ],
@@ -632,16 +629,11 @@ def test_unknown_encoding_name_reports_clean_error(tmp_path):
     assert "无法用编码 no-such-encoding 解码" in result.output
 
 
-@pytest.mark.parametrize("source", ["--replace-json", "--replace-file"])
-def test_invalid_replace_regex_reports_clean_error(tmp_path, source):
+def test_invalid_replace_regex_reports_clean_error(tmp_path):
     src = _write_sample(tmp_path)
-    bad = '[{"pattern": "("}]'
-    args = [str(src), source, bad]
-    if source == "--replace-file":
-        rules = tmp_path / "rules.json"
-        rules.write_text(bad, encoding="utf-8")
-        args[-1] = str(rules)
-    result = CliRunner().invoke(convert, args)
+    rules = tmp_path / "rules.json"
+    rules.write_text('[{"pattern": "("}]', encoding="utf-8")
+    result = CliRunner().invoke(convert, [str(src), "--replace-rules", str(rules)])
     assert result.exit_code == 2, result.output
     assert "替换规则正则非法" in result.output
     assert not isinstance(result.exception, re.error)

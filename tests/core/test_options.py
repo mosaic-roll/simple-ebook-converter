@@ -1,6 +1,5 @@
 """`build_config()`：前端的原始值 → Config。两个前端共用这一条转换路径。"""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -246,15 +245,11 @@ def test_no_replacement_by_default(tmp_path):
     assert _config(tmp_path).replacements == []
 
 
-def test_replacements_from_json_text(tmp_path):
-    cfg = _config(tmp_path, replace_json=json.dumps([{"pattern": "甲", "stage": "html"}]))
-    assert [(r.pattern, r.stage) for r in cfg.replacements] == [("甲", "html")]
-
-
 def test_replacements_from_file(tmp_path):
     path = tmp_path / "rules.json"
-    path.write_text('[{"pattern": "甲", "replace": "乙"}]', encoding="utf-8")
-    assert _config(tmp_path, replace_file=str(path)).replacements[0].replace == "乙"
+    path.write_text('[{"pattern": "甲", "replace": "乙", "stage": "html"}]', encoding="utf-8")
+    cfg = _config(tmp_path, replace_rules=str(path))
+    assert [(r.pattern, r.replace, r.stage) for r in cfg.replacements] == [("甲", "乙", "html")]
 
 
 def test_core_ignores_gui_table_rows(tmp_path):
@@ -265,13 +260,6 @@ def test_core_ignores_gui_table_rows(tmp_path):
 
 def test_core_ignores_rule_objects(tmp_path):
     assert _config(tmp_path, replacements=[Rule("甲", "乙", "all")]).replacements == []
-
-
-def test_replace_json_and_file_together_is_rejected(tmp_path):
-    path = tmp_path / "rules.json"
-    path.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError, match="只能给一处"):
-        _config(tmp_path, replace_json="[]", replace_file=str(path))
 
 
 # ---------- 选项表自身 ----------
@@ -329,7 +317,7 @@ def test_option_defaults_come_from_config():
 
 
 def test_empty_defaults_for_options_outside_config():
-    for name in ("replace_json", "replace_file"):
+    for name in ("replace_rules",):
         assert option_default(_option(name)) == ""
     assert option_default(_option("no_volume")) is False
     assert option_default(_option("level")) == ()
@@ -337,8 +325,10 @@ def test_empty_defaults_for_options_outside_config():
 
 def test_build_config_never_mutates_the_shared_defaults(tmp_path):
     """`DEFAULTS` 只是缺省值模板：谁都不许改它，否则两次调用会互相污染。"""
+    rules = tmp_path / "rules.json"
+    rules.write_text('[{"pattern": "甲"}]', encoding="utf-8")
     before = [(r.level, r.pattern) for r in DEFAULTS.levels]
-    _config(tmp_path, volume="^甲", clean=False, replace_json='[{"pattern": "甲"}]')
+    _config(tmp_path, volume="^甲", clean=False, replace_rules=str(rules))
     assert [(r.level, r.pattern) for r in DEFAULTS.levels] == before
     assert DEFAULTS.clean is True
 
@@ -354,7 +344,7 @@ def test_output_options_are_not_required_to_exist():
         assert _option(name).output, name
     for opt in OPTIONS:
         if opt.kind is Path and not opt.output:
-            assert opt.in_config or opt.name == "replace_file", opt.name
+            assert opt.in_config or opt.name == "replace_rules", opt.name
 
 
 def test_no_option_shadows_another_with_the_same_flag():

@@ -11,9 +11,9 @@ from simple_ebook_converter.core.replace import (
     Rule,
     check_stage,
     replacers_by_stage,
+    rules_from_file,
     rules_from_json,
     rules_from_rows,
-    rules_from_source,
     rules_to_json,
 )
 
@@ -137,30 +137,27 @@ def test_rules_from_rows_rejects_unknown_label():
         rules_from_rows([("a", "b", "第1章")])
 
 
-def test_rules_from_source_from_text():
-    assert rules_from_source('[{"pattern": "a"}]') == [Rule("a", "", "raw")]
-
-
-def test_rules_from_source_from_file(tmp_path):
+def test_rules_from_file_reads_file(tmp_path):
     path = tmp_path / "rules.json"
     path.write_text('[{"pattern": "a", "stage": "html"}]', encoding="utf-8")
-    assert rules_from_source(file=path) == [Rule("a", "", "html")]
+    assert rules_from_file(path) == [Rule("a", "", "html")]
 
 
-def test_rules_from_source_rejects_both(tmp_path):
+def test_rules_from_file_empty_path_is_empty():
+    """没给路径 = 没有规则，不是错误。"""
+    assert rules_from_file(None) == []
+    assert rules_from_file("") == []
+
+
+def test_rules_from_file_empty_file_is_empty(tmp_path):
     path = tmp_path / "rules.json"
-    path.write_text("[]", encoding="utf-8")
-    with pytest.raises(ValueError, match="只能给一处"):
-        rules_from_source("[]", path)
+    path.write_text("", encoding="utf-8")
+    assert rules_from_file(path) == []
 
 
-def test_rules_from_source_empty():
-    assert rules_from_source() == []
-
-
-def test_rules_from_source_reports_unreadable_file(tmp_path):
+def test_rules_from_file_reports_unreadable_file(tmp_path):
     with pytest.raises(ValueError, match="无法读取替换规则文件"):
-        rules_from_source(file=tmp_path / "nope.json")
+        rules_from_file(tmp_path / "nope.json")
 
 
 # ---------- 序列化 ----------
