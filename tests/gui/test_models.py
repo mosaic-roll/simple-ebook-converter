@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from simple_ebook_converter.gui.models import levels_state
 from simple_ebook_converter.gui.models.autofill import AutofillPolicy
 from simple_ebook_converter.gui.models.table_model import TableModel
 
@@ -113,3 +114,39 @@ def test_autofill_seed_protects_explicitly_saved_auto_encoding() -> None:
     policy.seed_from_values({"encoding": "auto"})
     assert policy.touched == {"encoding"}
     assert policy.plan({"encoding": "auto"}, {"encoding": "gb18030"}) == {}
+
+
+# ---------- levels_state（内置层级三态） ----------
+
+
+def test_levels_state_from_saved_none_is_untouched_default() -> None:
+    assert levels_state.from_saved(None, "DEFAULT") == (True, "DEFAULT", False)
+
+
+def test_levels_state_from_saved_empty_is_disabled() -> None:
+    assert levels_state.from_saved("", "DEFAULT") == (False, "", True)
+
+
+def test_levels_state_from_saved_pattern_is_touched() -> None:
+    assert levels_state.from_saved("^第.章", "DEFAULT") == (True, "^第.章", True)
+
+
+def test_levels_state_to_saved_disabled_is_empty_string() -> None:
+    assert levels_state.to_saved(False, True, "whatever") == ""
+
+
+def test_levels_state_to_saved_untouched_is_none() -> None:
+    assert levels_state.to_saved(True, False, "DEFAULT") is None
+
+
+def test_levels_state_to_saved_blank_text_is_disabled() -> None:
+    assert levels_state.to_saved(True, True, "   ") == ""
+
+
+def test_levels_state_to_saved_preserves_whitespace() -> None:
+    assert levels_state.to_saved(True, True, "  ^第.章  ") == "  ^第.章  "
+
+
+def test_levels_state_untouched_round_trips_to_none() -> None:
+    enabled, text, touched = levels_state.from_saved(None, "D")
+    assert levels_state.to_saved(enabled, touched, text) is None

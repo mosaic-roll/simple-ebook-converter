@@ -23,6 +23,7 @@ from ...core.config import LEVEL_PRESETS
 from ...core.options import OPTIONS, option_default
 from ..build_config_from_ui import IdentifyValues
 from ..metrics import s
+from ..models import levels_state
 from ..widgets.extra_levels import ExtraLevelsEditor
 from ..widgets.form import Field, Form, Section, Spin, Text
 from ..widgets.regex_entry import regex_entry
@@ -125,14 +126,11 @@ class IdentifyTab(ttk.Frame):
         try:
             for name, (enabled, pattern) in self._levels.items():
                 given = values.levels.get(name)
-                if given is None:
-                    enabled.set(True)
-                    pattern.set(str(option_default(_option(name))))
-                    self._touched[name] = False
-                else:
-                    enabled.set(bool(given))
-                    pattern.set(given)
-                    self._touched[name] = True
+                default = str(option_default(_option(name)))
+                on, text, touched = levels_state.from_saved(given, default)
+                enabled.set(on)
+                pattern.set(text)
+                self._touched[name] = touched
             self.extra.set([dict(row) for row in values.level_rows])
             self.form.set_value("max_title_len", values.max_title_len)
             self.form.set_value("preface_title", values.preface_title)
@@ -156,18 +154,12 @@ class IdentifyTab(ttk.Frame):
         空白、或故意匹配行尾空格）。core 的 `parse_level_spec()` 也只在 `:` 之前
         `strip`，冒号之后整段保留。
         """
-        state: dict[str, str | None] = {}
-        for name, (enabled, pattern) in self._levels.items():
-            if not enabled.get():
-                state[name] = ""
-            elif not self._touched[name]:
-                state[name] = None
-            else:
-                text = pattern.get()
-                # 只判「是不是空」，返回值原样保留首尾空格：`"  "` 当作没填（关闭），
-                # 但 `"  ^第.章  "` 里的空格要留住。
-                state[name] = text if text.strip() else ""
-        return state
+        return {
+            name: levels_state.to_saved(
+                enabled.get(), self._touched[name], pattern.get()
+            )
+            for name, (enabled, pattern) in self._levels.items()
+        }
 
     # ---------- 内部 ----------
 
