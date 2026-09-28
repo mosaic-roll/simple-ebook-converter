@@ -39,6 +39,7 @@ class Rule:
     pattern: str
     replace: str
     stage: str = DEFAULT_STAGE
+    enabled: bool = True
 
     @property
     def stage_label(self) -> str:
@@ -59,8 +60,8 @@ def check_stage(stage: str, where: str = "") -> str:
 def rules_from_json(text: str) -> list[Rule]:
     """解析一段 JSON 替换规则（有序列表），出错抛 ValueError。
 
-    每条规则形如 `{"pattern": "...", "replace": "...", "stage": "raw"}`：
-    `replace` 省略即删除匹配内容，`stage` 省略即匹配原文（`raw`）。
+    每条规则形如 `{"pattern": "...", "replace": "...", "stage": "raw", "enabled": true}`：
+    `replace` 省略即删除匹配内容，`stage` 省略即匹配原文（`raw`），`enabled` 省略即启用。
     """
     try:
         data = json.loads(text)
@@ -82,6 +83,7 @@ def rules_from_json(text: str) -> list[Rule]:
                 pattern,
                 str(item.get("replace", "")),
                 check_stage(item.get("stage", DEFAULT_STAGE), f"第 {index} 条替换规则"),
+                enabled=bool(item.get("enabled", True)),
             )
         )
     return rules
@@ -120,9 +122,9 @@ def rules_from_source(
 
 
 def rules_to_json(rules: Iterable[Rule]) -> str:
-    """序列化成 JSON 文本（`stage` 总是显式写出）。"""
+    """序列化成 JSON 文本（`stage` / `enabled` 总是显式写出）。"""
     return json.dumps(
-        [{"pattern": r.pattern, "replace": r.replace, "stage": r.stage} for r in rules],
+        [{"pattern": r.pattern, "replace": r.replace, "stage": r.stage, "enabled": r.enabled} for r in rules],
         ensure_ascii=False,
         indent=2,
     )
@@ -147,8 +149,11 @@ class Replacer:
 
 
 def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
-    """按阶段拆成 (raw 替换器, html 替换器)；两个阶段一前一后作用在标题上。"""
-    rules = list(rules)
+    """按阶段拆成 (raw 替换器, html 替换器)；两个阶段一前一后作用在标题上。
+
+    禁用的规则（`enabled=False`）直接跳过，不参与任何阶段。
+    """
+    rules = [r for r in rules if r.enabled]
     return (
         Replacer.of(r for r in rules if r.stage == "raw"),
         Replacer.of(r for r in rules if r.stage == "html"),

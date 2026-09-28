@@ -168,7 +168,7 @@ def test_rules_from_source_reports_unreadable_file(tmp_path):
 
 def test_rules_to_json_always_writes_stage():
     assert json.loads(rules_to_json([Rule("a", "b")])) == [
-        {"pattern": "a", "replace": "b", "stage": "raw"}
+        {"pattern": "a", "replace": "b", "stage": "raw", "enabled": True}
     ]
 
 
