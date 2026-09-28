@@ -131,6 +131,9 @@ class _Control:
     是 `StringVar`，同一个属性两种含义，调用方无法预期。
     """
 
+    #: 是否参与 `Form.values()`。复合控件（`Custom`）由页面自己取值，不算字段值。
+    has_value: bool = True
+
     def get(self):  # noqa: ANN201 - 子类各自返回 str / bool
         raise NotImplementedError
 
@@ -346,6 +349,8 @@ class _PathControl(_Control):
 class _CustomControl(_Control):
     """`Custom`：把一个复合组件原样摆进表单。不参与取值/设值（由页面自己持有引用）。"""
 
+    has_value = False
+
     def __init__(self, parent, field: Field, spec: Custom, on_change, on_path_valid) -> None:
         self._widget = spec.build(parent)
         self._widget.pack(
@@ -436,7 +441,11 @@ class Form(ttk.Frame):
         self._controls[name].set(value)
 
     def values(self) -> dict:
-        return {name: control.get() for name, control in self._controls.items()}
+        return {
+            name: control.get()
+            for name, control in self._controls.items()
+            if control.has_value
+        }
 
     def set_values(self, data: dict) -> None:
         for name, control in self._controls.items():

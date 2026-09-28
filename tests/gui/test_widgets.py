@@ -610,12 +610,12 @@ def test_typography_tab_round_trip(tk_root) -> None:
 
 
 def test_typography_tab_sections_and_align_mapping(tk_root) -> None:
-    """排版页分三组；对齐下拉显示中文、取值仍给 core 的英文。"""
+    """排版页分四组（含样式表）；对齐下拉显示中文、取值仍给 core 的英文。"""
     tab = TypographyTab(tk_root)
     frames = [
         str(w.cget("text")) for w in tab.form.winfo_children() if isinstance(w, ttk.LabelFrame)
     ]
-    assert frames == ["段落", "对齐", "正文字体"]
+    assert frames == ["段落", "对齐", "正文字体", "样式表"]
 
     control = tab.form.control("volume_align")
     tab.form.set_value("volume_align", "center")

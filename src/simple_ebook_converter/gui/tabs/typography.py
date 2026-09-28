@@ -4,7 +4,8 @@
 ——手抄的那份迟早和 core 脱节，用户改了 CLI 行为却发现界面默认值还是旧的。
 
 布局用声明式 `Form`（见 `widgets/form.py`）：这一页有什么、怎么分组，看 `SPEC` 即可。
-CSS 编辑器是不规则的组合块，不进 SPEC，作为具名控件直接摆在下方。
+CSS 编辑器作为 `Custom` 字段声明进最底下的「样式表」分节 —— 它的内部布局归
+`CssEditor` 自己，页面不写 `pack`/`grid`。
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from ...core.options import OPTIONS, option_default
 from ..build_config_from_ui import TypographyValues
 from ..metrics import s
 from ..widgets.css_editor import CssEditor
-from ..widgets.form import Choice, Field, Form, Path, Section, Spin, Text
+from ..widgets.form import Choice, Custom, Field, Form, Path, Section, Spin, Text
 from ..widgets.scroll_frame import ScrollFrame
 
 #: 对齐方式的中文标签
@@ -111,18 +112,26 @@ class TypographyTab(ttk.Frame):
         wrap = ScrollFrame(self)
         wrap.pack(fill="both", expand=True)
 
+        # 规则字段走模块级 SPEC；CSS 复合块用 Custom 追加成一节。
         self.form = Form(
             wrap.inner,
-            SPEC,
+            (
+                *SPEC,
+                Section(
+                    "样式表",
+                    (Field("css", "", Custom(self._build_css, expand=True)),),
+                    expand=True,
+                ),
+            ),
             on_change=lambda _name: self._changed(),
             padding=(s(12), s(12)),
         )
-        self.form.pack(fill="x")
+        self.form.pack(fill="both", expand=True)
 
-        css = ttk.LabelFrame(wrap.inner, text="样式表", padding=(s(8), s(6)))
-        css.pack(fill="both", expand=True, padx=s(12), pady=(s(10), s(12)))
-        self.css = CssEditor(css, on_change=self._changed)
-        self.css.pack(fill="both", expand=True)
+    def _build_css(self, parent: tk.Misc) -> ttk.Frame:
+        """样式表分节的复合控件；内部布局归 `CssEditor`。"""
+        self.css = CssEditor(parent, on_change=self._changed)
+        return self.css
 
     # ---------- 值 ----------
 
