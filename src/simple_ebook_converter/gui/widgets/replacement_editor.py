@@ -41,6 +41,10 @@ HEADINGS = {CHECK: "启用", FIND: "查找（正则）", REPL: "替换为", STAG
 COL_HEADING_ANCHORS = {CHECK: "center", FIND: "center", REPL: "center", STAGE: "center"}
 COL_ANCHORS = {CHECK: "center", FIND: "w", REPL: "w", STAGE: "w"}
 
+#: 双击可编辑的列（列号 `#n` → 列名）。
+#: `#1`（启用）不在内：单击切换启用，不开编辑框。
+EDITABLE_COLUMNS = {"#2": FIND, "#3": REPL, "#4": STAGE}
+
 #: 阶段下拉的中文标签，取自 core —— 界面不另立一套
 STAGE_CHOICES = tuple(STAGE_LABELS[stage] for stage in STAGES)
 
@@ -205,9 +209,9 @@ class ReplacementEditor(ttk.Frame):
         if not iid:
             return
         column = self.tree.identify_column(event.x)  # #1/#2/#3/#4
-        if column in ("#1", "#4"):  # CHECK 和 STAGE 列不开文本框
+        name = EDITABLE_COLUMNS.get(column)
+        if name is None:  # CHECK 列不开编辑框（单击切换启用）
             return
-        name = (FIND, REPL)[int(column[1:]) - 2]  # #2→0, #3→1（跳过 #1 CHECK）
         self._edit_cell(iid, name)
         return "break"
 
