@@ -28,10 +28,12 @@ from .treeview import build_treeview
 #: 三列
 CHECK, TITLE, RESULT = "check", "title", "result"
 
-#: 行高（设计稿像素）与三列的宽。勾选列留出 1em 左右的左右空白
+#: 行高（设计稿像素）与三列的宽。勾选列留出 1em 左右的左右空白。
+#: 「标题」与「替换后」等宽：两列展示的是同一批标题的前后对照，宽窄不一会很难比对。
 ROW_HEIGHT = 24
-COL_WIDTHS = {CHECK: 44, TITLE: 248, RESULT: 180}
-COL_MINWIDTHS = {CHECK: 44, TITLE: 120, RESULT: 100}
+_TITLE_WIDTH = 248
+COL_WIDTHS = {CHECK: 44, TITLE: _TITLE_WIDTH, RESULT: _TITLE_WIDTH}
+COL_MINWIDTHS = {CHECK: 44, TITLE: 120, RESULT: 120}
 HEADINGS = {CHECK: "启用", TITLE: "标题", RESULT: "替换后"}
 #: 三列标题都居中，内容左对齐
 COL_HEADING_ANCHORS = {CHECK: "center", TITLE: "center", RESULT: "center"}
