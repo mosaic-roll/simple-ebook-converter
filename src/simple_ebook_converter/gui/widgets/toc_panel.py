@@ -31,8 +31,9 @@ ROW_HEIGHT = 24
 COL_WIDTHS = {CHECK: 44, TITLE: 248, RESULT: 180}
 COL_MINWIDTHS = {CHECK: 44, TITLE: 120, RESULT: 100}
 HEADINGS = {CHECK: "启用", TITLE: "标题", RESULT: "替换后"}
-#: 三列标题都居中
-COL_ANCHORS = {CHECK: "center", TITLE: "center", RESULT: "center"}
+#: 三列标题都居中，内容左对齐
+COL_HEADING_ANCHORS = {CHECK: "center", TITLE: "center", RESULT: "center"}
+COL_ANCHORS = {CHECK: "center", TITLE: "w", RESULT: "center"}
 #: 勾选列不吃拉伸（拉伸会让它变宽，占掉标题的位置）
 COL_STRETCH = {CHECK: False, TITLE: True, RESULT: True}
 
@@ -115,7 +116,7 @@ class TocPanel(ttk.Frame):
             selectmode="browse",
             style="Toc.Treeview")
         for column in (CHECK, TITLE, RESULT):
-            self.tree.heading(column, text=HEADINGS[column], anchor=COL_ANCHORS[column])
+            self.tree.heading(column, text=HEADINGS[column], anchor=COL_HEADING_ANCHORS[column])
             self.tree.column(
                 column,
                 width=s(COL_WIDTHS[column]),

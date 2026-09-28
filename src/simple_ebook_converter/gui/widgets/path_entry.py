@@ -86,11 +86,11 @@ class PathEntry(ttk.Entry):
         # 提示文字立刻清掉，但**不重算校验**：边打字边红框会一直闪，失焦才算。
         if self.hint.cget("text"):
             self.clear_message()
-        if self._on_change is not None:
-            self._on_change()
 
     def _on_focus_out(self, _event: tk.Event) -> None:
         self.validate()
+        if self._on_change is not None:
+            self._on_change()
 
     def validate(self) -> Path | None:
         """按 `kind` 校验当前内容，更新提示与 `on_valid`，返回通过校验的路径。"""

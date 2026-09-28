@@ -103,7 +103,7 @@ class CssEditor(ttk.Frame):
         hbar = ttk.Scrollbar(wrap, orient="horizontal", command=self.text.xview)
         self.text.configure(xscrollcommand=hbar.set)
         hbar.pack(fill="x")
-        self.text.bind("<KeyRelease>", lambda _e: self._changed(), add="+")
+        self.text.bind("<FocusOut>", lambda _e: self._changed(), add="+")
         wrap.retag_all()  # Text 是后建的，得补 bindtag 才能滚
 
     # ---------- 模式 ----------

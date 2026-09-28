@@ -133,7 +133,7 @@ class _TextControl(_Control):
         self._var = tk.StringVar(value=spec.default)
         entry = ttk.Entry(top, textvariable=self._var)
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
-        entry.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
+        entry.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
         if spec.help:
             ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
@@ -206,7 +206,7 @@ class _SpinControl(_Control):
         spin = ttk.Spinbox(top, from_=spec.low, to=spec.high, width=6, textvariable=self._var)
         spin.pack(side="left", padx=(s(6), 0))
         # Spinbox 敲键时 `command` 不一定触发，两个都接上
-        spin.bind("<KeyRelease>", lambda _e: on_change(field.name), add="+")
+        spin.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
         spin.configure(command=lambda: on_change(field.name))
         self._low, self._high = spec.low, spec.high
         if spec.help:
