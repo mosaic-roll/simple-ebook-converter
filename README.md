@@ -64,8 +64,8 @@ tree, stats = process(lines, cfg)
 
 ## 替换规则的阶段
 
-替换规则**只作用于标题**（要改正文，直接改源文件更直接）。`--replace-json` /
-`--replace-file` 收一个 JSON 列表，每条规则可带可选的 `stage`，决定在 HTML 转义之前
+替换规则**只作用于标题**（要改正文，直接改源文件更直接）。`--replace-rules` 收一个
+JSON 文件（内容是一个有序列表），每条规则可带可选的 `stage`，决定在 HTML 转义之前
 还是之后匹配：
 
 ```json
