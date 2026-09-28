@@ -52,6 +52,9 @@ class ExtraLevelsEditor(ttk.Frame):
         self._is_enabled = is_builtin_enabled or (lambda _name: True)
 
         self.rows: list[dict] = []
+        #: 行 id 计数器。删除按钮按 id 定位行，**不能**闭包序号：删掉一行后其余行
+        #: 的序号会漂，旧按钮就会删错行。
+        self._next_id = 0
         ttk.Label(self, text=_HINT, wraplength=s(420)).pack(
             anchor="w", pady=(0, s(4)
             )
@@ -105,7 +108,8 @@ class ExtraLevelsEditor(ttk.Frame):
     # ---------- 增删 ----------
 
     def add(self) -> None:
-        """加一行。**动态新建的控件必须接上 `on_change` + 补 bindtag。**"""
+        """加一行。动态新建的控件在 `_append` 里接上 `on_change`；
+        滚动 bindtag 由外层 `ScrollFrame` 自动补，不必手动。"""
         if len(self.rows) >= MAX_ROWS:
             self._hint(f"最多 {MAX_ROWS} 条")
             return
@@ -113,16 +117,19 @@ class ExtraLevelsEditor(ttk.Frame):
         free = next((f"h{n}" for n in range(1, 7) if n not in used), "h1")
         self._append(free, "", "")
 
-    def remove(self, index: int) -> None:
-        if not 0 <= index < len(self.rows):
-            return
-        self.rows.pop(index)["frame"].destroy()
-        self._changed()
+    def remove(self, row_id: int) -> None:
+        """按稳定 id 删行。**不要按序号** —— 删掉一行后其余行的序号就漂了。"""
+        for index, row in enumerate(self.rows):
+            if row["id"] == row_id:
+                self.rows.pop(index)["frame"].destroy()
+                self._changed()
+                return
 
     def _append(self, level: str, class_name: str, regex: str) -> None:
         frame = ttk.Frame(self.body)
         frame.pack(fill="x", pady=(0, s(4)))
-        index = len(self.rows)  # 先取序号：self.rows.append 在下面，会变
+        row_id = self._next_id
+        self._next_id += 1
 
         v_h = tk.StringVar(value=level)
         v_class = tk.StringVar(value=class_name)
@@ -137,10 +144,11 @@ class ExtraLevelsEditor(ttk.Frame):
         e_class = ttk.Entry(frame, textvariable=v_class, width=14)
         e_class.pack(side="left", padx=(0, s(4)))
         ttk.Button(
-            frame, text="删除", width=6, command=lambda i=index: self.remove(i)
+            frame, text="删除", width=6, command=lambda rid=row_id: self.remove(rid)
         ).pack(side="left")
 
         row = {
+            "id": row_id,
             "frame": frame,
             "h": v_h,
             "class_name": v_class,
