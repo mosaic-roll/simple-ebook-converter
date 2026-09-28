@@ -41,6 +41,7 @@ from .build_config_from_ui import (
     build_config_from_ui,
     preview_replacements,
     write_temp_css,
+    write_temp_rules,
     write_temp_toc,
 )
 from .fonts import TITLE_SIZE, font
@@ -232,9 +233,10 @@ class App(ttk.Frame):
 
     def _load(self) -> None:
         data = load_settings()
-        # 两个临时文件的账本：内联 CSS 一份、目录树一份。只有路径，内容由
-        # build_config_from_ui 落盘；谁建的谁记，生成收尾统一删。
+        # 三个临时文件的账本：内联 CSS、界面里编辑的替换规则、目录树各一份。只有路径，
+        # 内容由 build_config_from_ui 落盘；谁建的谁记，生成收尾统一删。
         self._temp_css: Path | None = None
+        self._temp_rules: Path | None = None
         self._temp_toc: Path | None = None
         self.apply_settings(data)
         # 输入/输出路径**不存**（settings.py 的决定：换一本书就该重来），所以这里
@@ -481,8 +483,9 @@ class App(ttk.Frame):
             pass  # 删不掉临时文件不是用户该操心的事
 
     def _cleanup_temps(self) -> None:
-        """两个临时文件一起清。生成收尾和退出都走这里。"""
+        """三个临时文件一起清。生成收尾和退出都走这里。"""
         self._cleanup_temp_css()
+        self._cleanup_one("_temp_rules")
         self._cleanup_one("_temp_toc")
 
     # ---------- 目录导入/导出 ----------
@@ -544,6 +547,7 @@ class App(ttk.Frame):
             return build_config_from_ui(
                 self.collect(),
                 write_temp_css=self._track_temp_css,
+                write_temp_rules=self._track_temp_rules,
                 toc_entries=entries,
                 write_temp_toc=self._track_temp_toc,
             )
@@ -562,6 +566,12 @@ class App(ttk.Frame):
         self._cleanup_one("_temp_css")
         self._temp_css = write_temp_css(text)
         return self._temp_css
+
+    def _track_temp_rules(self, text: str) -> Path:
+        """同上，替换规则文件的记账回调。"""
+        self._cleanup_one("_temp_rules")
+        self._temp_rules = write_temp_rules(text)
+        return self._temp_rules
 
     def _track_temp_toc(self, entries: list[dict]) -> Path:
         """同上，目录树文件的记账回调。"""

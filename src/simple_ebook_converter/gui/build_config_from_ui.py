@@ -10,7 +10,7 @@
 
     Config(
         levels=build_levels(_level_specs(values)),
-        replacements=rules_from_source(values.get("replace_json"), ...),
+        replacements=rules_from_file(values.get("replace_rules")),
         **{opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS if opt.in_config},
     )
 
@@ -35,7 +35,7 @@ from typing import Any
 
 from ..core.config import Config
 from ..core.options import build_config
-from ..core.replace import Rule, rules_from_rows, rules_to_json
+from ..core.replace import Rule, rules_to_json
 
 #: CSS 模式：单一枚举，与 webview 版一致（不拆成两个字段）
 CSS_NONE, CSS_APPEND, CSS_OVERRIDE = "none", "append", "override"
@@ -149,18 +149,19 @@ def build_config_from_ui(
     values: UiValues,
     *,
     write_temp_css=None,
+    write_temp_rules=None,
     toc_entries: list[dict] | None = None,
     write_temp_toc=None,
 ) -> Config:
     """界面原始值 → `Config`，出错抛 `ValueError`（消息可直接展示）。
 
-    **注意两个临时文件的生命周期**：内联 CSS 和界面里编辑过的目录树都要先落盘
-    （core 只有文件入口，没有「一段字符串」这种入口）。core 是在工作线程里才读
-    它们的，所以**不能在返回前删** —— 生成的收尾处负责清理。
+    **注意三个临时文件的生命周期**：内联 CSS、界面里编辑过的替换规则、界面里编辑过的
+    目录树都要先落盘（core 只有文件入口，没有「一段字符串」这种入口）。core 是在工作
+    线程里才读它们的，所以**不能在返回前删** —— 生成的收尾处负责清理。
 
-    所以 `write_temp_css` / `write_temp_toc` 都是可注入的：调用方（App）传自己包
-    过的版本，把落盘路径记下来，生成完才能删。不注入的话调用方拿不到路径，只能
-    看着临时文件一份份堆在 temp 里。
+    所以 `write_temp_css` / `write_temp_rules` / `write_temp_toc` 都是可注入的：
+    调用方（App）传自己包过的版本，把落盘路径记下来，生成完才能删。不注入的话调用方
+    拿不到路径，只能看着临时文件一份份堆在 temp 里。
 
     `toc_entries` 给 `None` = **不用目录树文件**，让 core 从正则现场识别；给了
     列表（含 `deleted` 标记）就写成 `cfg.toc_file`。`None` 与 `[]` 的区别是**有意
@@ -174,23 +175,31 @@ def build_config_from_ui(
     """
     if write_temp_css is None:
         write_temp_css = globals()["write_temp_css"]
+    if write_temp_rules is None:
+        write_temp_rules = globals()["write_temp_rules"]
     if write_temp_toc is None:
         write_temp_toc = globals()["write_temp_toc"]
-    cfg = build_config(option_values(values, write_temp_css=write_temp_css))
+    cfg = build_config(
+        option_values(values, write_temp_css=write_temp_css, write_temp_rules=write_temp_rules)
+    )
     if toc_entries is not None:
         cfg.toc_file = write_temp_toc(toc_entries)
     cfg.validate()
     return cfg
 
 
-def option_values(values: UiValues, *, write_temp_css=None) -> dict[str, Any]:
+def option_values(
+    values: UiValues, *, write_temp_css=None, write_temp_rules=None
+) -> dict[str, Any]:
     """`UiValues` → `build_config()` 认的键名字典。
 
-    `write_temp_css` 只在「勾了 CSS 且没给路径、只改了文本」时被调用，注入是为了
-    让测试不落盘、以及让调用方跟踪临时文件的路径。
+    `write_temp_css` 只在「勾了 CSS 且没给路径、只改了文本」时被调用，`write_temp_rules`
+    只在有规则行时被调用；注入是为了让测试不落盘、以及让调用方跟踪临时文件的路径。
     """
     if write_temp_css is None:
         write_temp_css = globals()["write_temp_css"]
+    if write_temp_rules is None:
+        write_temp_rules = globals()["write_temp_rules"]
     out: dict[str, Any] = {}
 
     # ---- 基础 ----
@@ -220,14 +229,14 @@ def option_values(values: UiValues, *, write_temp_css=None) -> dict[str, Any]:
     out["preface_title"] = values.identify.preface_title
 
     # ---- 替换 ----
-    # core 只认一段 JSON 文本（`replace_json`），表格只是这个界面上的写法。
-    # 空规则就不写这个键，免得覆盖掉别处可能给的值。
+    # core 只认 JSON 文件（`replace_rules`），表格只是这个界面上的写法：序列化成临时
+    # 文件，路径交给 core。空规则就不写这个键，免得覆盖掉别处可能给的值。
     if values.rules:
         rules: list[Rule] = [
             Rule(pattern=row[0], replace=row[1], stage=row[2], enabled=bool(row[3]) if len(row) >= 4 else True)
             for row in values.rules
         ]
-        out["replace_json"] = rules_to_json(rules)
+        out["replace_rules"] = str(write_temp_rules(rules_to_json(rules)))
 
     # ---- 排版 ----
     typo = values.typography
@@ -273,6 +282,18 @@ def write_temp_css(text: str) -> Path:
     无法再次打开，而 core 要用路径重新打开。
     """
     handle, name = tempfile.mkstemp(prefix="sec-style-", suffix=".css", text=True)
+    with os.fdopen(handle, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return Path(name)
+
+
+def write_temp_rules(text: str) -> Path:
+    """把界面里编辑的替换规则写到临时 JSON 文件，返回路径。
+
+    理由同 `write_temp_css`：core 只认文件（`rules_from_file`），没有「一段 JSON
+    字符串」这个入口。**生命周期由调用方负责**。
+    """
+    handle, name = tempfile.mkstemp(prefix="sec-rules-", suffix=".json", text=True)
     with os.fdopen(handle, "w", encoding="utf-8") as fh:
         fh.write(text)
     return Path(name)

@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from click.testing import CliRunner
@@ -55,8 +57,7 @@ _GUI_ONLY_EXCLUSIONS = {
     "css_append": "由 CssEditor 的 append 模式产出",
     # 只在有额外层级/替换规则时才产出，见 option_values()
     "level": "有 level_rows 时才产出",
-    "replace_json": "有规则行时才产出",
-    "replace_file": "界面用表格编辑规则，不走文件",
+    "replace_rules": "有规则行时才产出（表格序列化成临时 JSON 文件）",
     # 三个内置层级是「条件产出」：未动过（None）不写键，显式给了才写。
     # 放在这张表里是为了 test_exclusions_stay_excluded 能守住「默认界面不写它们」。
     "volume": "未动过（None）时不写键，交给 core 缺省",
@@ -74,7 +75,7 @@ _GUI_ONLY_EXCLUSIONS = {
 def test_all_options_covered(ui: UiValues) -> None:
     """`OPTIONS` 里每个选项，要么被界面收上来，要么在「刻意不做」表里有理由。
 
-    默认产出的 `values` 里 `level` / `replace_json` / `css_*` 不会出现（它们是有条件
+    默认产出的 `values` 里 `level` / `replace_rules` / `css_*` 不会出现（它们是有条件
     的），所以这里用一张**塞满条件值**的 `UiValues` 来取覆盖面。
     """
     rich = UiValues(
@@ -132,7 +133,7 @@ def test_all_config_fields_covered() -> None:
         rules=[("a", "b", "原文")],
     )
     produced = set(option_values(rich))
-    # levels / replacements 由 core 从 level / replace_json 合成，不直接出现在 values 里
+    # levels / replacements 由 core 从 level / replace_rules 合成，不直接出现在 values 里
     synthesized = {"levels", "replacements"}
     unexplained = sorted(set(CONFIG_KINDS) - produced - synthesized - set(_NO_UI_FIELD))
     assert not unexplained, f"这些 Config 字段既没界面来源、也没在 _NO_UI_FIELD 说明：{unexplained}"
@@ -146,7 +147,7 @@ def test_no_unknown_keys(ui: UiValues) -> None:
     # 三条内置层级的 class 名（volume/chapter/section）不在 CONFIG_KINDS 里 ——
     # 它们由 core 的 _level_specs() 拼进 level，但 GUI 直接用这三个键名传正则
     recognized = {opt.name for opt in OPTIONS if opt.in_config}
-    recognized |= {"level", "replace_json", "replace_file", "no_volume", *LEVEL_NAMES}
+    recognized |= {"level", "replace_rules", "no_volume", *LEVEL_NAMES}
     extra = sorted(set(option_values(ui)) - recognized)
     assert not extra, f"这些键 core 不会读，等于静默丢弃：{extra}"
 
@@ -330,6 +331,14 @@ def test_explicit_values_match_cli(tmp_path) -> None:
             rules=[("第(.+?)章", r"第\1节", "原文")],
         )
     )
+    rules_file = tmp_path / "rules.json"
+    rules_file.write_text(
+        json.dumps(
+            [{"pattern": "第(.+?)章", "replace": r"第\1节", "stage": "raw"}],
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     cli = _cli_config([
         "--dump-css", str(tmp_path / "x.css"),
         "--encoding", "gb18030", "--title", "书名", "--author", "作者",
@@ -340,7 +349,7 @@ def test_explicit_values_match_cli(tmp_path) -> None:
         "--indent", "0", "--line-height", "150%", "--para-spacing", "12px",
         "--volume-align", "left", "--chapter-align", "right",
         "--toc-depth", "3", "--no-toc",
-        "--replace-json", '[{"pattern": "第(.+?)章", "replace": "第\\\\1节", "stage": "raw"}]',
+        "--replace-rules", str(rules_file),
     ])
     for name in _COMPARED:
         assert getattr(gui, name) == getattr(cli, name), (
