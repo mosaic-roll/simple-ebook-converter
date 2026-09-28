@@ -22,6 +22,7 @@ def build_treeview(
     style: str,
     row_height: int,
     anchors: dict[str, str] | None = None,
+    heading_anchors: dict[str, str] | None = None,
     stretches: dict[str, bool] | None = None,
 ) -> tuple[ttk.Treeview, ttk.Scrollbar, ttk.Frame]:
     """构建「树 + 滚动条」的标准布局。
@@ -38,19 +39,22 @@ def build_treeview(
         style=style,
     )
     anchors = anchors or {}
+    heading_anchors = heading_anchors or anchors
     stretches = stretches or {}
     for column in columns:
         heading_kw: dict[str, object] = {"text": headings[column]}
-        if anchors.get(column):
-            heading_kw["anchor"] = anchors[column]
+        ha = heading_anchors.get(column)
+        if ha:
+            heading_kw["anchor"] = ha
         tree.heading(column, **heading_kw)
         col_kw: dict[str, object] = {
             "width": s(widths[column]),
             "minwidth": s(minwidths[column]),
             "stretch": stretches.get(column, True),
         }
-        if anchors.get(column):
-            col_kw["anchor"] = anchors[column]
+        a = anchors.get(column)
+        if a:
+            col_kw["anchor"] = a
         tree.column(column, **col_kw)
     set_row_height(style, px=row_height)
 

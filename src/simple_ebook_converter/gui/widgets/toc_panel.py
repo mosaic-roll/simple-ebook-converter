@@ -115,6 +115,7 @@ class TocPanel(ttk.Frame):
             style="Toc.Treeview",
             row_height=ROW_HEIGHT,
             anchors=COL_ANCHORS,
+            heading_anchors=COL_HEADING_ANCHORS,
             stretches=COL_STRETCH,
         )
         theme.on_colors_changed(self.tree, self._apply_colors)
