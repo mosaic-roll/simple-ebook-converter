@@ -148,26 +148,43 @@ class _Control:
 
 class _TextControl(_Control):
     def __init__(self, parent, field: Field, spec: Text, on_change, on_path_valid) -> None:
+        self._name = field.name
+        self._on_change = on_change
         frame = ttk.Frame(parent)
         frame.pack(fill="x", pady=(0, s(4)))
         top = ttk.Frame(frame)
         top.pack(fill="x")
         ttk.Label(top, text=field.label, width=8).pack(side="left")
         self._var = tk.StringVar(value=spec.default)
+        self._committed = spec.default
         entry = ttk.Entry(top, textvariable=self._var)
         entry.pack(side="left", fill="x", expand=True, padx=(s(6), 0))
-        entry.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
+        # 失焦只在**值真的变了**时才提交：否则每次点到别处都会触发一次重扫，
+        # 左栏跟着灰一下又亮一下（闪烁）。
+        entry.bind("<FocusIn>", lambda _e: self._remember(), add="+")
+        entry.bind("<FocusOut>", lambda _e: self._commit(), add="+")
         self._widget = entry
         if spec.help:
             ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
             )
 
+    def _remember(self) -> None:
+        self._committed = self._var.get()
+
+    def _commit(self) -> None:
+        value = self._var.get()
+        if value == self._committed:
+            return
+        self._committed = value
+        self._on_change(self._name)
+
     def get(self) -> str:
         return self._var.get()
 
     def set(self, value) -> None:
         self._var.set(value)
+        self._committed = value
 
     @property
     def widget(self) -> tk.Misc:
@@ -222,6 +239,8 @@ class _ChoiceControl(_Control):
 
 class _SpinControl(_Control):
     def __init__(self, parent, field: Field, spec: Spin, on_change, on_path_valid) -> None:
+        self._name = field.name
+        self._on_change = on_change
         frame = ttk.Frame(parent)
         frame.pack(fill="x", pady=(0, s(4)))
         top = ttk.Frame(frame)
@@ -230,15 +249,27 @@ class _SpinControl(_Control):
         self._var = tk.IntVar(value=spec.default)
         spin = ttk.Spinbox(top, from_=spec.low, to=spec.high, width=6, textvariable=self._var)
         spin.pack(side="left", padx=(s(6), 0))
-        # Spinbox 敲键时 `command` 不一定触发，两个都接上
-        spin.bind("<FocusOut>", lambda _e: on_change(field.name), add="+")
-        spin.configure(command=lambda: on_change(field.name))
+        # Spinbox 敲键时 `command` 不一定触发，两个都接上；只在值变了时提交。
+        spin.bind("<FocusIn>", lambda _e: self._remember(), add="+")
+        spin.bind("<FocusOut>", lambda _e: self._commit(), add="+")
+        spin.configure(command=self._commit)
         self._widget = spin
         self._low, self._high = spec.low, spec.high
+        self._committed = spec.default
         if spec.help:
             ttk.Label(frame, text=spec.help).pack(
                 anchor="w", padx=(s(8), 0)
             )
+
+    def _remember(self) -> None:
+        self._committed = self.get()
+
+    def _commit(self) -> None:
+        value = self.get()
+        if value == self._committed:
+            return
+        self._committed = value
+        self._on_change(self._name)
 
     def get(self) -> int:
         try:
@@ -249,6 +280,7 @@ class _SpinControl(_Control):
 
     def set(self, value) -> None:
         self._var.set(int(value))
+        self._committed = int(value)
 
     @property
     def widget(self) -> tk.Misc:

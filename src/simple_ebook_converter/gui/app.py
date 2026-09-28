@@ -163,14 +163,18 @@ class App(ttk.Frame):
             ("replace", "替换", ReplaceTab),
             ("typography", "排版", TypographyTab),
         ):
-            # 替换规则改动**不重扫**：替换只改写标题文字，不影响目录的识别结果，
-            # 而 entries 已经在内存里了。走 _schedule_rescan 的话，改一条规则会
-            # 把整本书重读重解析一遍，就为了重画「替换后」那一列 —— 一次按键一次
-            # 全量扫描。而且生成期间 status.busy 还会把它挡掉，那段时间改规则
-            # 预览就不动了。
-            on_change = (
-                self._refresh_preview if key == "replace" else self._schedule_rescan
-            )
+            # 各页的 on_change 语义不同，别再一刀切去重扫：
+            # * 替换：只重画「替换后」一列，**不重扫**（规则不参与识别）；
+            # * 识别：识别设置只在点「应用」时通知，通知即重扫；
+            # * 基础 / 排版：只影响生成用的配置，**不重扫** —— 目录识别与它们无关，
+            #   更不能因为失焦就重扫（那会让点一下别处就灰一下、闪一次）。
+            # 重扫只由用户动作触发：选文件、点「重扫」、F5/Ctrl-G、识别页「应用」。
+            if key == "replace":
+                on_change = self._refresh_preview
+            elif key == "identify":
+                on_change = self._schedule_rescan
+            else:
+                on_change = self._on_settings_changed
             tab = factory(notebook, on_change=on_change)
             notebook.add(tab, text=label)
             self.tabs[key] = tab
@@ -362,6 +366,15 @@ class App(ttk.Frame):
         self.toc.set_entries(entries)
         self.status.set_count(len(entries))
         self._refresh_preview()
+        self._refresh_enabled()
+
+    def _on_settings_changed(self) -> None:
+        """基础 / 排版字段改动：只刷新按钮可用性，**不重扫目录**。
+
+        这些字段只影响生成时的配置（元数据、排版、CSS），目录识别用不到它们。
+        重扫是要读整个文件、重新切分标题的重活，应该由用户点按钮触发，不该在
+        每次失焦时静默跑一遍。
+        """
         self._refresh_enabled()
 
     def _refresh_enabled(self) -> None:

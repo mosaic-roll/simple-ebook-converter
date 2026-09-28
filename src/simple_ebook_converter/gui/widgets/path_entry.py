@@ -47,9 +47,13 @@ class PathEntry(ttk.Entry):
         self._on_valid = on_valid
         self._valid: Path | None = None
         self._state = OK
+        #: 聚焦时的内容。失焦时和它比较，**只在真的改了**时才通知 —— 否则每次点到
+        #: 别处都会触发一次重扫，左栏跟着灰一下又亮一下。
+        self._committed = self.get()
 
         self.hint = ttk.Label(master, text="", wraplength=0)
         self.bind("<KeyRelease>", self._on_key_release, add="+")
+        self.bind("<FocusIn>", self._on_focus_in, add="+")
         self.bind("<FocusOut>", self._on_focus_out, add="+")
         theme.on_colors_changed(self, self._apply_colors)
 
@@ -87,8 +91,18 @@ class PathEntry(ttk.Entry):
         if self.hint.cget("text"):
             self.clear_message()
 
+    def _on_focus_in(self, _event: tk.Event) -> None:
+        # 记下进入时的内容，供失焦时判断有没有真改过（程序化 set 也算）
+        self._committed = self.get()
+
     def _on_focus_out(self, _event: tk.Event) -> None:
+        # 校验每次都做（提示是「我刚填的对不对」），但**值没变就不通知**：
+        # 通知会一路走到重扫，每次点开别的控件都重扫一次，界面闪烁就是这么来的。
         self.validate()
+        current = self.get()
+        if current == self._committed:
+            return
+        self._committed = current
         if self._on_change is not None:
             self._on_change()
 

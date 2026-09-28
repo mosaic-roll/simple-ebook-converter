@@ -83,6 +83,9 @@ class BasicTab(ttk.Frame):
         #: 自动填充期间挂起 on_change，免得填值本身触发一次重扫
         self._suspend = False
         self._rescan_for_input = False
+        #: 上次已确认的输入路径。只在真的换了文件时才标记「这次重扫要自动填充」，
+        #: 点进点出没改不算。
+        self._last_input = ""
 
         wrap = ScrollFrame(self)
         wrap.pack(fill="both", expand=True)
@@ -164,16 +167,22 @@ class BasicTab(ttk.Frame):
         self._changed()
 
     def _path_valid(self, name: str, _path) -> None:
-        """输入文件确定后告知外部（要重扫目录）。其余路径字段没有额外处理。"""
-        if name == "input" and self.on_input_chosen is not None:
-            self._rescan_for_input = True
-            self.on_input_chosen(self.input_row.get())
+        """输入文件**真的换了**才标记「下次重扫要自动填充」。其余路径字段不处理。"""
+        if name != "input" or self.on_input_chosen is None:
+            return
+        current = self.input_row.get()
+        if current == self._last_input:
+            return
+        self._last_input = current
+        self._rescan_for_input = True
+        self.on_input_chosen(current)
 
     def set_input(self, path: str) -> None:
         """外部（拖入/命令行/最近文件）改了输入路径时同步。只在真的变了才回调。"""
         if self.input_row.get() == path:
             return
         self.input_row.set(path)
+        self._last_input = path
         self._rescan_for_input = True
         self._changed()
 
