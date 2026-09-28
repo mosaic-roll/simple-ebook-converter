@@ -33,6 +33,10 @@ class ButtonRow(ttk.Frame):
     def add_spacer(self, padx: int = s(8)) -> None:
         ttk.Label(self, text="").pack(side="left", padx=padx)
 
+    def add_spacer_expand(self) -> None:
+        """添加一个撑满剩余宽度的 spacer，用于将后续按钮推到右侧。"""
+        ttk.Label(self, text="").pack(side="left", fill="x", expand=True)
+
     def add_label(self, text: str) -> ttk.Label:
         lbl = ttk.Label(self, text=text)
         lbl.pack(side="left", padx=(s(4), 0))

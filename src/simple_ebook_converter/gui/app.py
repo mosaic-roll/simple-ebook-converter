@@ -52,6 +52,7 @@ from .tabs.identify import IdentifyTab
 from .tabs.replace import ReplaceTab
 from .tabs.typography import TypographyTab
 
+from .widgets.button_row import ButtonRow
 from .widgets.scroll_frame import ScrollFrame
 from .widgets.status_bar import StatusBar
 from .widgets.toc_panel import TocPanel
@@ -129,13 +130,11 @@ class App(ttk.Frame):
         """
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=s(8), pady=(s(8), s(4)))
-        self.btn_generate = ttk.Button(
-            bar, text="生成 EPUB", command=self.generate
-        )
-        self.btn_generate.pack(side="left")
-        # 文字标出**当前**主题，和界面观感一致
-        self.btn_theme = ttk.Button(bar, text=self._theme_button_text(), command=self._toggle_theme)
-        self.btn_theme.pack(side="right")
+        row = ButtonRow(bar)
+        row.pack(fill="x")
+        self.btn_generate = row.add("生成 EPUB", self.generate)
+        row.add_spacer_expand()
+        self.btn_theme = row.add(self._theme_button_text(), self._toggle_theme)
 
     def _build_status(self) -> None:
         """底部状态栏：整宽一行，位于左右两栏下方。"""
