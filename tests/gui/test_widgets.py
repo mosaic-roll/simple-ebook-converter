@@ -284,16 +284,16 @@ def test_extra_levels_spec_allows_colon_in_regex(tk_root) -> None:
 
 def test_replacement_editor_round_trip(tk_root) -> None:
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("第(.+?)章", r"第\1节", "原文")])
-    assert ed.get_rows() == [("第(.+?)章", r"第\1节", "原文")]
+    ed.set_rows([("第(.+?)章", r"第\1节", "原文", True)])
+    assert ed.get_rows() == [("第(.+?)章", r"第\1节", "原文", True)]
     rules = ed.get_rules()
-    assert rules == [Rule(r"第(.+?)章", r"第\1节", "raw")]
+    assert rules == [Rule(r"第(.+?)章", r"第\1节", "raw", True)]
 
 
 def test_replacement_editor_skips_empty_rows(tk_root) -> None:
     """`查找` 为空的行忽略 —— 删行后不该留下空洞。"""
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "原文"), ("", "2", "原文")])
+    ed.set_rows([("a", "1", "原文", True), ("", "2", "原文", True)])
     assert len(ed.get_rules()) == 1
 
 
@@ -302,21 +302,21 @@ def test_replacement_editor_json_matches_core_format(tk_root) -> None:
     import json
 
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "原文")])
+    ed.set_rows([("a", "1", "原文", True)])
     data = json.loads(ed.get_json())
-    assert data == [{"pattern": "a", "replace": "1", "stage": "raw"}]
+    assert data == [{"pattern": "a", "replace": "1", "stage": "raw", "enabled": True}]
 
 
 def test_replacement_editor_preserves_order(tk_root) -> None:
     """顺序即语义：规则按表格显示顺序执行。"""
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "原文"), ("a", "2", "原文")])
+    ed.set_rows([("a", "1", "原文", True), ("a", "2", "原文", True)])
     assert [r.replace for r in ed.get_rules()] == ["1", "2"]
 
 
 def test_replacement_editor_move_requires_selection(tk_root) -> None:
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "原文")])
+    ed.set_rows([("a", "1", "原文", True)])
     assert ed.move_selected(-1) is False, "没选中就不该动"
 
 
@@ -327,7 +327,7 @@ def test_replacement_editor_move_up_down_keeps_all_rows(tk_root) -> None:
     会抛 `Item X already exists`，行就此「消失」。
     """
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "原文"), ("b", "2", "原文"), ("c", "3", "原文")])
+    ed.set_rows([("a", "1", "原文", True), ("b", "2", "原文", True), ("c", "3", "原文", True)])
     order = ed.tree.get_children()
 
     ed.tree.selection_set(order[1])  # b
@@ -362,7 +362,7 @@ def test_identify_tab_does_not_notify_until_apply(tk_root) -> None:
 def test_replacement_editor_stage_accepts_value_or_label(tk_root) -> None:
     """`阶段` 认取值（raw）也认标签（原文）。"""
     ed = ReplacementEditor(tk_root)
-    ed.set_rows([("a", "1", "raw")])
+    ed.set_rows([("a", "1", "raw", True)])
     assert ed.get_rows()[0][2] == "原文"
 
 
@@ -667,10 +667,10 @@ def test_basic_tab_explicit_auto_encoding_is_respected(tk_root) -> None:
 
 def test_replace_tab_round_trip(tk_root) -> None:
     tab = ReplaceTab(tk_root)
-    tab.set_rows([("a", "1", "原文"), ("b", "", "HTML")])
+    tab.set_rows([("a", "1", "原文", True), ("b", "", "HTML", True)])
     rows = tab.get_rows()
-    assert rows[0] == ("a", "1", "原文")
-    assert rules_from_rows(rows) == [Rule("a", "1", "raw"), Rule("b", "", "html")]
+    assert rows[0] == ("a", "1", "原文", True)
+    assert rules_from_rows(rows) == [Rule("a", "1", "raw", True), Rule("b", "", "html", True)]
 
 
 def _opt(name: str):
