@@ -102,8 +102,8 @@ def test_rescan_completes_through_worker_thread(app, tk_root, tmp_path) -> None:
     titles = [app.toc.tree.set(i, TITLE).strip() for i in app.toc.tree.get_children("")]
     assert "第一章 开始" in titles
     assert "第二章 结束" in titles
-    # 标题数在目录面板底部，编码自动填进基础页（状态行不再重复这两样）
-    assert app.toc.v_count.get() == "2 个标题"
+    # 标题数在状态栏（底部整宽），编码自动填进基础页
+    assert app.status.text.cget("text") == "共2个标题"
     assert app.tabs["basic"].get().encoding == "utf-8"
 
 

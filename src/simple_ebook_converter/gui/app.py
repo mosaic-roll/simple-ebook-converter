@@ -173,7 +173,7 @@ class App(ttk.Frame):
             notebook.add(tab, text=label)
             self.tabs[key] = tab
         # 基础页换输入文件要重扫，其余页只改排版，不必重扫
-        self.tabs["basic"].on_input_chosen = lambda _p: self.rescan()
+        self.tabs["basic"].on_input_chosen = self._rescan_input
 
     def _build_right(self, parent: ttk.Frame) -> None:
         ttk.Label(parent, text="目录", font=font("ui", TITLE_SIZE, "bold")).pack(anchor="w")
@@ -320,7 +320,15 @@ class App(ttk.Frame):
         # 冻结期间控件的 `state` 是 disabled，而禁用的 ttk.Entry 会**静默忽略**
         # `insert` —— 输出/封面这两个 PathRow 会填了个寂寞（靠 StringVar 活着的
         # 那几个字段反倒正常，于是错误只表现成「路径没自动填」）。
-        self._autofill(resolved, used)
+        self.root.update_idletasks()
+        # 仅在「因输入文件而重扫」时自动填充（用户改设置触发的重扫不填）
+        if self.tabs["basic"]._rescan_for_input:
+            self.tabs["basic"]._rescan_for_input = False
+            self._autofill(resolved, used)
+
+    def _rescan_input(self, path: str) -> None:
+        """输入文件确定后标记为「输入触发」重扫，由调用方执行 rescan()。"""
+        self.tabs["basic"]._rescan_for_input = True
 
     def _autofill(self, resolved, used: str) -> None:
         """扫完按设计 §7.4 填输出路径/编码/书名/作者/封面。
@@ -349,7 +357,7 @@ class App(ttk.Frame):
     def _show_entries(self, entries: list[dict]) -> None:
         self._toc_entries = list(entries)
         self.toc.set_entries(entries)
-        self.toc.set_count(len(entries))
+        self.status.set_count(len(entries))
         self._refresh_preview()
         self._refresh_enabled()
 

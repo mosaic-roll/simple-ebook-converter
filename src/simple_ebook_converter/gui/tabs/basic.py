@@ -83,6 +83,7 @@ class BasicTab(ttk.Frame):
         self._auto: dict[str, str] = {}
         #: 自动填充期间挂起 on_change，免得填值本身触发一次重扫
         self._suspend = False
+        self._rescan_for_input = False
 
         wrap = ScrollFrame(self)
         wrap.pack(fill="both", expand=True)
@@ -189,6 +190,7 @@ class BasicTab(ttk.Frame):
     def _path_valid(self, name: str, _path) -> None:
         """输入文件确定后告知外部（要重扫目录）。其余路径字段没有额外处理。"""
         if name == "input" and self.on_input_chosen is not None:
+            self._rescan_for_input = True
             self.on_input_chosen(self.input_row.get())
 
     def set_input(self, path: str) -> None:
@@ -196,6 +198,7 @@ class BasicTab(ttk.Frame):
         if self.input_row.get() == path:
             return
         self.input_row.set(path)
+        self._rescan_for_input = True
         self._changed()
 
     # ---------- 内部 ----------

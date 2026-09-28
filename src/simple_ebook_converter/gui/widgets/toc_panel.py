@@ -26,13 +26,13 @@ from ..metrics import s, set_row_height
 #: 三列
 CHECK, TITLE, RESULT = "check", "title", "result"
 
-#: 行高（设计稿像素）与三列的宽
+#: 行高（设计稿像素）与三列的宽。勾选列留出 1em 左右的左右空白
 ROW_HEIGHT = 24
-COL_WIDTHS = {CHECK: 26, TITLE: 260, RESULT: 180}
-COL_MINWIDTHS = {CHECK: 26, TITLE: 120, RESULT: 100}
+COL_WIDTHS = {CHECK: 44, TITLE: 248, RESULT: 180}
+COL_MINWIDTHS = {CHECK: 44, TITLE: 120, RESULT: 100}
 HEADINGS = {CHECK: "启用", TITLE: "标题", RESULT: "替换后"}
-#: 勾选列居中；标题/结果左对齐
-COL_ANCHORS = {CHECK: "center", TITLE: "w", RESULT: "w"}
+#: 三列标题都居中
+COL_ANCHORS = {CHECK: "center", TITLE: "center", RESULT: "center"}
 #: 勾选列不吃拉伸（拉伸会让它变宽，占掉标题的位置）
 COL_STRETCH = {CHECK: False, TITLE: True, RESULT: True}
 
@@ -67,7 +67,6 @@ class TocPanel(ttk.Frame):
 
         self._build_toolbar()
         self._build_tree()
-        self._build_count()
 
     # ---------- 布局 ----------
 
@@ -137,13 +136,6 @@ class TocPanel(ttk.Frame):
 
     def _apply_colors(self) -> None:
         self.tree.tag_configure(TAG_DELETED, foreground=theme.colors()["muted"])
-
-    def _build_count(self) -> None:
-        """底部一行：右对齐的「N 个标题」。"""
-        bar = ttk.Frame(self)
-        bar.pack(fill="x", pady=(s(4), 0))
-        self.v_count = tk.StringVar(value="")
-        ttk.Label(bar, textvariable=self.v_count).pack(side="right")
 
     # ---------- 内容 ----------
 
@@ -246,9 +238,7 @@ class TocPanel(ttk.Frame):
         self.v_depth.set(_clamp_depth(data.toc_depth))
         self.v_in_spine.set(data.toc_in_spine)
 
-    def set_count(self, count: int) -> None:
-        """目录条目数（底部右对齐）。"""
-        self.v_count.set(f"{count} 个标题" if count else "")
+
 
     # ---------- 导出给 core ----------
 
