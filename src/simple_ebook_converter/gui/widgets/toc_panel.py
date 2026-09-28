@@ -35,7 +35,7 @@ COL_MINWIDTHS = {CHECK: 44, TITLE: 120, RESULT: 100}
 HEADINGS = {CHECK: "启用", TITLE: "标题", RESULT: "替换后"}
 #: 三列标题都居中，内容左对齐
 COL_HEADING_ANCHORS = {CHECK: "center", TITLE: "center", RESULT: "center"}
-COL_ANCHORS = {CHECK: "center", TITLE: "w", RESULT: "center"}
+COL_ANCHORS = {CHECK: "center", TITLE: "w", RESULT: "w"}
 #: 勾选列不吃拉伸（拉伸会让它变宽，占掉标题的位置）
 COL_STRETCH = {CHECK: False, TITLE: True, RESULT: True}
 
@@ -177,11 +177,9 @@ class TocPanel(ttk.Frame):
 
     def _row_values(self, entry: dict, iid: str, shown: str = "") -> tuple[str, str, str]:
         deleted = self._deleted.get(iid, False)
-        # 已划掉：灰前景 + check 列留空（用空格而不是「□」，少一个字符就不用担心字形）
-        mark = "  " if deleted else "√"
         indent = " " * (2 * max(0, entry.get("level", 1) - 1))
         raw_title = entry.get("raw_title", "")
-        return (mark, indent + raw_title, indent + shown)
+        return ("  " if deleted else "√", indent + raw_title, indent + shown)
 
     def _on_click(self, event: tk.Event) -> None:
         """点 `check` 列切换启用；点别处就是普通选中。"""
