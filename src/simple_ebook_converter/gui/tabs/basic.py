@@ -16,6 +16,7 @@ from ...core.encoding import AUTO_ENCODING, ENCODING_CHOICES
 from ...core.options import OPTIONS
 from ..build_config_from_ui import BasicValues
 from ..metrics import s
+from ..models.autofill import AutofillPolicy
 from ..widgets.form import Check, Choice, Field, Form, Path, Section, Text
 from ..widgets.scroll_frame import ScrollFrame
 
@@ -76,10 +77,9 @@ class BasicTab(ttk.Frame):
         super().__init__(master, **kwargs)
         self.on_change = on_change
         self.on_input_chosen = on_input_chosen
-        #: 用户动过的字段（自动填充永不复位它们）
-        self._touched: set[str] = set()
-        #: 字段 → 上次自动填的值（用于「仍等于上次自动值就允许再覆盖」）
-        self._auto: dict[str, str] = {}
+        #: 自动填充的覆盖规则（哪些动过、上次自动填了什么）。规则在 models 里，
+        #: 与 Tk 无关，可单测。
+        self._policy = AutofillPolicy(_AUTOFILL_KEYS, AUTO_ENCODING)
         #: 自动填充期间挂起 on_change，免得填值本身触发一次重扫
         self._suspend = False
         self._rescan_for_input = False
@@ -125,10 +125,9 @@ class BasicTab(ttk.Frame):
             self.form.set_values(data)
             # 从设置里读回来的非空字段算「用户已定」，自动填充不许冲掉。
             # 空的（out/encoding 可能是空）留给自动填充。
-            self._touched = {
-                key for key in _AUTOFILL_KEYS if getattr(values, key)
-            }
-            self._auto.clear()
+            self._policy.seed_from_values(
+                {key: getattr(values, key) for key in _AUTOFILL_KEYS}
+            )
         finally:
             self._suspend = False
 
@@ -139,38 +138,18 @@ class BasicTab(ttk.Frame):
         `None` 表示「这次没有可填的值」（比如没找到封面），跳过。
 
         **dirty 规则**：只有当字段为空、或仍等于上次自动填的值时才覆盖；用户改过的
-        （`_touched`）永不复位。日期/语言没有 core 来源，不在自动填充范围内。
+        永不复位。规则细节见 `models.autofill.AutofillPolicy`。日期/语言没有 core
+        来源，不在自动填充范围内。
         """
-        changed = False
+        current = {key: self._get_field(key) for key in desired}
         self._suspend = True
         try:
-            for key, value in desired.items():
-                if value is None:
-                    continue
-                current = self._get_field(key)
-                if current == value:
-                    self._auto[key] = value
-                    continue
-                # 设计 §7.4：只有「空」或「仍等于上次自动值」才覆盖。
-                if not self._fillable(key, current):
-                    continue
+            updates = self._policy.plan(current, desired)
+            for key, value in updates.items():
                 self._set_field(key, value)
-                self._auto[key] = value
-                changed = True
         finally:
             self._suspend = False
-        return changed
-
-    def _fillable(self, key: str, current: str) -> bool:
-        if not current or current == self._auto.get(key):
-            return True
-        # 编码的默认值是 `auto`（非空串），但它表示「还没定」。只有用户**显式**
-        # 选过 auto 时才不该被覆盖 —— 这个「显式」靠 `_touched` 记。
-        return (
-            key == "encoding"
-            and current == AUTO_ENCODING
-            and key not in self._touched
-        )
+        return bool(updates)
 
     def _get_field(self, key: str) -> str:
         return self.form.value(key)
@@ -181,7 +160,7 @@ class BasicTab(ttk.Frame):
     def _field_changed(self, key: str) -> None:
         """控件被用户改动：记下「动过」，再走常规变更通知。"""
         if not self._suspend:
-            self._touched.add(key)
+            self._policy.mark_touched(key)
         self._changed()
 
     def _path_valid(self, name: str, _path) -> None:

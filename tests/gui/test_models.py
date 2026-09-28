@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+from simple_ebook_converter.gui.models.autofill import AutofillPolicy
 from simple_ebook_converter.gui.models.table_model import TableModel
+
+_AUTOFILL_KEYS = ("out", "encoding", "title", "author", "cover")
 
 
 def test_add_assigns_distinct_stable_ids() -> None:
@@ -57,3 +60,56 @@ def test_clear_does_not_reuse_ids() -> None:
     assert len(model) == 0
     b = model.add()
     assert b["id"] > a["id"]
+
+
+# ---------- AutofillPolicy ----------
+
+
+def test_autofill_fills_empty_fields() -> None:
+    policy = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    updates = policy.plan(
+        {"encoding": "auto", "title": "", "author": "", "out": ""},
+        {"encoding": "gb18030", "title": "书", "author": "作", "out": "a.epub"},
+    )
+    assert updates == {"encoding": "gb18030", "title": "书", "author": "作", "out": "a.epub"}
+
+
+def test_autofill_does_not_overwrite_touched_field() -> None:
+    policy = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    policy.mark_touched("title")
+    updates = policy.plan(
+        {"title": "用户书名", "out": ""}, {"title": "猜的", "out": "b.epub"}
+    )
+    assert updates == {"out": "b.epub"}
+
+
+def test_autofill_refills_value_equal_to_last_auto() -> None:
+    """仍是上次自动填的值 → 允许再覆盖（才算「用户没动过」）。"""
+    policy = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    assert policy.plan({"out": ""}, {"out": "a.epub"}) == {"out": "a.epub"}
+    assert policy.plan({"out": "a.epub"}, {"out": "b.epub"}) == {"out": "b.epub"}
+
+
+def test_autofill_none_means_nothing_to_fill() -> None:
+    policy = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    assert policy.plan({"cover": ""}, {"cover": None}) == {}
+
+
+def test_autofill_auto_encoding_fillable_unless_explicitly_touched() -> None:
+    """`auto` 是「未定」，默认可被真实编码覆盖；用户显式选回 auto 则不覆盖。"""
+    fresh = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    assert fresh.plan({"encoding": "auto"}, {"encoding": "gb18030"}) == {
+        "encoding": "gb18030"
+    }
+
+    explicit = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    explicit.mark_touched("encoding")
+    assert explicit.plan({"encoding": "auto"}, {"encoding": "utf-8"}) == {}
+
+
+def test_autofill_seed_protects_explicitly_saved_auto_encoding() -> None:
+    """设置里存了 `auto` 说明用户显式选过它，加载后不该被自动填充改掉。"""
+    policy = AutofillPolicy(_AUTOFILL_KEYS, "auto")
+    policy.seed_from_values({"encoding": "auto"})
+    assert policy.touched == {"encoding"}
+    assert policy.plan({"encoding": "auto"}, {"encoding": "gb18030"}) == {}
