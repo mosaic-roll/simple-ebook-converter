@@ -124,8 +124,6 @@ class TypographyTab(ttk.Frame):
         self.css = CssEditor(css, on_change=self._changed)
         self.css.pack(fill="both", expand=True)
 
-        wrap.retag_all()
-
     # ---------- 值 ----------
 
     def get(self) -> TypographyValues:

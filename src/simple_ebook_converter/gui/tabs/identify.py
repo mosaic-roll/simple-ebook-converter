@@ -109,7 +109,6 @@ class IdentifyTab(ttk.Frame):
         ttk.Label(actions, textvariable=self.v_dirty).pack(side="left")
 
         self._suspend = False
-        wrap.retag_all()
 
     # ---------- 值 ----------
 

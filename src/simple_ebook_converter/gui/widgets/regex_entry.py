@@ -13,7 +13,7 @@ r"""单行正则编辑框。
 * **`Shift+滚轮` 归这个框**，横向滚动。
 
 前提是 ScrollFrame 的 bindtag 已挂到这个 Entry 上，否则返回 `None` 也没有接收者，
-滚轮会完全没反应（见 `ScrollFrame.retag_all()`）。
+滚轮会完全没反应（ScrollFrame 会自动补挂，见其模块 docstring）。
 """
 
 from __future__ import annotations

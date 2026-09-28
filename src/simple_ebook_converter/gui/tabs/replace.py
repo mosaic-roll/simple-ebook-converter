@@ -38,8 +38,6 @@ class ReplaceTab(ttk.Frame):
         self.editor = ReplacementEditor(body, on_change=on_change)
         self.editor.pack(fill="both", expand=True)
 
-        wrap.retag_all()
-
     # ---------- 值 ----------
 
     def get_rows(self) -> list[tuple[str, str, str]]:

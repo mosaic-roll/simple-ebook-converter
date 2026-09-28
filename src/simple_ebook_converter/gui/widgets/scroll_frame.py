@@ -5,7 +5,9 @@
 bindtag，在那个 tag 上绑处理器（`bindtags()` 里自定义 tag 排在 class 绑定之后、
 toplevel 之前，能收到所有后代的事件）。
 
-动态新增控件之后必须调 `retag_all()` 补上新控件，否则新增的行滚不动。
+**动态新增控件的 bindtag 由本类自动补**：子控件变化会改变 `inner` 的尺寸，触发
+它的 `<Configure>`，本类据此在 `after_idle` 里补挂（见 `_schedule_retag`）。所以
+调用方**不需要**再手动 `retag_all()`；确有需要时也可显式调 `track(widget)`。
 """
 
 from __future__ import annotations
@@ -33,6 +35,8 @@ class ScrollFrame(ttk.Frame):
 
     def __init__(self, master: tk.Misc, **kwargs) -> None:
         super().__init__(master, **kwargs)
+        #: 是否已排了一次 `after_idle` 的补挂（合并同一轮里的多次 Configure）
+        self._retag_pending = False
         self.canvas = tk.Canvas(
             self,
             highlightthickness=0,
@@ -61,6 +65,23 @@ class ScrollFrame(ttk.Frame):
 
     def _on_inner_configure(self, _event: tk.Event) -> None:
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        # 内容尺寸变了：可能刚新增了控件，下一轮空闲里补挂 bindtag
+        self._schedule_retag()
+
+    def _schedule_retag(self) -> None:
+        """内容变化的下一轮空闲里补挂 bindtag（合并多次触发）。"""
+        if self._retag_pending:
+            return
+        self._retag_pending = True
+        self.after_idle(self._retag_now)
+
+    def _retag_now(self) -> None:
+        self._retag_pending = False
+        self.retag_all()
+
+    def track(self, widget: tk.Misc) -> None:
+        """显式给某个动态新增的子树挂 bindtag（懒重扫之外的另一条路径）。"""
+        self._retag_descendants(widget)
 
     def _on_canvas_configure(self, event: tk.Event) -> None:
         self.canvas.itemconfigure(self._win, width=event.width)
@@ -85,7 +106,10 @@ class ScrollFrame(ttk.Frame):
         self.retag_all()
 
     def retag_all(self) -> None:
-        """重新给所有后代挂上滚轮 bindtag。**动态增删控件后必须调。**
+        """重新给所有后代挂上滚轮 bindtag。
+
+        通常**不必手动调**：内容变化会自动触发（见 `_schedule_retag`）。
+        需要立刻生效时（如刚建完一批控件）可以显式调一次。
 
         递归而不是只扫一层：设计上以为「Canvas + vbar + inner + inner 的直接子控件」
         就是全部，但 `inner` 里的每个子控件自己还可能有子控件（`PathRow` 里就有

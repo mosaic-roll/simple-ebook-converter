@@ -107,8 +107,6 @@ class BasicTab(ttk.Frame):
         self._date = self.form.control("date").var
         self._language = self.form.control("language").var
 
-        wrap.retag_all()
-
     # ---------- 值 ----------
 
     def get(self) -> BasicValues:
