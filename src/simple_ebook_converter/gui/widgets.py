@@ -71,6 +71,7 @@ def make_field_btn(
     label: str,
     ctx: GuiContext,
     command: Callable[[], None],
+    placeholder: str = "",
     extra_btns: Sequence[tuple[str, Callable[[], None]]] | None = None,
     btn_text: str = "浏览",
     btn_width: int = BTN_W_S,
@@ -79,7 +80,7 @@ def make_field_btn(
 
     `command` 是主按钮（文字 `btn_text`，默认「浏览」）的回调；`extra_btns` 是
     排在主按钮右边的 `(文字, 回调)` 列表，如 `[("查看", open_cover)]`。
-    同一行所有按钮宽度都用 `btn_width`。
+    同一行所有按钮宽度都用 `btn_width`，`placeholder` 同 `make_field`。
     """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="w", font=font).grid(
@@ -94,7 +95,7 @@ def make_field_btn(
         pady=ROW_PADY,
         sticky="ew",
     )
-    entry = ctk.CTkEntry(box, font=font)
+    entry = ctk.CTkEntry(box, font=font, placeholder_text=placeholder)
     entry.pack(side="left", fill="x", expand=True)
 
     btn_box = ctk.CTkFrame(box, fg_color="transparent")

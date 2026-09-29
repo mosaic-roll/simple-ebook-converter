@@ -50,7 +50,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
 
     # ---- 嵌入字体 ----
     fo = make_group(parent, "嵌入字体", 2, ctx)
-    font_entry = make_field_btn(fo, 1, "路径", ctx, command=ctx.cb("pick_font"))
+    font_entry = make_field_btn(
+        fo,
+        1,
+        "路径",
+        ctx,
+        command=ctx.cb("pick_font"),
+        placeholder="字体文件（.ttf / .otf / .woff）",
+    )
 
     # ---- 自定义 CSS ----
     css = make_group(parent, "自定义 CSS", 3, ctx)
@@ -92,6 +99,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "路径",
         ctx,
         command=ctx.cb("pick_css"),
+        placeholder="CSS 文件路径（整体覆盖内置样式）",
         extra_btns=[("清空", ctx.cb("clear_css"))],
     )
 
@@ -128,15 +136,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
 
     # ---- 来源切换 ----
     def _on_source_change() -> None:
+        # 路径框两种来源下都能编辑，不跟着切 state
         if source_var.get() == CSS_SOURCE_FILE:
-            # 使用文件：只有路径生效，其余全部禁用
-            css_path.configure(state="normal")
+            # 使用文件：只有路径生效，模式与文本框禁用（内容保留）
             css_mode.configure(state="disabled")
             css_text.configure(state="disabled")
             load_builtin_btn.configure(state="disabled")
         else:
-            # 直接编辑：路径禁用，模式 + 文本框生效
-            css_path.configure(state="disabled")
+            # 直接编辑：模式 + 文本框生效
             css_mode.configure(state="normal")
             css_text.configure(state="normal")
             load_builtin_btn.configure(state="normal")

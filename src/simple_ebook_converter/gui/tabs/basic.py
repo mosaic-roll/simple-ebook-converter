@@ -45,6 +45,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "路径",
         ctx,
         command=ctx.cb("pick_cover"),
+        placeholder="封面图片（.jpg / .png / .webp）",
         extra_btns=[("查看", ctx.cb("open_cover"))],
     )
     # TODO: 接 core 后初值取 core.config.DEFAULTS["text_cover"]
