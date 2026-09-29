@@ -130,6 +130,13 @@ class App(ctk.CTk):
             c, text="无封面时生成文字封面", variable=self.text_cover_var
         ).grid(row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w")
 
+        # 其他
+        o = self._group(parent, "其他", 3)
+        self.clean_var = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(o, text="清理文本", variable=self.clean_var).grid(
+            row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w"
+        )
+
     # ==================== 规则 Tab ====================
     def _build_rules_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
@@ -182,8 +189,7 @@ class App(ctk.CTk):
             return
         entry.delete(0, "end")
 
-        # ==================== 排版 Tab ====================
-
+    # ==================== 排版 Tab ====================
     def _build_layout_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
@@ -210,21 +216,21 @@ class App(ctk.CTk):
         fo = self._group(parent, "嵌入字体", 2)
         self.font_entry = self._field_btn(fo, 1, "路径", self._pick_font)
 
-        # CSS 组：在 parent 里 sticky="nsew"，让自身能纵向长高；
-        # pady 显式用 (8, 0) 与其他组一致（_group 默认就是 (8, 0)）。
+        # 自定义 CSS：在 parent 里 sticky="nsew"，让自身能纵向长高；
+        # pady 显式用 (8, 0) 与其他组一致。
         css = self._group(parent, "自定义 CSS", 3)
         css.grid_configure(sticky="nsew", pady=(8, 0))
         css.grid_columnconfigure(0, weight=1)
-        css.grid_rowconfigure(1, weight=1)  # 文本框所在行吸收拉伸
+        css.grid_rowconfigure(2, weight=1)  # 文本框所在行吸收拉伸
 
         self.css_mode = ctk.CTkSegmentedButton(css, values=["忽略", "追加", "覆盖"])
         self.css_mode.set("忽略")
         self.css_mode.grid(
-            row=0, column=0, columnspan=4, padx=10, pady=(6, 4), sticky="w"
+            row=1, column=0, columnspan=4, padx=10, pady=(6, 4), sticky="w"
         )
         self.css_text = ctk.CTkTextbox(css)
         self.css_text.grid(
-            row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
+            row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
         )
 
         parent.grid_rowconfigure(3, weight=1)
@@ -345,11 +351,6 @@ class App(ctk.CTk):
             font=ctk.CTkFont(weight="bold"),
             command=self._on_generate,
         ).grid(row=0, column=0, padx=14, pady=6, sticky="w")
-
-        self.clean_var = tk.BooleanVar(value=True)
-        ctk.CTkCheckBox(bar, text="清理文本", variable=self.clean_var).grid(
-            row=0, column=2, padx=14, pady=6, sticky="e"
-        )
 
     # ==================== 封装组件 ====================
     def _group(self, parent, title, row):
