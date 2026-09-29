@@ -29,21 +29,15 @@ def open_with_default_app(path: str) -> None:
 
 class App(ctk.CTk):
     PAD = 6
-    GAP = 4
+    GAP = 6
     ALIGNS = ["left", "center", "right"]
     HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
-
-    # 右侧目录面板宽度约束
-    PANEL_DEFAULT = 300
-    PANEL_MIN = 200
-    PANEL_MAX = 560
-    SPLITTER_W = 6
 
     def __init__(self):
         super().__init__()
         self.title("Simple Ebook Converter")
-        self.geometry("760x700")
-        self.minsize(680, 600)
+        self.geometry("900x720")
+        self.minsize(720, 600)
 
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
@@ -81,13 +75,13 @@ class App(ctk.CTk):
         self.main.grid(row=1, column=0, sticky="nsew",
                        padx=self.PAD, pady=(self.PAD, 0))
         self.main.grid_rowconfigure(0, weight=1)
-        self.main.grid_columnconfigure(0, weight=1)   # 左：tabs
-        self.main.grid_columnconfigure(1, weight=0)   # 中：splitter
-        self.main.grid_columnconfigure(2, weight=0)   # 右：目录面板
+        # 左右各 50%，比例固定
+        self.main.grid_columnconfigure(0, weight=1, uniform="col")
+        self.main.grid_columnconfigure(1, weight=1, uniform="col")
 
-        # border_width=0：去掉 Tabview 自带的边框，弱化两栏的分界
+        # 左：Tabview
         self.tabs = ctk.CTkTabview(self.main, border_width=0)
-        self.tabs.grid(row=0, column=0, sticky="nsew")
+        self.tabs.grid(row=0, column=0, sticky="nsew", padx=(0, self.GAP // 2))
         for name in ("基础", "规则", "排版", "替换"):
             self.tabs.add(name)
 
@@ -96,31 +90,8 @@ class App(ctk.CTk):
         self._build_layout_tab(self.tabs.tab("排版"))
         self._build_replace_tab(self.tabs.tab("替换"))
 
-        self._build_splitter()
+        # 右：目录面板
         self._build_toc_panel(self.main)
-
-    # ---------- 可拖拽分界线 ----------
-    def _build_splitter(self):
-        self.splitter = ctk.CTkFrame(
-            self.main, width=self.SPLITTER_W, corner_radius=3,
-            fg_color="transparent", cursor="sb_h_double_arrow",
-        )
-        self.splitter.grid(row=0, column=1, sticky="ns", pady=8)
-        self.splitter.grid_propagate(False)
-        self.splitter.bind(
-            "<Enter>", lambda _e: self.splitter.configure(
-                fg_color=("gray75", "gray30")))
-        self.splitter.bind(
-            "<Leave>", lambda _e: self.splitter.configure(
-                fg_color="transparent"))
-        self.splitter.bind("<B1-Motion>", self._on_splitter_drag)
-
-    def _on_splitter_drag(self, event):
-        # event.x_root 是屏幕坐标；用 main 的右边缘倒推面板宽度
-        main_right = self.main.winfo_rootx() + self.main.winfo_width()
-        new_width = main_right - event.x_root - self.SPLITTER_W // 2
-        new_width = max(self.PANEL_MIN, min(self.PANEL_MAX, new_width))
-        self.panel.configure(width=new_width)
 
     # ---------- 基础 Tab ----------
     def _build_basic_tab(self, parent):
@@ -128,48 +99,25 @@ class App(ctk.CTk):
 
         # 文件
         f = self._group(parent, "文件", 0)
-        f.grid_columnconfigure(1, weight=1)
         self.input_entry = self._file_row(f, 1, "源文件", self._pick_input)
         self.output_entry = self._file_row(f, 2, "目标", self._pick_output)
-        ctk.CTkLabel(f, text="编码", anchor="w").grid(
-            row=3, column=0, padx=(10, 6), pady=6, sticky="w")
-        self.encoding_menu = ctk.CTkOptionMenu(
-            f,
-            values=["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"],
-            width=140, anchor="center",
+        self.encoding_menu = self._option_row(
+            f, 3, "编码",
+            ["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"],
         )
-        self.encoding_menu.set("auto")
-        # 不再 columnspan=2 / sticky=ew，宽度回到固定 140
-        self.encoding_menu.grid(row=3, column=1, padx=(0, 10), pady=6,
-                                sticky="w")
 
         # 书籍信息（2×2）
         m = self._group(parent, "书籍信息", 1)
-        for c in (1, 3):
-            m.grid_columnconfigure(c, weight=1)
         self.book_title = self._label_entry(m, 1, 0, "书名", "书名")
         self.book_author = self._label_entry(m, 1, 2, "作者", "作者")
         self.book_date = self._label_entry(m, 2, 0, "日期", "2024-05-13")
-        ctk.CTkLabel(m, text="语言", anchor="w").grid(
-            row=2, column=2, padx=(10, 6), pady=6, sticky="w")
-        self.lang_menu = ctk.CTkOptionMenu(
-            m, values=["zh", "en", "jp"], anchor="center")
-        self.lang_menu.set("zh")
-        self.lang_menu.grid(row=2, column=3, padx=(0, 10), pady=6, sticky="ew")
+        self.lang_menu = self._option_row(m, 2, "语言",
+                                          ["zh", "en", "jp"], col=2)
 
         # 封面
         c = self._group(parent, "封面", 2)
-        c.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(c, text="路径", anchor="w").grid(
-            row=1, column=0, padx=(10, 6), pady=6, sticky="w")
-        self.cover_entry = ctk.CTkEntry(c)
-        self.cover_entry.grid(row=1, column=1, pady=6, sticky="ew")
-        ctk.CTkButton(c, text="浏览", width=60,
-                      command=self._pick_cover).grid(
-            row=1, column=2, padx=(6, 4), pady=6)
-        ctk.CTkButton(c, text="打开", width=60,
-                      command=self._open_cover).grid(
-            row=1, column=3, padx=(0, 10), pady=6)
+        self.cover_entry = self._file_row(c, 1, "路径", self._pick_cover,
+                                          extra_btn=("打开", self._open_cover))
         self.text_cover_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(c, text="无封面时生成文字封面",
                         variable=self.text_cover_var).grid(
@@ -180,7 +128,6 @@ class App(ctk.CTk):
         parent.grid_columnconfigure(0, weight=1)
 
         b = self._group(parent, "基础规则", 0)
-        b.grid_columnconfigure(1, weight=1)
         rows = [
             ("卷", "^第…[卷部]"),
             ("章", "^第…[章节回]"),
@@ -190,20 +137,16 @@ class App(ctk.CTk):
         ]
         self.rules_entries = []
         for i, (label, hint) in enumerate(rows, start=1):
-            ctk.CTkLabel(b, text=label, anchor="w").grid(
-                row=i, column=0, padx=(10, 6), pady=6, sticky="w")
-            e = ctk.CTkEntry(b, placeholder_text=hint)
-            e.grid(row=i, column=1, padx=(0, 10), pady=6, sticky="ew")
+            e = self._label_entry(b, i, 0, label, hint)
             self.rules_entries.append(e)
 
         a = self._group(parent, "额外规则", 1)
-        a.grid_columnconfigure(0, weight=1)
         self.extra_rows = []
         for i in range(2):
             self.extra_rows.append(self._extra_level_row(a, i + 1))
 
         btns = ctk.CTkFrame(a, fg_color="transparent")
-        btns.grid(row=99, column=0, pady=(4, 10))
+        btns.grid(row=99, column=0, columnspan=2, pady=(4, 10))
         ctk.CTkButton(btns, text="＋ 添加", width=90,
                       command=self._add_extra_rule).pack(side="left", padx=4)
         ctk.CTkButton(btns, text="－ 删除", width=90,
@@ -211,7 +154,7 @@ class App(ctk.CTk):
 
     def _extra_level_row(self, parent, r):
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.grid(row=r, column=0, sticky="ew", padx=10, pady=4)
+        row.grid(row=r, column=0, columnspan=2, sticky="ew", padx=10, pady=4)
         row.grid_columnconfigure(2, weight=1)
         level = ctk.CTkOptionMenu(row, values=self.HEADINGS,
                                   width=70, anchor="center")
@@ -229,8 +172,6 @@ class App(ctk.CTk):
 
         # 段落 2×2
         p = self._group(parent, "段落", 0)
-        for c in (1, 3):
-            p.grid_columnconfigure(c, weight=1)
         self.indent = self._label_entry(p, 1, 0, "缩进", "2")
         self.line_height = self._label_entry(p, 1, 2, "行高", "1.5")
         self.para_spacing = self._label_entry(p, 2, 0, "段间距", "1em")
@@ -238,8 +179,6 @@ class App(ctk.CTk):
 
         # 对齐方式 2×2
         al = self._group(parent, "对齐方式", 1)
-        for c in (1, 3):
-            al.grid_columnconfigure(c, weight=1)
         self.align_volume = self._align_row(al, 1, 0, "卷", "center")
         self.align_chapter = self._align_row(al, 1, 2, "章", "center")
         self.align_section = self._align_row(al, 2, 0, "节", "left")
@@ -247,14 +186,7 @@ class App(ctk.CTk):
 
         # 嵌入字体
         fo = self._group(parent, "嵌入字体", 2)
-        fo.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(fo, text="路径", anchor="w").grid(
-            row=1, column=0, padx=(10, 6), pady=6, sticky="w")
-        self.font_entry = ctk.CTkEntry(fo)
-        self.font_entry.grid(row=1, column=1, pady=6, sticky="ew")
-        ctk.CTkButton(fo, text="浏览", width=60,
-                      command=self._pick_font).grid(
-            row=1, column=2, padx=(6, 10), pady=6)
+        self.font_entry = self._file_row(fo, 1, "路径", self._pick_font)
 
         # 自定义 CSS
         css = self._group(parent, "自定义 CSS", 3)
@@ -268,7 +200,7 @@ class App(ctk.CTk):
         self.css_text.grid(row=1, column=0, padx=10, pady=(0, 10),
                            sticky="nsew")
 
-        parent.grid_rowconfigure(3, weight=1)  # CSS 块可随 Tab 拉高
+        parent.grid_rowconfigure(3, weight=1)
 
     # ---------- 替换 Tab ----------
     def _build_replace_tab(self, parent):
@@ -301,10 +233,8 @@ class App(ctk.CTk):
 
     # ---------- 右侧目录面板 ----------
     def _build_toc_panel(self, parent):
-        self.panel = ctk.CTkFrame(parent, width=self.PANEL_DEFAULT,
-                                  corner_radius=4)
-        self.panel.grid(row=0, column=2, sticky="nsew")
-        self.panel.grid_propagate(False)
+        self.panel = ctk.CTkFrame(parent, corner_radius=4)
+        self.panel.grid(row=0, column=1, sticky="nsew", padx=(self.GAP // 2, 0))
         self.panel.grid_rowconfigure(1, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
@@ -313,18 +243,31 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=13, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 4))
 
+        holder = ctk.CTkFrame(self.panel, fg_color="transparent")
+        holder.grid(row=1, column=0, sticky="nsew", padx=10)
+        holder.grid_rowconfigure(0, weight=1)
+        holder.grid_columnconfigure(0, weight=1)
+
         self.toc_table = ttk.Treeview(
-            self.panel, columns=("enabled", "title", "preview"),
+            holder, columns=("enabled", "title", "preview"),
             show="headings", height=16,
         )
-        for col, text, w in (
-            ("enabled", "启用", 50),
-            ("title", "标题", 140),
-            ("preview", "预览", 90),
-        ):
-            self.toc_table.heading(col, text=text)
-            self.toc_table.column(col, width=w, anchor="w")
-        self.toc_table.grid(row=1, column=0, sticky="nsew", padx=10)
+        self.toc_table.heading("enabled", text="启用")
+        self.toc_table.heading("title", text="标题")
+        self.toc_table.heading("preview", text="预览")
+        self.toc_table.column("enabled", width=40,  anchor="center", stretch=False)
+        self.toc_table.column("title",   width=180, anchor="w",      stretch=True)
+        self.toc_table.column("preview", width=160, anchor="w",      stretch=True)
+
+        vsb = ttk.Scrollbar(holder, orient="vertical",
+                            command=self.toc_table.yview)
+        hsb = ttk.Scrollbar(holder, orient="horizontal",
+                            command=self.toc_table.xview)
+        self.toc_table.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+        self.toc_table.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
 
         btns = ctk.CTkFrame(self.panel, fg_color="transparent")
         btns.grid(row=2, column=0, pady=6)
@@ -350,48 +293,81 @@ class App(ctk.CTk):
 
     # ==================== 底部栏 ====================
     def _build_bottombar(self):
-        bar = ctk.CTkFrame(self, height=48, corner_radius=0)
+        bar = ctk.CTkFrame(self, height=44, corner_radius=0)
         bar.grid(row=2, column=0, sticky="ew", pady=(self.GAP, 0))
         bar.grid_columnconfigure(1, weight=1)
 
         ctk.CTkButton(
-            bar, text="⚙  开始生成", width=140, height=32,
+            bar, text="⚙  开始生成", width=140, height=28,
             font=ctk.CTkFont(weight="bold"),
             command=self._on_generate,
-        ).grid(row=0, column=0, padx=14, pady=8, sticky="w")
+        ).grid(row=0, column=0, padx=14, pady=6, sticky="w")
 
         self.clean_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(bar, text="清理文本",
                         variable=self.clean_var).grid(
-            row=0, column=2, padx=14, pady=8, sticky="e")
+            row=0, column=2, padx=14, pady=6, sticky="e")
 
     # ==================== 复用组件 ====================
     def _group(self, parent, title, row):
+        """分组框：内部统一为「标签列 + 输入列 (+按钮列)」结构。
+
+        - 标签列 col 0：weight=0，宽度由文字决定
+        - 输入列 col 1：weight=1，吃掉所有剩余宽度
+        - 按钮列 col 2：weight=0
+        对 2×2 布局，会在右侧再复制一份 (col 2, col 3)。
+        """
         frame = ctk.CTkFrame(parent, border_width=1, corner_radius=4)
         frame.grid(row=row, column=0, sticky="ew", padx=10, pady=(8, 0))
-        frame.grid_columnconfigure(0, weight=1)
+        # 左半区：标签 0 / 输入 1；右半区：标签 2 / 输入 3
+        frame.grid_columnconfigure(0, weight=0)   # 标签
+        frame.grid_columnconfigure(1, weight=1)   # 输入
+        frame.grid_columnconfigure(2, weight=0)   # 标签
+        frame.grid_columnconfigure(3, weight=1)   # 输入
         ctk.CTkLabel(
             frame, text=title,
             font=ctk.CTkFont(size=11, weight="bold"),
             text_color=("gray30", "gray70"),
-        ).grid(row=0, column=0, sticky="w", padx=10, pady=(6, 2))
+        ).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(6, 2))
         return frame
 
-    def _file_row(self, parent, r, label, command):
+    def _file_row(self, parent, r, label, command, extra_btn=None):
         ctk.CTkLabel(parent, text=label, anchor="w").grid(
             row=r, column=0, padx=(10, 6), pady=6, sticky="w")
         entry = ctk.CTkEntry(parent)
-        entry.grid(row=r, column=1, pady=6, sticky="ew")
-        ctk.CTkButton(parent, text="浏览", width=60, command=command).grid(
-            row=r, column=2, padx=(6, 10), pady=6)
+        entry.grid(row=r, column=1, columnspan=3, pady=6, sticky="ew")
+        if extra_btn:
+            text, cmd = extra_btn
+            ctk.CTkButton(parent, text=text, width=60, command=cmd).grid(
+                row=r, column=2, padx=(6, 10), pady=6, sticky="e")
+            # 输入框跨到 col3 里其实已经占了，这里按钮覆盖其右端
+            entry.grid_configure(columnspan=2)
+            ctk.CTkButton(parent, text="浏览", width=60, command=command).grid(
+                row=r, column=3, padx=(0, 4), pady=6, sticky="e")
+        else:
+            ctk.CTkButton(parent, text="浏览", width=60, command=command).grid(
+                row=r, column=2, columnspan=2, padx=(6, 10), pady=6, sticky="e")
         return entry
 
     def _label_entry(self, parent, r, c, label, placeholder=""):
+        """一对「标签 + 输入框」。c 必须是 0 或 2。
+
+        c=0 → 左半区（标签 0 / 输入 1）
+        c=2 → 右半区（标签 2 / 输入 3）
+        """
         ctk.CTkLabel(parent, text=label, anchor="w").grid(
             row=r, column=c, padx=(10, 6), pady=6, sticky="w")
         entry = ctk.CTkEntry(parent, placeholder_text=placeholder)
         entry.grid(row=r, column=c + 1, padx=(0, 10), pady=6, sticky="ew")
         return entry
+
+    def _option_row(self, parent, r, label, values, col=0):
+        ctk.CTkLabel(parent, text=label, anchor="w").grid(
+            row=r, column=col, padx=(10, 6), pady=6, sticky="w")
+        menu = ctk.CTkOptionMenu(parent, values=values, anchor="center")
+        menu.set(values[0])
+        menu.grid(row=r, column=col + 1, padx=(0, 10), pady=6, sticky="ew")
+        return menu
 
     def _align_row(self, parent, r, c, label, default):
         ctk.CTkLabel(parent, text=label, anchor="w").grid(
