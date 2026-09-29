@@ -1,6 +1,9 @@
 """规则 Tab：内置层级正则 + 额外层级行。
 
 内置层级只是预填项：整条正则可编辑，恢复默认时回填 `DEFAULTS` 里的原值。
+
+额外层级行没有选中态：添加就是往末尾加一行，删除就是去掉最后一行，因此
+永远不会出现行号空洞，也就不需要重排。默认 hN 见 `EXTRA_LEVEL_DEFAULTS`。
 """
 
 from __future__ import annotations
@@ -22,7 +25,18 @@ from ..widgets import make_field_btn, make_group
 #: 预置行标签 → DEFAULTS 的键；TODO: 接 core 后由 core.config.DEFAULTS 补全
 BUILTIN_ROWS = ("卷", "章", "节", "字数上限", "无标题章节")
 
-_MIN_EXTRA_ROWS = 1
+#: 额外层级的默认 hN：第 1 行 h5、第 2 行 h6，之后新增的行都 h6
+EXTRA_LEVEL_DEFAULTS = ("h5", "h6")
+
+#: 「额外规则」组内：0 是组标题，1 是按钮条，额外层级行从 2 开始
+_FIRST_EXTRA_ROW = 2
+
+
+def _default_level(index: int) -> str:
+    """第 `index` 行（0 起）该预填的 hN。"""
+    if index < len(EXTRA_LEVEL_DEFAULTS):
+        return EXTRA_LEVEL_DEFAULTS[index]
+    return EXTRA_LEVEL_DEFAULTS[-1]
 
 
 def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
@@ -54,21 +68,21 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     extra_rows: list[dict[str, ctk.CTkBaseClass]] = []
 
     def add_extra_rule() -> None:
-        extra_rows.append(_extra_level_row(a, len(extra_rows) + 1, ctx))
-        _relayout_extra_rows(a, extra_rows)
+        i = len(extra_rows)
+        extra_rows.append(
+            _extra_level_row(a, _FIRST_EXTRA_ROW + i, ctx, _default_level(i))
+        )
+        del_btn.configure(state="normal")
 
     def remove_extra_rule() -> None:
-        # TODO: 改成按选中行删除；现在没有选中态，只能去最后一行
-        if len(extra_rows) <= _MIN_EXTRA_ROWS:
+        if not extra_rows:
             return
-        extra_rows.pop().destroy()
-        _relayout_extra_rows(a, extra_rows)
+        extra_rows.pop()["frame"].destroy()
+        del_btn.configure(state="normal" if extra_rows else "disabled")
 
-    add_extra_rule()
-    add_extra_rule()
-
+    # 按钮放在组标题下面而不是末尾：行往下长，末尾的按钮会被顶得从鼠标底下滑走
     btns = ctk.CTkFrame(a, fg_color="transparent")
-    btns.grid(row=99, column=0, columnspan=4, pady=(4, 10))
+    btns.grid(row=1, column=0, columnspan=4, sticky="w", padx=GROUP_PADX)
     ctk.CTkButton(
         btns,
         text="＋ 添加",
@@ -76,13 +90,17 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         font=font,
         command=add_extra_rule,
     ).pack(side="left", padx=BTN_GAP)
-    ctk.CTkButton(
+    del_btn = ctk.CTkButton(
         btns,
         text="－ 删除",
         width=BTN_W_XL,
         font=font,
         command=remove_extra_rule,
-    ).pack(side="left", padx=BTN_GAP)
+    )
+    del_btn.pack(side="left", padx=BTN_GAP)
+
+    add_extra_rule()
+    add_extra_rule()
 
     return {
         "rule_entries": rule_entries,
@@ -91,7 +109,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
 
 
 def _extra_level_row(
-    parent: ctk.CTkBaseClass, r: int, ctx: GuiContext
+    parent: ctk.CTkBaseClass, r: int, ctx: GuiContext, level: str
 ) -> dict[str, ctk.CTkBaseClass]:
     """一行额外层级：级别选项 + class 输入 + 正则输入。
 
@@ -102,7 +120,7 @@ def _extra_level_row(
     row.grid_columnconfigure(2, weight=1)
     font = ctx.fonts.base
 
-    level = ctk.CTkOptionMenu(
+    menu = ctk.CTkOptionMenu(
         row,
         values=HEADINGS,
         width=OPTION_W_S,
@@ -110,8 +128,8 @@ def _extra_level_row(
         font=font,
         dropdown_font=font,
     )
-    level.set("h2")
-    level.grid(row=0, column=0, padx=(0, 6))
+    menu.set(level)
+    menu.grid(row=0, column=0, padx=(0, 6))
 
     cls = ctk.CTkEntry(row, width=ENTRY_W_M, placeholder_text="class", font=font)
     cls.grid(row=0, column=1, padx=(0, 6))
@@ -119,12 +137,4 @@ def _extra_level_row(
     regex = ctk.CTkEntry(row, placeholder_text="正则", font=font)
     regex.grid(row=0, column=2, sticky="ew")
 
-    return {"frame": row, "level": level, "class": cls, "regex": regex}
-
-
-def _relayout_extra_rows(parent: ctk.CTkBaseClass, rows: list) -> None:
-    """删除后行号会留洞，重排一遍。"""
-    for i, item in enumerate(rows, start=1):
-        item["frame"].grid(
-            row=i, column=0, columnspan=4, sticky="ew", padx=GROUP_PADX, pady=4
-        )
+    return {"frame": row, "level": menu, "class": cls, "regex": regex}
