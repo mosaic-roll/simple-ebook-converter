@@ -277,7 +277,7 @@ class App(ctk.CTk):
     def _build_toc_panel(self, parent):
         self.panel = ctk.CTkFrame(parent, corner_radius=4)
         self.panel.grid(row=0, column=1, sticky="nsew", padx=(self.GAP // 2, 0))
-        self.panel.grid_rowconfigure(1, weight=1)
+        self.panel.grid_rowconfigure(2, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -286,23 +286,40 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=13, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 4))
 
+        # ---- 顶部按钮行：重新扫描（左） + 导入/导出（右） ----
+        top = ctk.CTkFrame(self.panel, fg_color="transparent")
+        top.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 4))
+        top.grid_columnconfigure(0, weight=1)  # 左区撑开，把右区推到最右
+
+        ctk.CTkButton(top, text="重新扫描", width=90).grid(row=0, column=0, sticky="w")
+        right_top = ctk.CTkFrame(top, fg_color="transparent")
+        right_top.grid(row=0, column=1, sticky="e")
+        ctk.CTkButton(right_top, text="导入", width=60).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(right_top, text="导出", width=60).pack(side="left")
+
+        # ---- 表格 ----
         holder = ctk.CTkFrame(self.panel, fg_color="transparent")
-        holder.grid(row=1, column=0, sticky="nsew", padx=10)
+        holder.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 4))
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_columnconfigure(0, weight=1)
 
         self.toc_table = ttk.Treeview(
             holder,
-            columns=("enabled", "title", "preview"),
+            columns=("title", "result"),
             show="headings",
             height=16,
         )
-        self.toc_table.heading("enabled", text="启用")
         self.toc_table.heading("title", text="标题")
-        self.toc_table.heading("preview", text="预览")
-        self.toc_table.column("enabled", width=40, anchor="center", stretch=False)
+        self.toc_table.heading("result", text="替换结果")
         self.toc_table.column("title", width=180, anchor="w", stretch=True)
-        self.toc_table.column("preview", width=160, anchor="w", stretch=True)
+        self.toc_table.column("result", width=160, anchor="w", stretch=True)
+
+        # 已删除行的样式：灰 + 删除线
+        self.toc_table.tag_configure(
+            "deleted",
+            foreground="gray60",
+            font=("TkDefaultFont", 10, "overstrike"),
+        )
 
         vsb = ttk.Scrollbar(holder, orient="vertical", command=self.toc_table.yview)
         hsb = ttk.Scrollbar(holder, orient="horizontal", command=self.toc_table.xview)
@@ -312,19 +329,19 @@ class App(ctk.CTk):
         vsb.grid(row=0, column=1, sticky="ns")
         hsb.grid(row=1, column=0, sticky="ew")
 
-        btns = ctk.CTkFrame(self.panel, fg_color="transparent")
-        btns.grid(row=2, column=0, pady=6)
-        ctk.CTkButton(btns, text="重新扫描", width=90).pack(side="left", padx=4)
-        ctk.CTkButton(btns, text="导入", width=60).pack(side="left", padx=4)
-        ctk.CTkButton(btns, text="导出", width=60).pack(side="left", padx=4)
+        # 测试数据
+        self._load_toc_test_data()
 
-        # 深度 + 勾选框合并成一行，整行居中
-        opts = ctk.CTkFrame(self.panel, fg_color="transparent")
-        opts.grid(row=3, column=0, pady=(0, 10))
+        # ---- 底部行：深度 + 勾选（左） + 删除/恢复（右） ----
+        bottom = ctk.CTkFrame(self.panel, fg_color="transparent")
+        bottom.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
+        bottom.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(opts, text="目录深度").pack(side="left")
+        left = ctk.CTkFrame(bottom, fg_color="transparent")
+        left.grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(left, text="目录深度").pack(side="left")
         self.toc_depth = ctk.CTkOptionMenu(
-            opts,
+            left,
             values=[str(i) for i in range(1, 7)],
             width=70,
             anchor="center",
@@ -334,8 +351,41 @@ class App(ctk.CTk):
 
         self.toc_in_book_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            opts, text="目录页出现在书中", variable=self.toc_in_book_var
+            left, text="目录页出现在书中", variable=self.toc_in_book_var
         ).pack(side="left")
+
+        right = ctk.CTkFrame(bottom, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="e")
+        ctk.CTkButton(
+            right, text="删除", width=60, command=self._mark_toc_deleted
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(
+            right, text="恢复", width=60, command=self._restore_toc_deleted
+        ).pack(side="left")
+
+    # ==================== 目录：测试数据与删除标记 ====================
+    def _load_toc_test_data(self):
+        """填充几条测试目录数据。"""
+        data = [
+            ("第一卷 起源", "第一卷 起源"),
+            ("  第一章 开端", "第一章 开端"),
+            ("  第二章 离别", "第二章 离别"),
+            ("    第一节 清晨", "第一节 清晨"),
+            ("第二卷 风暴", "第二卷 风暴"),
+            ("  第三章 重逢", "第三章 重逢"),
+        ]
+        for title, result in data:
+            self.toc_table.insert("", "end", values=(title, result))
+
+    def _mark_toc_deleted(self):
+        """把选中的目录条目标记为删除（置灰 + 删除线）。"""
+        for item_id in self.toc_table.selection():
+            self.toc_table.item(item_id, tags=("deleted",))
+
+    def _restore_toc_deleted(self):
+        """恢复选中的目录条目。"""
+        for item_id in self.toc_table.selection():
+            self.toc_table.item(item_id, tags=())
 
     # ==================== 底部栏 ====================
     def _build_bottombar(self):
