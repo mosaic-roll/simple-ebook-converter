@@ -6,7 +6,7 @@
 - 只有一个模块用 → 留在那个模块里（如 `toc_panel.TOC_*`、`settings_dialog.SETTINGS_*`）
 - 是某个模块自己的实现细节 → 也留在那个模块（如 `fonts.FONT_*_OFFSET`）
 
-本模块**不依赖任何其他 gui_ctk 模块**，只 import 标准库。
+本模块**不依赖任何其他 gui 模块**，只 import 标准库。
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """图形界面入口：直接运行即可，无需依赖 CLI/core。
 
     pip install "simple-ebook-converter[gui]"
-    python -m simple_ebook_converter.gui_ctk
+    python -m simple_ebook_converter.gui
     simple-ebook-converter
 """
 

@@ -19,7 +19,7 @@ gui = [
 ]
 
 [project.scripts]
-simple-ebook-converter = "simple_ebook_converter.gui_ctk.__main__:main"
+simple-ebook-converter = "simple_ebook_converter.gui.__main__:main"
 simple-ebook-converter-cli = "simple_ebook_converter.cli.cli:main"
 
 [dependency-groups]

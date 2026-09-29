@@ -6,7 +6,7 @@
 | ------------------------------- | --------------------------------------------------- |
 | `simple_ebook_converter.core`   | 核心库，不依赖任何前端；无状态，模块各管一件事        |
 | `simple_ebook_converter.cli`    | 命令行前端，入口点 `simple-ebook-converter-cli`     |
-| `simple_ebook_converter.gui_ctk` | 图形界面前端（customtkinter），入口点 `simple-ebook-converter` |
+| `simple_ebook_converter.gui`     | 图形界面前端（customtkinter），入口点 `simple-ebook-converter`  |
 
 版本号只有一处：根 `pyproject.toml` 的 `version`。`simple_ebook_converter.__version__`、
 `simple_ebook_converter.core.__version__` 等全部由 `simple_ebook_converter._meta` 里的
@@ -21,6 +21,12 @@ uv sync
 ```
 
 就这一条命令——只有一个包需要安装，不再有 workspace 成员，也不需要 `--all-packages`。
+
+customtkinter 只在 `[gui]` 这一个 extra 里，跑图形界面前装上（`uv run` 不会自动带上）：
+
+```bash
+uv sync --extra gui
+```
 
 ## 用法
 
@@ -40,7 +46,8 @@ uv run simple-ebook-converter-cli 我的小说.txt --dump-css out.css     # 只�
 图形界面：
 
 ```bash
-uv run simple-ebook-converter
+uv run simple-ebook-converter            # 装了 [gui] extra 才能跑
+uv run python -m simple_ebook_converter.gui
 ```
 
 作为库：

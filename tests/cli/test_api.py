@@ -14,13 +14,13 @@ def test_version_matches_packaging_metadata():
 def test_all_frontends_share_one_version():
     """核心库 / core / cli / gui 读出的都是同一个 pyproject.toml 里的版本"""
     import simple_ebook_converter.core
-    import simple_ebook_converter.gui_ctk
+    import simple_ebook_converter.gui
 
     assert (
         simple_ebook_converter.__version__
         == simple_ebook_converter.core.__version__
         == simple_ebook_converter.cli.__version__
-        == simple_ebook_converter.gui_ctk.__version__
+        == simple_ebook_converter.gui.__version__
     )
 
 

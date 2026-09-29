@@ -4,7 +4,7 @@
 
 - `simple_ebook_converter.core`  核心库（无前端依赖，唯一入口 `process()`）
 - `simple_ebook_converter.cli`   命令行前端，入口点 `simple-ebook-converter-cli`
-- `simple_ebook_converter.gui_ctk` 图形界面前端（customtkinter），入口点 `simple-ebook-converter`
+- `simple_ebook_converter.gui`   图形界面前端（customtkinter），入口点 `simple-ebook-converter`
 
 顶层包本身不导出业务函数，只作为命名空间；请从具体子包导入。
 """
