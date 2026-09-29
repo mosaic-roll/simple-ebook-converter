@@ -160,6 +160,7 @@ class App(ctk.CTk):
         self._build_bottombar()
 
         self._apply_toc_theme()
+        self._apply_toc_font()
 
     # ======================================================================
     # 区块 4：字体与主题
@@ -278,6 +279,7 @@ class App(ctk.CTk):
     def _on_theme_change(self, value: str):
         ctk.set_appearance_mode("dark" if value == "深色" else "light")
         self._apply_toc_theme()
+        self._apply_toc_font()
 
     # ======================================================================
     # 区块 6：主体布局
