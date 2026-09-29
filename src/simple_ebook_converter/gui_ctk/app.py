@@ -135,17 +135,18 @@ class App(ctk.CTk):
         parent.grid_columnconfigure(0, weight=1)
 
         b = self._group(parent, "基础规则", 0)
-        rows = [
-            ("卷", "^第…[卷部]"),
-            ("章", "^第…[章节回]"),
-            ("节", ""),
-            ("字数上限", "35"),
-            ("无标题章节", "前言"),
-        ]
-        self.rules_entries = [
-            self._field(b, i, label, hint)
-            for i, (label, hint) in enumerate(rows, start=1)
-        ]
+        rows = ["卷", "章", "节", "字数上限", "无标题章节"]
+        self.rule_entries: dict[str, ctk.CTkEntry] = {}
+        for i, label in enumerate(rows, start=1):
+            entry = self._field_btn(
+                b,
+                i,
+                label,
+                command=lambda lbl=label: self._restore_rule_default(lbl),
+                btn_text="恢复默认",
+                btn_width=80,
+            )
+            self.rule_entries[label] = entry
 
         a = self._group(parent, "额外规则", 1)
         self.extra_rows = []
@@ -173,6 +174,13 @@ class App(ctk.CTk):
         regex = ctk.CTkEntry(row, placeholder_text="正则")
         regex.grid(row=0, column=2, sticky="ew")
         return row
+
+    def _restore_rule_default(self, label: str):
+        """占位：恢复默认值。业务逻辑接 core 后填。"""
+        entry = self.rule_entries.get(label)
+        if entry is None:
+            return
+        entry.delete(0, "end")
 
     # ==================== 排版 Tab ====================
     def _build_layout_tab(self, parent):
@@ -209,7 +217,7 @@ class App(ctk.CTk):
         self.css_mode.grid(
             row=0, column=0, columnspan=4, padx=10, pady=(6, 4), sticky="w"
         )
-        self.css_text = ctk.CTkTextbox(css, height=160)
+        self.css_text = ctk.CTkTextbox(css)
         self.css_text.grid(
             row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
         )
@@ -222,7 +230,7 @@ class App(ctk.CTk):
         parent.grid_rowconfigure(0, weight=1)
 
         holder = ctk.CTkFrame(parent)
-        holder.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        holder.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 6))
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_columnconfigure(0, weight=1)
 
@@ -242,10 +250,17 @@ class App(ctk.CTk):
             self.replace_table.column(col, width=w, anchor="w")
         self.replace_table.grid(row=0, column=0, sticky="nsew")
 
+        # 第一行：上移 / 下移 / 添加 / 删除
         btns = ctk.CTkFrame(parent, fg_color="transparent")
-        btns.grid(row=1, column=0, pady=(0, 10))
-        for text in ("上移", "下移", "添加", "删除", "导入", "导出"):
+        btns.grid(row=1, column=0, pady=(0, 4))
+        for text in ("上移", "下移", "添加", "删除"):
             ctk.CTkButton(btns, text=text, width=60).pack(side="left", padx=4)
+
+        # 第二行：导入 / 导出
+        btns2 = ctk.CTkFrame(parent, fg_color="transparent")
+        btns2.grid(row=2, column=0, pady=(0, 10))
+        for text in ("导入", "导出"):
+            ctk.CTkButton(btns2, text=text, width=60).pack(side="left", padx=4)
 
     # ==================== 右侧目录面板 ====================
     def _build_toc_panel(self, parent):
@@ -292,8 +307,10 @@ class App(ctk.CTk):
         ctk.CTkButton(btns, text="导入", width=60).pack(side="left", padx=4)
         ctk.CTkButton(btns, text="导出", width=60).pack(side="left", padx=4)
 
+        # 深度 + 勾选框合并成一行，整行居中
         opts = ctk.CTkFrame(self.panel, fg_color="transparent")
-        opts.grid(row=3, column=0, sticky="w", padx=12, pady=(0, 4))
+        opts.grid(row=3, column=0, pady=(0, 10))
+
         ctk.CTkLabel(opts, text="目录深度").pack(side="left")
         self.toc_depth = ctk.CTkOptionMenu(
             opts,
@@ -302,14 +319,12 @@ class App(ctk.CTk):
             anchor="center",
         )
         self.toc_depth.set("6")
-        self.toc_depth.pack(side="left", padx=6)
+        self.toc_depth.pack(side="left", padx=(6, 16))
 
         self.toc_in_book_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            self.panel,
-            text="目录页出现在书中",
-            variable=self.toc_in_book_var,
-        ).grid(row=4, column=0, sticky="w", padx=12, pady=(0, 10))
+            opts, text="目录页出现在书中", variable=self.toc_in_book_var
+        ).pack(side="left")
 
     # ==================== 底部栏 ====================
     def _build_bottombar(self):
@@ -335,8 +350,8 @@ class App(ctk.CTk):
     def _group(self, parent, title, row):
         """分组框。内部统一为 4 列：
 
-        col 0: 左半区标签    col 1: 左半区输入（weight=1）
-        col 2: 右半区标签    col 3: 右半区输入（weight=1）
+        col 0: 左半区标签    col 1: 左半区字段（weight=1）
+        col 2: 右半区标签    col 3: 右半区字段（weight=1）
         """
         frame = ctk.CTkFrame(parent, border_width=1, corner_radius=4)
         frame.grid(row=row, column=0, sticky="ew", padx=10, pady=(8, 0))
@@ -363,25 +378,35 @@ class App(ctk.CTk):
         )
         return entry
 
-    def _field_btn(self, parent, r, label, command, extra_btn=None):
+    def _field_btn(
+        self, parent, r, label, command, extra_btn=None, btn_text="浏览", btn_width=56
+    ):
         """标签 + 输入框 + 按钮（可选第二个按钮）。
 
-        布局：标签占 col 0，输入框占 col 1-2，按钮贴 col 3。
-        extra_btn 给了的话，两个按钮并排靠右。
+        标签占 col 0；输入框与按钮放在 col 1-3 的内部子 frame 里：
+        输入框 pack(side="left", expand=True) 顶到分组框右边缘，按钮 pack(side="right") 贴右。
+        拉伸时只动输入框，不会在输入框和按钮之间裂开缝。
         """
         ctk.CTkLabel(parent, text=label, anchor="w").grid(
             row=r, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
         )
-        entry = ctk.CTkEntry(parent)
-        entry.grid(
-            row=r, column=1, columnspan=2, padx=(0, 0), pady=self.ROW_PADY, sticky="ew"
+        box = ctk.CTkFrame(parent, fg_color="transparent")
+        box.grid(
+            row=r,
+            column=1,
+            columnspan=3,
+            padx=self.FIELD_PADX,
+            pady=self.ROW_PADY,
+            sticky="ew",
         )
+        entry = ctk.CTkEntry(box)
+        entry.pack(side="left", fill="x", expand=True)
 
-        btn_box = ctk.CTkFrame(parent, fg_color="transparent")
-        btn_box.grid(
-            row=r, column=3, padx=self.BTN_PADX, pady=self.ROW_PADY, sticky="e"
+        btn_box = ctk.CTkFrame(box, fg_color="transparent")
+        btn_box.pack(side="right", padx=(8, 0))
+        ctk.CTkButton(btn_box, text=btn_text, width=btn_width, command=command).pack(
+            side="left"
         )
-        ctk.CTkButton(btn_box, text="浏览", width=56, command=command).pack(side="left")
         if extra_btn:
             text, cmd = extra_btn
             ctk.CTkButton(btn_box, text=text, width=56, command=cmd).pack(
