@@ -102,7 +102,7 @@ class App(ctk.CTk):
 
         # 标签头条：普通 frame，内部放一个 CTkSegmentedButton，sticky="w"
         # 只占按钮本身宽度，右边留白；配色全走主题。
-        head = ctk.CTkFrame(pane, corner_radius=0, height=36)
+        head = ctk.CTkFrame(pane, corner_radius=0, height=36, fg_color="transparent")
         head.grid(row=0, column=0, sticky="ew")
         head.grid_propagate(False)
         head.grid_columnconfigure(0, weight=0)
