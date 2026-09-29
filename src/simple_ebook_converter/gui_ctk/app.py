@@ -1,7 +1,7 @@
 """Simple Ebook Converter — GUI 骨架（CTk 布局版，无业务逻辑）
 
-依赖：customtkinter
-    pip install customtkinter
+依赖：customtkinter, tksheet
+    pip install customtkinter tksheet
 """
 
 from __future__ import annotations
@@ -10,9 +10,10 @@ import os
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox
 
 import customtkinter as ctk
+from tksheet import Sheet
 
 
 # ---------- 跨平台：用系统默认程序打开文件 ----------
@@ -38,6 +39,9 @@ class App(ctk.CTk):
     FIELD_PADX = (0, 10)
     BTN_PADX = (6, 10)
     ROW_PADY = 5
+
+    # 替换规则阶段
+    STAGES = ["raw", "html"]
 
     def __init__(self):
         super().__init__()
@@ -238,46 +242,76 @@ class App(ctk.CTk):
     # ==================== 替换 Tab ====================
     def _build_replace_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=1)
 
+        # 上方：导入 / 导出
+        top = ctk.CTkFrame(parent, fg_color="transparent")
+        top.grid(row=0, column=0, pady=(10, 6))
+        for text in ("导入", "导出"):
+            ctk.CTkButton(top, text=text, width=60).pack(side="left", padx=4)
+
+        # 中间：表格
         holder = ctk.CTkFrame(parent)
-        holder.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 6))
+        holder.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 6))
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_columnconfigure(0, weight=1)
 
-        self.replace_table = ttk.Treeview(
+        self.replace_sheet = Sheet(
             holder,
-            columns=("enabled", "pattern", "replace", "stage"),
-            show="headings",
-            height=12,
+            headers=["启用", "正则", "替换为", "阶段"],
+            data=[],
+            show_row_index=False,
+            show_top_left=False,
+            row_height=24,
+            header_height=26,
         )
-        for col, text, w in (
-            ("enabled", "启用", 50),
-            ("pattern", "正则", 200),
-            ("replace", "替换为", 150),
-            ("stage", "阶段", 60),
-        ):
-            self.replace_table.heading(col, text=text)
-            self.replace_table.column(col, width=w, anchor="w")
-        self.replace_table.grid(row=0, column=0, sticky="nsew")
+        self.replace_sheet.enable_bindings(
+            (
+                "single_select",
+                "row_select",
+                "column_width_resize",
+                "arrowkeys",
+                "right_click_popup_menu",
+                "rc_select",
+                "copy",
+                "cut",
+                "paste",
+                "delete",
+                "undo",
+                "edit_cell",
+            )
+        )
+        self.replace_sheet.grid(row=0, column=0, sticky="nsew")
 
-        # 第一行：上移 / 下移 / 添加 / 删除
+        # 列宽
+        self.replace_sheet.column_width(column=0, width=50)
+        self.replace_sheet.column_width(column=1, width=200)
+        self.replace_sheet.column_width(column=2, width=150)
+        self.replace_sheet.column_width(column=3, width=70)
+
+        # 启用列做成复选框（tksheet 7 Span API）
+        self.replace_sheet["A"].checkbox(
+            checked=False,
+            state="normal",
+        )
+
+        # 阶段列做成下拉框（tksheet 7 Span API）
+        self.replace_sheet["D"].dropdown(
+            values=self.STAGES,
+            state="normal",
+        )
+
+        # 下方：行编辑按钮
         btns = ctk.CTkFrame(parent, fg_color="transparent")
-        btns.grid(row=1, column=0, pady=(0, 4))
+        btns.grid(row=2, column=0, pady=(0, 10))
         for text in ("上移", "下移", "添加", "删除"):
             ctk.CTkButton(btns, text=text, width=60).pack(side="left", padx=4)
-
-        # 第二行：导入 / 导出
-        btns2 = ctk.CTkFrame(parent, fg_color="transparent")
-        btns2.grid(row=2, column=0, pady=(0, 10))
-        for text in ("导入", "导出"):
-            ctk.CTkButton(btns2, text=text, width=60).pack(side="left", padx=4)
 
     # ==================== 右侧目录面板 ====================
     def _build_toc_panel(self, parent):
         self.panel = ctk.CTkFrame(parent, corner_radius=4)
         self.panel.grid(row=0, column=1, sticky="nsew", padx=(self.GAP // 2, 0))
-        self.panel.grid_rowconfigure(1, weight=1)
+        self.panel.grid_rowconfigure(2, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -286,56 +320,76 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=13, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 4))
 
+        # 上方：重新扫描 / 导入 / 导出
+        top = ctk.CTkFrame(self.panel, fg_color="transparent")
+        top.grid(row=1, column=0, pady=(0, 6))
+        ctk.CTkButton(top, text="重新扫描", width=90).pack(side="left", padx=4)
+        ctk.CTkButton(top, text="导入", width=60).pack(side="left", padx=4)
+        ctk.CTkButton(top, text="导出", width=60).pack(side="left", padx=4)
+
+        # 中间：表格
         holder = ctk.CTkFrame(self.panel, fg_color="transparent")
-        holder.grid(row=1, column=0, sticky="nsew", padx=10)
+        holder.grid(row=2, column=0, sticky="nsew", padx=10)
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_columnconfigure(0, weight=1)
 
-        self.toc_table = ttk.Treeview(
+        self.toc_sheet = Sheet(
             holder,
-            columns=("enabled", "title", "preview"),
-            show="headings",
-            height=16,
+            headers=["启用", "标题", "预览"],
+            data=[],
+            show_row_index=False,
+            show_top_left=False,
+            row_height=24,
+            header_height=26,
         )
-        self.toc_table.heading("enabled", text="启用")
-        self.toc_table.heading("title", text="标题")
-        self.toc_table.heading("preview", text="预览")
-        self.toc_table.column("enabled", width=40, anchor="center", stretch=False)
-        self.toc_table.column("title", width=180, anchor="w", stretch=True)
-        self.toc_table.column("preview", width=160, anchor="w", stretch=True)
+        self.toc_sheet.enable_bindings(
+            (
+                "single_select",
+                "row_select",
+                "column_width_resize",
+                "arrowkeys",
+                "right_click_popup_menu",
+                "rc_select",
+                "copy",
+                "cut",
+                "paste",
+                "delete",
+                "undo",
+                "edit_cell",
+            )
+        )
+        self.toc_sheet.grid(row=0, column=0, sticky="nsew")
 
-        vsb = ttk.Scrollbar(holder, orient="vertical", command=self.toc_table.yview)
-        hsb = ttk.Scrollbar(holder, orient="horizontal", command=self.toc_table.xview)
-        self.toc_table.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        self.toc_sheet.column_width(column=0, width=40)
+        self.toc_sheet.column_width(column=1, width=180)
+        self.toc_sheet.column_width(column=2, width=160)
 
-        self.toc_table.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
+        # 启用列做成复选框（tksheet 7 Span API）
+        self.toc_sheet["A"].checkbox(
+            checked=False,
+            state="normal",
+        )
 
-        btns = ctk.CTkFrame(self.panel, fg_color="transparent")
-        btns.grid(row=2, column=0, pady=6)
-        ctk.CTkButton(btns, text="重新扫描", width=90).pack(side="left", padx=4)
-        ctk.CTkButton(btns, text="导入", width=60).pack(side="left", padx=4)
-        ctk.CTkButton(btns, text="导出", width=60).pack(side="left", padx=4)
-
-        # 深度 + 勾选框合并成一行，整行居中
+        # 下方：深度左对齐，勾选框右对齐
         opts = ctk.CTkFrame(self.panel, fg_color="transparent")
-        opts.grid(row=3, column=0, pady=(0, 10))
+        opts.grid(row=3, column=0, sticky="ew", padx=12, pady=(6, 10))
 
-        ctk.CTkLabel(opts, text="目录深度").pack(side="left")
+        depth_box = ctk.CTkFrame(opts, fg_color="transparent")
+        depth_box.pack(side="left")
+        ctk.CTkLabel(depth_box, text="目录深度").pack(side="left")
         self.toc_depth = ctk.CTkOptionMenu(
-            opts,
+            depth_box,
             values=[str(i) for i in range(1, 7)],
             width=70,
             anchor="center",
         )
         self.toc_depth.set("6")
-        self.toc_depth.pack(side="left", padx=(6, 16))
+        self.toc_depth.pack(side="left", padx=(6, 0))
 
         self.toc_in_book_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
             opts, text="目录页出现在书中", variable=self.toc_in_book_var
-        ).pack(side="left")
+        ).pack(side="right")
 
     # ==================== 底部栏 ====================
     def _build_bottombar(self):
