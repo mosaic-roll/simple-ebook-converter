@@ -205,6 +205,7 @@ class App(ctk.CTk):
     def _apply_toc_theme(self):
         dark = ctk.get_appearance_mode() == "Dark"
         style = ttk.Style()
+        style.theme_use("clam")
 
         if dark:
             bg, fg, field = "#2b2b2b", "#e0e0e0", "#2b2b2b"
@@ -233,7 +234,13 @@ class App(ctk.CTk):
             background=head_bg,
             foreground=head_fg,
         )
+        style.map(
+            "Toc.Treeview.Heading",
+            background=[("!active", head_bg), ("active", head_bg)],
+            foreground=[("!active", head_fg), ("active", head_fg)],
+        )
         self.toc_table.tag_configure("deleted", foreground=del_fg)
+        self.toc_table.update_idletasks()
 
     # ======================================================================
     # 区块 5：顶部栏
