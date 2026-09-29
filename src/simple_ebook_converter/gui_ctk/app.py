@@ -303,16 +303,19 @@ class App(ctk.CTk):
         holder.grid_rowconfigure(0, weight=1)
         holder.grid_columnconfigure(0, weight=1)
 
+        # 树形模式：#0 列承载层级缩进和展开箭头，其余列作为平级数据列
         self.toc_table = ttk.Treeview(
             holder,
             columns=("title", "result"),
-            show="headings",
+            show="tree headings",
             height=16,
         )
+        self.toc_table.heading("#0", text="")
+        self.toc_table.column("#0", width=60, minwidth=60, stretch=False)
         self.toc_table.heading("title", text="标题")
         self.toc_table.heading("result", text="替换结果")
-        self.toc_table.column("title", width=180, anchor="w", stretch=True)
-        self.toc_table.column("result", width=160, anchor="w", stretch=True)
+        self.toc_table.column("title", width=150, anchor="w", stretch=True)
+        self.toc_table.column("result", width=150, anchor="w", stretch=True)
 
         # 已删除行的样式：灰 + 删除线
         self.toc_table.tag_configure(
@@ -365,17 +368,18 @@ class App(ctk.CTk):
 
     # ==================== 目录：测试数据与删除标记 ====================
     def _load_toc_test_data(self):
-        """填充几条测试目录数据。"""
-        data = [
-            ("第一卷 起源", "第一卷 起源"),
-            ("  第一章 开端", "第一章 开端"),
-            ("  第二章 离别", "第二章 离别"),
-            ("    第一节 清晨", "第一节 清晨"),
-            ("第二卷 风暴", "第二卷 风暴"),
-            ("  第三章 重逢", "第三章 重逢"),
-        ]
-        for title, result in data:
-            self.toc_table.insert("", "end", values=(title, result))
+        """填充几条测试目录数据（树形结构）。"""
+        vol1 = self.toc_table.insert("", "end", values=("第一卷 起源", "第一卷 起源"))
+        self.toc_table.insert(vol1, "end", values=("第一章 开端", "第一章 开端"))
+        ch2 = self.toc_table.insert(vol1, "end", values=("第二章 离别", "第二章 离别"))
+        self.toc_table.insert(ch2, "end", values=("第一节 清晨", "第一节 清晨"))
+        vol2 = self.toc_table.insert("", "end", values=("第二卷 风暴", "第二卷 风暴"))
+        self.toc_table.insert(vol2, "end", values=("第三章 重逢", "第三章 重逢"))
+
+        # 默认展开所有卷/章
+        self.toc_table.item(vol1, open=True)
+        self.toc_table.item(ch2, open=True)
+        self.toc_table.item(vol2, open=True)
 
     def _mark_toc_deleted(self):
         """把选中的目录条目标记为删除（置灰 + 删除线）。"""
