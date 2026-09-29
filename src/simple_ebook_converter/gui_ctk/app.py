@@ -133,7 +133,7 @@ class App(ctk.CTk):
         # 其他
         o = self._group(parent, "其他", 3)
         self.clean_var = tk.BooleanVar(value=True)
-        ctk.CTkCheckBox(o, text="清理文本", variable=self.clean_var).grid(
+        ctk.CTkCheckBox(o, text="清理段首空格及空行", variable=self.clean_var).grid(
             row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w"
         )
 
