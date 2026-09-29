@@ -769,6 +769,7 @@ class App(ctk.CTk):
 
     def _open_settings(self):
         win = ctk.CTkToplevel(self)
+        win.attributes("-alpha", 0.0)  # ① 先透明，别让用户看到初始态
         win.title("设置")
         win.resizable(False, False)
         win.transient(self)
@@ -847,15 +848,16 @@ class App(ctk.CTk):
             command=win.destroy,
         ).pack(side="left", padx=4)
 
-        def center():
+        def center_and_show():
             self.update_idletasks()
             win.update_idletasks()
             px, py = self.winfo_rootx(), self.winfo_rooty()
             pw, ph = self.winfo_width(), self.winfo_height()
             ww, wh = win.winfo_width(), win.winfo_height()
             win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
+            win.attributes("-alpha", 1.0)  # ② 位置定好后再恢复可见
 
-        self.after(20, center)
+        self.after(20, center_and_show)
 
     # ======================================================================
     # 区块 13：底部栏
