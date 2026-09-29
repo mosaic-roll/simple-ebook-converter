@@ -182,7 +182,8 @@ class App(ctk.CTk):
             return
         entry.delete(0, "end")
 
-    # ==================== 排版 Tab ====================
+        # ==================== 排版 Tab ====================
+
     def _build_layout_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
@@ -209,9 +210,13 @@ class App(ctk.CTk):
         fo = self._group(parent, "嵌入字体", 2)
         self.font_entry = self._field_btn(fo, 1, "路径", self._pick_font)
 
+        # CSS 组：在 parent 里 sticky="nsew"，让自身能纵向长高；
+        # pady 显式用 (8, 0) 与其他组一致（_group 默认就是 (8, 0)）。
         css = self._group(parent, "自定义 CSS", 3)
+        css.grid_configure(sticky="nsew", pady=(8, 0))
         css.grid_columnconfigure(0, weight=1)
-        css.grid_rowconfigure(1, weight=1)
+        css.grid_rowconfigure(1, weight=1)  # 文本框所在行吸收拉伸
+
         self.css_mode = ctk.CTkSegmentedButton(css, values=["忽略", "追加", "覆盖"])
         self.css_mode.set("忽略")
         self.css_mode.grid(
