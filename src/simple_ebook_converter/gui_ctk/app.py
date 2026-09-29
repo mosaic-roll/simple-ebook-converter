@@ -780,17 +780,18 @@ class App(ctk.CTk):
         body.grid_columnconfigure(0, weight=1)
 
         def add_row(r: int, label: str, widget: ctk.CTkBaseClass):
-            """一行：标签左、控件右。标签和控件都用共享字体，跟随热更新。"""
+            """一行：标签列固定宽，控件列吸收剩余宽度。"""
             row = ctk.CTkFrame(body, fg_color="transparent")
             row.grid(row=r, column=0, sticky="ew", pady=(0, SETTINGS_ROW_PADY))
-            row.grid_columnconfigure(0, weight=1)
+            row.grid_columnconfigure(0, weight=0)  # 标签列：不拉伸
+            row.grid_columnconfigure(1, weight=1)  # 控件列：吸收剩余宽度
             ctk.CTkLabel(
                 row,
                 text=label,
                 anchor="w",
                 font=self.font_base,
             ).grid(row=0, column=0, sticky="w", padx=SETTINGS_LABEL_PADX)
-            widget.grid(row=0, column=1, sticky="e")
+            widget.grid(row=0, column=1, sticky="ew")
 
         font_combo = ctk.CTkComboBox(
             body,
