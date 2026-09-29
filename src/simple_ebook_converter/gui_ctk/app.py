@@ -81,16 +81,6 @@ TOC_DEPTHS = [str(i) for i in range(1, 7)]
 FONT_SIZES = ["默认"] + [str(i) for i in range(9, 21)]
 DEFAULT_UI_SIZE = 13
 DEFAULT_TOC_SIZE = 14
-
-
-def _size_to_label(size: int, default: int) -> str:
-    return f"默认 ({default})" if size == default else str(size)
-
-
-def _label_to_size(label: str, default: int) -> int:
-    return default if label.startswith("默认") else int(label)
-
-
 DEFAULT_FONT_LABEL = "系统默认"
 
 # ---- 字体预设：显示名 → 实际字体族名 ----
@@ -816,7 +806,7 @@ class App(ctk.CTk):
             font=self.font_base,
             dropdown_font=self.font_base,
         )
-        ui_menu.set(_size_to_label(self.ui_size, DEFAULT_UI_SIZE))
+        ui_menu.set("默认" if self.ui_size == DEFAULT_UI_SIZE else str(self.ui_size))
 
         toc_menu = ctk.CTkOptionMenu(
             body,
@@ -826,7 +816,7 @@ class App(ctk.CTk):
             font=self.font_base,
             dropdown_font=self.font_base,
         )
-        toc_menu.set(_size_to_label(self.toc_size, DEFAULT_TOC_SIZE))
+        toc_menu.set("默认" if self.toc_size == DEFAULT_TOC_SIZE else str(self.toc_size))
 
         def add_row(r: int, label: str, widget: ctk.CTkBaseClass):
             """一行：标签列固定宽，控件列吸收剩余宽度。"""
@@ -844,8 +834,8 @@ class App(ctk.CTk):
 
         def apply_and_close():
             self._apply_font_family(font_combo.get())
-            ui_val = _label_to_size(ui_menu.get(), DEFAULT_UI_SIZE)
-            toc_val = _label_to_size(toc_menu.get(), DEFAULT_TOC_SIZE)
+            ui_val = DEFAULT_UI_SIZE if ui_menu.get() == "默认" else int(ui_menu.get())
+            toc_val = DEFAULT_TOC_SIZE if toc_menu.get() == "默认" else int(toc_menu.get())
             self._apply_ui_font_size(ui_val)
             self.toc_size = toc_val
             self._apply_toc_font()
