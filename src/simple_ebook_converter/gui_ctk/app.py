@@ -777,21 +777,8 @@ class App(ctk.CTk):
 
         body = ctk.CTkFrame(win, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=SETTINGS_PAD, pady=SETTINGS_PAD)
-        body.grid_columnconfigure(0, weight=1)
-
-        def add_row(r: int, label: str, widget: ctk.CTkBaseClass):
-            """一行：标签列固定宽，控件列吸收剩余宽度。"""
-            row = ctk.CTkFrame(body, fg_color="transparent")
-            row.grid(row=r, column=0, sticky="ew", pady=(0, SETTINGS_ROW_PADY))
-            row.grid_columnconfigure(0, weight=0)  # 标签列：不拉伸
-            row.grid_columnconfigure(1, weight=1)  # 控件列：吸收剩余宽度
-            ctk.CTkLabel(
-                row,
-                text=label,
-                anchor="w",
-                font=self.font_base,
-            ).grid(row=0, column=0, sticky="w", padx=SETTINGS_LABEL_PADX)
-            widget.grid(row=0, column=1, sticky="ew")
+        body.grid_columnconfigure(0, weight=0)  # 标签列：不拉伸
+        body.grid_columnconfigure(1, weight=1)  # 控件列：吸收剩余宽度
 
         font_combo = ctk.CTkComboBox(
             body,
@@ -801,7 +788,6 @@ class App(ctk.CTk):
             dropdown_font=self.font_base,
         )
         font_combo.set(self.font_family_label)
-        add_row(0, "字体", font_combo)
 
         ui_menu = ctk.CTkOptionMenu(
             body,
@@ -812,7 +798,6 @@ class App(ctk.CTk):
             dropdown_font=self.font_base,
         )
         ui_menu.set(str(self.ui_size))
-        add_row(1, "界面字号", ui_menu)
 
         toc_menu = ctk.CTkOptionMenu(
             body,
@@ -823,6 +808,19 @@ class App(ctk.CTk):
             dropdown_font=self.font_base,
         )
         toc_menu.set(str(self.toc_size))
+
+        def add_row(r: int, label: str, widget: ctk.CTkBaseClass):
+            """一行：标签列固定宽，控件列吸收剩余宽度。"""
+            ctk.CTkLabel(
+                body,
+                text=label,
+                anchor="w",
+                font=self.font_base,
+            ).grid(row=r, column=0, sticky="w", padx=SETTINGS_LABEL_PADX, pady=(0, SETTINGS_ROW_PADY))
+            widget.grid(row=r, column=1, sticky="ew", pady=(0, SETTINGS_ROW_PADY))
+
+        add_row(0, "字体", font_combo)
+        add_row(1, "界面字号", ui_menu)
         add_row(2, "目录字号", toc_menu)
 
         def apply_and_close():
