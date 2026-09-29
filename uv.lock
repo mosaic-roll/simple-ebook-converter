@@ -282,7 +282,7 @@ dev = [
 requires-dist = [
     { name = "chardet", specifier = ">=7.6.0" },
     { name = "click", specifier = ">=8.5.0" },
-    { name = "customtkinter", marker = "extra == 'gui'", specifier = ">=5.2" },
+    { name = "customtkinter", marker = "extra == 'gui'", specifier = ">=6.0" },
     { name = "ebooklib", specifier = ">=0.20" },
 ]
 provides-extras = ["gui"]

@@ -15,7 +15,7 @@ dependencies = [
 #:   pip install simple-ebook-converter           # 仅 CLI
 #:   pip install "simple-ebook-converter[gui]"   # 带图形界面（customtkinter）
 gui = [
-    "customtkinter>=5.2",
+    "customtkinter>=6.0",
 ]
 
 [project.scripts]
