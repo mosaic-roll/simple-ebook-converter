@@ -28,17 +28,21 @@ def open_with_default_app(path: str) -> None:
 
 
 class App(ctk.CTk):
-    PAD = 0          # 外层 frame 之间不留缝
-    GAP = 0          # 左右两栏之间不留缝
+    PAD = 0
+    GAP = 0
     ALIGNS = ["left", "center", "right"]
     HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
 
-    # 页内行距（页内要留呼吸感，统一在这里改）
+    # 页内行距
     LABEL_PADX = (12, 8)
     FIELD_PADX = (0, 12)
     BTN_PADX = (8, 12)
     ROW_PADY = 8
-    GROUP_PADY = (10, 0)   # 分组框之间的上下间距
+    GROUP_PADY = (10, 0)
+
+    # Tab 外观
+    TAB_NAMES = ("基础", "规则", "排版", "替换")
+    TAB_HEIGHT = 32
 
     def __init__(self):
         super().__init__()
@@ -81,23 +85,86 @@ class App(ctk.CTk):
 
     # ==================== 主体 ====================
     def _build_main(self):
-        self.main = ctk.CTkFrame(self, fg_color="transparent")
-        self.main.grid(row=1, column=0, sticky="nsew")  # 外层零 padding
+        self.main = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.main.grid(row=1, column=0, sticky="nsew")
         self.main.grid_rowconfigure(0, weight=1)
         self.main.grid_columnconfigure(0, weight=1, uniform="col")
         self.main.grid_columnconfigure(1, weight=1, uniform="col")
 
-        self.tabs = ctk.CTkTabview(self.main, border_width=0)
-        self.tabs.grid(row=0, column=0, sticky="nsew")  # 与右栏零间距
-        for name in ("基础", "规则", "排版", "替换"):
-            self.tabs.add(name)
-
-        self._build_basic_tab(self.tabs.tab("基础"))
-        self._build_rules_tab(self.tabs.tab("规则"))
-        self._build_layout_tab(self.tabs.tab("排版"))
-        self._build_replace_tab(self.tabs.tab("替换"))
-
+        self._build_left_pane(self.main)
         self._build_toc_panel(self.main)
+
+    # ---------- 左侧自绘 Tab ----------
+    def _build_left_pane(self, parent):
+        pane = ctk.CTkFrame(parent, corner_radius=0)
+        pane.grid(row=0, column=0, sticky="nsew")
+        pane.grid_rowconfigure(1, weight=1)
+        pane.grid_columnconfigure(0, weight=1)
+
+        # 标签头条：一排按钮，无圆角，贴边
+        head = ctk.CTkFrame(pane, corner_radius=0, height=self.TAB_HEIGHT)
+        head.grid(row=0, column=0, sticky="ew")
+        head.grid_propagate(False)
+        for c in range(len(self.TAB_NAMES)):
+            head.grid_columnconfigure(c, weight=0)
+
+        self._tab_buttons: dict[str, ctk.CTkButton] = {}
+        self._tab_frames: dict[str, ctk.CTkFrame] = {}
+
+        for i, name in enumerate(self.TAB_NAMES):
+            btn = ctk.CTkButton(
+                head,
+                text=name,
+                width=72,
+                height=self.TAB_HEIGHT,
+                corner_radius=0,
+                fg_color="transparent",
+                text_color=("gray20", "gray80"),
+                hover_color=("gray85", "gray25"),
+                command=lambda n=name: self._select_tab(n),
+            )
+            btn.grid(row=0, column=i, sticky="nsw")
+            self._tab_buttons[name] = btn
+
+        # 内容区：普通 frame，无圆角，与标签头严丝合缝
+        body = ctk.CTkFrame(pane, corner_radius=0)
+        body.grid(row=1, column=0, sticky="nsew")
+        body.grid_rowconfigure(0, weight=1)
+        body.grid_columnconfigure(0, weight=1)
+
+        for name in self.TAB_NAMES:
+            frame = ctk.CTkFrame(body, corner_radius=0)
+            frame.grid(row=0, column=0, sticky="nsew")
+            frame.grid_columnconfigure(0, weight=1)
+            self._tab_frames[name] = frame
+
+        self._build_basic_tab(self._tab_frames["基础"])
+        self._build_rules_tab(self._tab_frames["规则"])
+        self._build_layout_tab(self._tab_frames["排版"])
+        self._build_replace_tab(self._tab_frames["替换"])
+
+        self._current_tab = None
+        self._select_tab(self.TAB_NAMES[0])
+
+    def _select_tab(self, name: str):
+        if self._current_tab == name:
+            return
+        self._current_tab = name
+        for n, frame in self._tab_frames.items():
+            if n == name:
+                frame.tkraise()
+            # 其他 frame 留在原地，tkraise 负责层叠
+        for n, btn in self._tab_buttons.items():
+            if n == name:
+                btn.configure(
+                    fg_color=("gray75", "gray30"),
+                    text_color=("gray10", "gray90"),
+                )
+            else:
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=("gray20", "gray80"),
+                )
 
     # ==================== 基础 Tab ====================
     def _build_basic_tab(self, parent):
@@ -134,7 +201,9 @@ class App(ctk.CTk):
         self.rule_entries: dict[str, ctk.CTkEntry] = {}
         for i, label in enumerate(rows, start=1):
             entry = self._field_btn(
-                b, i, label,
+                b,
+                i,
+                label,
                 command=lambda lbl=label: self._restore_rule_default(lbl),
                 btn_text="恢复默认",
                 btn_width=80,
@@ -256,7 +325,7 @@ class App(ctk.CTk):
     # ==================== 右侧目录面板 ====================
     def _build_toc_panel(self, parent):
         self.panel = ctk.CTkFrame(parent, corner_radius=0)
-        self.panel.grid(row=0, column=1, sticky="nsew")  # 与左栏零间距
+        self.panel.grid(row=0, column=1, sticky="nsew")
         self.panel.grid_rowconfigure(1, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
@@ -319,7 +388,7 @@ class App(ctk.CTk):
     # ==================== 底部栏 ====================
     def _build_bottombar(self):
         bar = ctk.CTkFrame(self, height=44, corner_radius=0)
-        bar.grid(row=2, column=0, sticky="ew")  # 与主体零间距
+        bar.grid(row=2, column=0, sticky="ew")
         bar.grid_columnconfigure(1, weight=1)
 
         ctk.CTkButton(
@@ -343,12 +412,9 @@ class App(ctk.CTk):
         col 0: 左半区标签    col 1: 左半区字段（weight=1）
         col 3: 右半区标签    col 4: 右半区字段（weight=1）
         col 2 / 5 保留给右半区按钮对齐，本骨架不用。
-
-        分组框之间留 GROUP_PADY 的上下间距。
         """
         frame = ctk.CTkFrame(parent, border_width=1, corner_radius=4)
-        frame.grid(row=row, column=0, sticky="ew",
-                   padx=12, pady=self.GROUP_PADY)
+        frame.grid(row=row, column=0, sticky="ew", padx=12, pady=self.GROUP_PADY)
         frame.grid_columnconfigure(0, weight=0)
         frame.grid_columnconfigure(1, weight=1)
         frame.grid_columnconfigure(2, weight=0)
@@ -374,8 +440,9 @@ class App(ctk.CTk):
         )
         return entry
 
-    def _field_btn(self, parent, r, label, command, extra_btn=None,
-                   btn_text="浏览", btn_width=56):
+    def _field_btn(
+        self, parent, r, label, command, extra_btn=None, btn_text="浏览", btn_width=56
+    ):
         """标签 + 输入框 + 按钮。
 
         输入框与按钮共处 col 1 内部子 frame：输入框 pack(side="left", expand=True)
@@ -386,15 +453,21 @@ class App(ctk.CTk):
         )
         box = ctk.CTkFrame(parent, fg_color="transparent")
         box.grid(
-            row=r, column=1, columnspan=5,
-            padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew",
+            row=r,
+            column=1,
+            columnspan=5,
+            padx=self.FIELD_PADX,
+            pady=self.ROW_PADY,
+            sticky="ew",
         )
         entry = ctk.CTkEntry(box)
         entry.pack(side="left", fill="x", expand=True)
 
         btn_box = ctk.CTkFrame(box, fg_color="transparent")
         btn_box.pack(side="right", padx=(8, 0))
-        ctk.CTkButton(btn_box, text=btn_text, width=btn_width, command=command).pack(side="left")
+        ctk.CTkButton(btn_box, text=btn_text, width=btn_width, command=command).pack(
+            side="left"
+        )
         if extra_btn:
             text, cmd = extra_btn
             ctk.CTkButton(btn_box, text=text, width=56, command=cmd).pack(
