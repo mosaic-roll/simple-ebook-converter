@@ -1,6 +1,11 @@
 import pytest
 
-from simple_ebook_converter.core.config import LevelRule, default_levels
+from simple_ebook_converter.core.config import (
+    DEFAULT_CHAPTER_RE,
+    DEFAULT_VOLUME_RE,
+    LevelRule,
+    default_levels,
+)
 from simple_ebook_converter.core.levels import build_levels
 from simple_ebook_converter.core.parser import NoEnabledRulesError, parse, walk
 
@@ -115,15 +120,52 @@ def test_custom_level_hierarchy():
 
 def test_no_volume_flag_ignores_volume():
     lines = ["第一卷 甲", "第一章 a", "正文"]
-    tree, _ = parse(lines, build_levels(["h2.volume:"]), fallback_title="书名")
+    levels = build_levels(["h2.volume:", f"h3.chapter:{DEFAULT_CHAPTER_RE}"])
+    tree, _ = parse(lines, levels, fallback_title="书名")
     assert [n.title for n in tree] == ["前言", "第一章 a"]
     assert tree[0].paragraphs == ["第一卷 甲"]
     assert tree[1].paragraphs == ["正文"]
 
 
+def test_level_wins_over_priority():
+    """先比级别：h1 的额外层级比卷（h2）级别低，所以仍先被试。"""
+    levels = build_levels(["h1.part:^第一卷"])
+    tree, _ = parse(["第一卷 甲", "正文"], levels, fallback_title="书名")
+    assert [(n.level, n.class_name) for n in tree] == [(1, "part")]
+
+
+def test_builtin_wins_within_one_level():
+    """同级比优先级：内置卷的 class 赢过用户写的 h2 规则。"""
+    levels = build_levels(
+        [f"h2.volume:{DEFAULT_VOLUME_RE}", "h2.part:^第一卷", f"h3.chapter:{DEFAULT_CHAPTER_RE}"]
+    )
+    tree, _ = parse(["第一卷 甲", "第一章 a"], levels, fallback_title="书名")
+    assert [(n.level, n.class_name) for n in walk(tree)] == [(2, "volume"), (3, "chapter")]
+
+
+def test_first_written_wins_within_one_level():
+    """同级里写在前面的先试，命中后同一行不再试后面的规则。"""
+    levels = build_levels(["h5.note:^※", "h5.scene:^※"])
+    tree, _ = parse(["※甲", "正文"], levels, fallback_title="书名")
+    assert [(n.level, n.class_name) for n in tree] == [(5, "note")]
+
+
+def test_same_class_specs_work_as_an_ordered_set():
+    """同 class 拆成多条：第一条没命中的行交给下一条，内置那条已经让位。"""
+    levels = build_levels(["h2.volume:^第一卷", "h2.volume:^第.+部"])
+    tree, _ = parse(["第一卷 甲", "第二卷 乙", "第一部 丙"], levels, fallback_title="书名")
+    assert [(n.class_name, n.title) for n in tree] == [
+        ("volume", "第一卷 甲"),
+        ("volume", "第一部 丙"),
+    ]
+    assert "第二卷 乙" in tree[0].paragraphs
+
+
 def test_no_enabled_rules():
     with pytest.raises(NoEnabledRulesError):
         parse([], [LevelRule(2, "", "volume")], fallback_title="x")
+
+
 
 
 def test_no_enabled_rules_is_value_error():

@@ -83,10 +83,15 @@ def parse(
 ) -> tuple[list[Node], ParseStats]:
     """把行切分为章节树，返回 (顶层节点列表, 统计信息)。
 
+    逐行找标题：先按级别从低到高试，同一级按 `levels` 的顺序试（前端把卷/章/节三条排
+    在最前，用户写的额外层级按书写顺序跟在后面），第一条命中的规则说了算，同一行的其余
+    规则不再试。超长的行（> `max_title_len`）直接按正文处理，不参与匹配。
+
     正文段落跟随最近的标题；首个标题之前的段落归到 `preface_title`；一条标题都没
     命中时整篇作为一章，标题用 `fallback_title`。不启用某层级就是把它的正则留空。
     每个节点同时记下它在输入里的行范围（`Node.lines`），供目录树往返与预览定位。
     """
+    # 排序键只有级别，而排序是稳定的 → 同级保持 `levels` 的顺序，即上面的优先级
     rules = sorted((r for r in levels if r.active), key=lambda r: r.level)
     if not rules:
         raise NoEnabledRulesError("没有启用的标题规则：卷/章/节至少要有一个非空正则")
@@ -98,7 +103,8 @@ def parse(
 
     for lineno, line in enumerate(lines, start=1):
         title = line.strip()
-        rule = _match(title, compiled, max_title_len) if title else None
+        # 超长行不可能是标题，直接归正文，连正则都不试
+        rule = _match(title, compiled) if title and len(title) <= max_title_len else None
         if rule is None:
             if builder.last is not None:
                 node = builder.last
@@ -137,11 +143,9 @@ def _full_spans(nodes: list[Node]) -> None:
 
 
 def _match(
-    title: str, compiled: list[tuple[LevelRule, re.Pattern[str]]], max_title_len: int
+    title: str, compiled: list[tuple[LevelRule, re.Pattern[str]]]
 ) -> LevelRule | None:
-    """超长的行即使命中正则也当正文。"""
-    if len(title) > max_title_len:
-        return None
+    """按顺序试规则，返回第一条命中的。调用方保证 `title` 非空且不超长。"""
     for rule, pattern in compiled:
         if pattern.match(title):
             return rule

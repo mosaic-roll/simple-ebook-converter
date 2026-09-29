@@ -26,24 +26,18 @@ def test_check_pattern_reports_the_label():
         check_pattern("(", "章标题")
 
 
-def test_build_levels_keeps_builtin_when_spec_missing():
-    levels = build_levels()
-    assert [(r.level, r.class_name) for r in levels] == [
-        (2, "volume"),
-        (3, "chapter"),
-        (4, "section"),
+def test_build_levels_without_specs_has_no_rules():
+    """内置默认值不在这里补：`Config` 的字段默认是 `default_levels()`，前端
+    （`options._level_specs()`）会把卷/章/节三条规格排在前面传进来。"""
+    assert build_levels() == []
+
+
+def test_build_levels_returns_only_the_specs():
+    levels = build_levels(["h3.chapter:^第[0-9]+[章]", "h2.volume:^第[0-9]+[卷]"])
+    assert [(r.level, r.class_name, r.pattern) for r in levels] == [
+        (2, "volume", "^第[0-9]+[卷]"),
+        (3, "chapter", "^第[0-9]+[章]"),
     ]
-    assert next(r for r in levels if r.level == 2).pattern != ""
-    assert next(r for r in levels if r.level == 4).pattern == ""
-
-
-def test_build_levels_spec_overrides_builtin():
-    levels = build_levels(["h2.volume:^第[0-9]+[卷]", "h3.chapter:^第[0-9]+[章]"])
-    assert len(levels) == len(default_levels())
-    assert next(r for r in levels if r.level == 2).pattern == "^第[0-9]+[卷]"
-    assert next(r for r in levels if r.level == 3).pattern == "^第[0-9]+[章]"
-    section = next(r for r in levels if r.level == 4)
-    assert section.active is False
 
 
 def test_build_levels_blank_pattern_disables_that_level():
@@ -52,13 +46,19 @@ def test_build_levels_blank_pattern_disables_that_level():
     assert [r.active for r in levels] == [False, True, False]
 
 
-def test_build_levels_extra_specs_append_and_override():
+def test_build_levels_sorts_by_level_keeping_written_order():
     levels = build_levels(["h5.note:^注解", "h2:^第[0-9]+卷"])
-    by_level = {r.level: r for r in levels}
-    assert set(by_level) == {2, 3, 4, 5}
-    assert (by_level[5].pattern, by_level[5].class_name) == ("^注解", "note")
-    # class 省略 = 不给该标题加 class
-    assert (by_level[2].pattern, by_level[2].class_name) == ("^第[0-9]+卷", "")
+    assert [(r.level, r.class_name) for r in levels] == [(2, ""), (5, "note")]
+
+
+def test_build_levels_keeps_every_spec_in_written_order():
+    """同一级、同 class 都照单全收：正则难写就拆成几条，先写的先试。"""
+    levels = build_levels(["h5.note:^注", "h5.scene:^场景", "h5.note:^注解"])
+    assert [(r.level, r.class_name, r.pattern) for r in levels if r.level == 5] == [
+        (5, "note", "^注"),
+        (5, "scene", "^场景"),
+        (5, "note", "^注解"),
+    ]
 
 
 def test_build_levels_does_not_share_default_rules():

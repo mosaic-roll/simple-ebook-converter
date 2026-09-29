@@ -181,9 +181,22 @@ def test_extra_level_without_class_has_no_class(tmp_path):
     assert next(r for r in cfg.levels if r.level == 1).class_name == ""
 
 
-def test_extra_level_overrides_preset(tmp_path):
+def test_extra_level_at_preset_level_appends_behind_it(tmp_path):
+    """`--level h2:…` 不再顶掉卷，而是同级排在卷后面（内置优先）。"""
     cfg = _config(tmp_path, volume="^甲", level="h2:^乙")
-    assert next(r for r in cfg.levels if r.level == 2).pattern == "^乙"
+    assert [(r.class_name, r.pattern) for r in cfg.levels if r.level == 2] == [
+        ("volume", "^甲"),
+        ("", "^乙"),
+    ]
+
+
+def test_extra_level_with_preset_class_joins_the_preset_rule(tmp_path):
+    """`--level h2.volume:…` 只新增一条：内置那条已经被 `--volume` 的值顶掉了。"""
+    cfg = _config(tmp_path, volume="^甲", level="h2.volume:^丙")
+    assert [(r.class_name, r.pattern) for r in cfg.levels if r.level == 2] == [
+        ("volume", "^甲"),
+        ("volume", "^丙"),
+    ]
 
 
 def test_bad_preset_regex_is_rejected(tmp_path):

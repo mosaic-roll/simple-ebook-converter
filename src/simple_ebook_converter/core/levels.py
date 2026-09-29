@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from .config import LEVEL_PRESETS, LevelRule, default_levels
+from .config import LEVEL_PRESETS, LevelRule
 
 #: 额外层级的统称，用于错误消息
 _EXTRA = "额外层级"
@@ -44,16 +44,18 @@ def parse_level_spec(spec: str) -> tuple[int, str, str]:
 
 
 def build_levels(specs: Iterable[str] = ()) -> list[LevelRule]:
-    """`hN[.class]:正则` 规格列表 → 层级规则，按级别排序。
+    """`hN[.class]:正则` 规格列表 → 层级规则，按级别排序，同级保持规格给出的顺序。
 
-    未提及的层级保持内置值；空正则不启用该层级；同一级别后面的规格覆盖前面的。
+    每条规格就是一条独立规则，没有「后写的顶掉先写的」这回事——同 class 也可以有多条，
+    按书写顺序排下去（正则难写就拆成几条，一行没命中的交给下一行）。内置的卷/章/节不
+    在这里补：`Config` 的字段默认是 `default_levels()`，前端（`options._level_specs()`）
+    把这三条规格排在最前面，它们自然就占着同级里的高优先级。
+
+    `parse()` 先比级别、同级按本函数给的顺序试，命中即止。
     """
-    by_level = {rule.level: rule for rule in default_levels()}
+    rules: list[LevelRule] = []
     for spec in specs:
         level, pattern, class_name = parse_level_spec(spec)
         check_pattern(pattern, _PRESET_LABELS.get(class_name) or f"{_EXTRA} h{level}")
-        if rule := by_level.get(level):
-            rule.pattern, rule.class_name = pattern, class_name
-        else:
-            by_level[level] = LevelRule(level, pattern, class_name)
-    return sorted(by_level.values(), key=lambda rule: rule.level)
+        rules.append(LevelRule(level, pattern, class_name))
+    return sorted(rules, key=lambda rule: rule.level)  # 稳定排序：同级保持上面的顺序
