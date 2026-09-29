@@ -134,7 +134,12 @@ class App(ctk.CTk):
         o = self._group(parent, "其他", 3)
         self.clean_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(o, text="清理段首空格及空行", variable=self.clean_var).grid(
-            row=1, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w"
+            row=1, column=0, columnspan=4, padx=10, pady=(0, 6), sticky="w"
+        )
+
+        self.toc_in_book_var = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(o, text="生成书内目录页", variable=self.toc_in_book_var).grid(
+            row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w"
         )
 
     # ==================== 规则 Tab ====================
@@ -335,7 +340,7 @@ class App(ctk.CTk):
         # 测试数据
         self._load_toc_test_data()
 
-        # ---- 底部行：深度 + 勾选（左） + 删除/恢复（右） ----
+        # ---- 底部行：目录深度（左） + 删除/恢复（右） ----
         bottom = ctk.CTkFrame(self.panel, fg_color="transparent")
         bottom.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
         bottom.grid_columnconfigure(0, weight=1)
@@ -350,12 +355,7 @@ class App(ctk.CTk):
             anchor="center",
         )
         self.toc_depth.set("6")
-        self.toc_depth.pack(side="left", padx=(6, 16))
-
-        self.toc_in_book_var = tk.BooleanVar(value=True)
-        ctk.CTkCheckBox(
-            left, text="目录页出现在书中", variable=self.toc_in_book_var
-        ).pack(side="left")
+        self.toc_depth.pack(side="left", padx=(6, 0))
 
         right = ctk.CTkFrame(bottom, fg_color="transparent")
         right.grid(row=0, column=1, sticky="e")
