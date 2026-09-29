@@ -832,7 +832,7 @@ class App(ctk.CTk):
             win.destroy()
 
         btns = ctk.CTkFrame(body, fg_color="transparent")
-        btns.grid(row=3, column=0, pady=(SETTINGS_ROW_PADY, 0))
+        btns.grid(row=3, column=0, columnspan=2, pady=(SETTINGS_ROW_PADY, 0))
         ctk.CTkButton(
             btns,
             text="应用",
