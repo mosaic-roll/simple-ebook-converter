@@ -79,8 +79,8 @@ TOC_DEPTHS = [str(i) for i in range(1, 7)]
 
 # ---- 字号 ----
 FONT_SIZES = [str(i) for i in range(9, 21)]
-DEFAULT_UI_SIZE = 13
-DEFAULT_TOC_SIZE = 14
+DEFAULT_UI_SIZE = 14
+DEFAULT_TOC_SIZE = 16
 DEFAULT_FONT_LABEL = "系统默认"
 
 # ---- 字体预设：显示名 → 实际字体族名 ----
