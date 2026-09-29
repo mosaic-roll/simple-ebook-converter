@@ -243,40 +243,127 @@ class App(ctk.CTk):
     # ==================== 替换 Tab ====================
     def _build_replace_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=1)  # 卡片列表所在行吸收拉伸
 
-        holder = ctk.CTkFrame(parent)
-        holder.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 6))
-        holder.grid_rowconfigure(0, weight=1)
-        holder.grid_columnconfigure(0, weight=1)
+        # ---- 顶部：添加规则（左） + 导入/导出（右） ----
+        top = ctk.CTkFrame(parent, fg_color="transparent")
+        top.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 4))
+        top.grid_columnconfigure(0, weight=1)
 
-        self.replace_table = ttk.Treeview(
-            holder,
-            columns=("enabled", "pattern", "replace", "stage"),
-            show="headings",
-            height=12,
+        ctk.CTkButton(
+            top, text="添加规则", width=90, command=self._add_replace_rule
+        ).grid(row=0, column=0, sticky="w")
+        right_top = ctk.CTkFrame(top, fg_color="transparent")
+        right_top.grid(row=0, column=1, sticky="e")
+        ctk.CTkButton(right_top, text="导入", width=60).pack(side="left", padx=(0, 4))
+        ctk.CTkButton(right_top, text="导出", width=60).pack(side="left")
+
+        # ---- 中间：可滚动的规则卡片列表 ----
+        self.rules_holder = ctk.CTkScrollableFrame(parent, fg_color="transparent")
+        self.rules_holder.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.rules_holder.grid_columnconfigure(0, weight=1)
+
+        self.rule_cards: list[ctk.CTkFrame] = []
+
+        # 预填两条测试规则
+        self._add_replace_rule()
+        self._add_replace_rule()
+
+    # ==================== 替换规则：卡片 ====================
+    def _add_replace_rule(self):
+        """在列表末尾追加一条空规则卡片。"""
+        card = self._make_rule_card()
+        self.rule_cards.append(card)
+        self._relayout_rule_cards()
+
+    def _make_rule_card(self):
+        """创建一条规则卡片。字段：启用 / 阶段 / 正则 / 替换为。"""
+        card = ctk.CTkFrame(self.rules_holder, border_width=1, corner_radius=4)
+        card.grid_columnconfigure(1, weight=1)  # 输入框列吸收拉伸
+
+        # 第一行：启用勾选（左） + 阶段下拉 + ↑↓✕（右）
+        head = ctk.CTkFrame(card, fg_color="transparent")
+        head.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 2))
+        head.grid_columnconfigure(0, weight=1)
+
+        enabled_var = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(head, text="启用", variable=enabled_var).grid(
+            row=0, column=0, sticky="w"
         )
-        for col, text, w in (
-            ("enabled", "启用", 50),
-            ("pattern", "正则", 200),
-            ("replace", "替换为", 150),
-            ("stage", "阶段", 60),
-        ):
-            self.replace_table.heading(col, text=text)
-            self.replace_table.column(col, width=w, anchor="w")
-        self.replace_table.grid(row=0, column=0, sticky="nsew")
 
-        # 第一行：上移 / 下移 / 添加 / 删除
-        btns = ctk.CTkFrame(parent, fg_color="transparent")
-        btns.grid(row=1, column=0, pady=(0, 4))
-        for text in ("上移", "下移", "添加", "删除"):
-            ctk.CTkButton(btns, text=text, width=60).pack(side="left", padx=4)
+        right = ctk.CTkFrame(head, fg_color="transparent")
+        right.grid(row=0, column=1, sticky="e")
 
-        # 第二行：导入 / 导出
-        btns2 = ctk.CTkFrame(parent, fg_color="transparent")
-        btns2.grid(row=2, column=0, pady=(0, 10))
-        for text in ("导入", "导出"):
-            ctk.CTkButton(btns2, text=text, width=60).pack(side="left", padx=4)
+        stage_menu = ctk.CTkOptionMenu(
+            right, values=["原文", "HTML"], width=90, anchor="center"
+        )
+        stage_menu.set("原文")
+        stage_menu.pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(
+            right, text="↑", width=28, command=lambda c=card: self._move_rule(c, -1)
+        ).pack(side="left", padx=(0, 2))
+        ctk.CTkButton(
+            right, text="↓", width=28, command=lambda c=card: self._move_rule(c, +1)
+        ).pack(side="left", padx=(0, 2))
+        ctk.CTkButton(
+            right, text="✕", width=28, command=lambda c=card: self._remove_rule(c)
+        ).pack(side="left")
+
+        # 第二行：正则
+        ctk.CTkLabel(card, text="正则", anchor="w").grid(
+            row=1, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+        )
+        pattern_entry = ctk.CTkEntry(
+            card, placeholder_text=r"如 ^#+\s* 或 (第.{1,10}章)\s*"
+        )
+        pattern_entry.grid(
+            row=1, column=1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+        )
+
+        # 第三行：替换为
+        ctk.CTkLabel(card, text="替换为", anchor="w").grid(
+            row=2, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+        )
+        replace_entry = ctk.CTkEntry(
+            card, placeholder_text=r"留空即删除匹配内容；可用 \1 引用分组"
+        )
+        replace_entry.grid(
+            row=2, column=1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+        )
+
+        # 控件引用挂在卡片上，供后续读取/导出
+        card.enabled_var = enabled_var  # type: ignore[attr-defined]
+        card.pattern_entry = pattern_entry  # type: ignore[attr-defined]
+        card.replace_entry = replace_entry  # type: ignore[attr-defined]
+        card.stage_menu = stage_menu  # type: ignore[attr-defined]
+
+        return card
+
+    def _relayout_rule_cards(self):
+        """按 self.rule_cards 的顺序重新 grid 所有卡片。"""
+        for i, card in enumerate(self.rule_cards):
+            card.grid(row=i, column=0, sticky="ew", pady=(0, 6))
+        self.rules_holder.grid_columnconfigure(0, weight=1)
+
+    def _move_rule(self, card, delta):
+        """把卡片在列表中上移/下移一格。"""
+        if card not in self.rule_cards:
+            return
+        i = self.rule_cards.index(card)
+        j = i + delta
+        if j < 0 or j >= len(self.rule_cards):
+            return
+        self.rule_cards[i], self.rule_cards[j] = self.rule_cards[j], self.rule_cards[i]
+        self._relayout_rule_cards()
+
+    def _remove_rule(self, card):
+        """删除一张卡片。"""
+        if card not in self.rule_cards:
+            return
+        self.rule_cards.remove(card)
+        card.destroy()
+        self._relayout_rule_cards()
 
     # ==================== 右侧目录面板 ====================
     def _build_toc_panel(self, parent):
@@ -294,7 +381,7 @@ class App(ctk.CTk):
         # ---- 顶部按钮行：重新扫描（左） + 导入/导出（右） ----
         top = ctk.CTkFrame(self.panel, fg_color="transparent")
         top.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 4))
-        top.grid_columnconfigure(0, weight=1)  # 左区撑开，把右区推到最右
+        top.grid_columnconfigure(0, weight=1)
 
         ctk.CTkButton(top, text="重新扫描", width=90).grid(row=0, column=0, sticky="w")
         right_top = ctk.CTkFrame(top, fg_color="transparent")
