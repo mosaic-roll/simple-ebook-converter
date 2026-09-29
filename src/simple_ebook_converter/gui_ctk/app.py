@@ -2,6 +2,14 @@
 
 依赖：customtkinter
     pip install customtkinter
+
+代码按区块组织，将来可拆成：
+  - gui/constants.py   常量
+  - gui/utils.py       跨平台工具
+  - gui/theme.py       字体与主题
+  - gui/settings_dialog.py  设置窗
+  - gui/widgets.py     封装控件
+  - gui/tabs/*.py      各 Tab
 """
 
 from __future__ import annotations
@@ -15,7 +23,10 @@ from tkinter import messagebox, ttk
 import customtkinter as ctk
 
 
-# ---------- 跨平台：用系统默认程序打开文件 ----------
+# ==========================================================================
+# 区块 1：跨平台工具
+# ==========================================================================
+
 def open_with_default_app(path: str) -> None:
     if not path or not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -27,52 +38,67 @@ def open_with_default_app(path: str) -> None:
         subprocess.run(["xdg-open", path], check=False)
 
 
+# ==========================================================================
+# 区块 2：常量
+# ==========================================================================
+
+# 通用间距
+PAD = 6
+GAP = 6
+LABEL_PADX = (10, 6)
+FIELD_PADX = (0, 10)
+BTN_PADX = (6, 10)
+ROW_PADY = 5
+
+# 设置窗间距
+SETTINGS_PAD = 20
+SETTINGS_ROW_PADY = 10
+SETTINGS_LABEL_PADX = (0, 12)
+
+# 选项
+ALIGNS = ["left", "center", "right"]
+HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
+STAGES = ["原文", "HTML"]
+
+# 字号
+FONT_SIZES = [str(i) for i in range(9, 21)]
+DEFAULT_UI_SIZE = 13
+DEFAULT_TOC_SIZE = 14
+
+# 按系统分预设字体：显示名 → 实际字体族名
+FONT_PRESETS_BY_OS = {
+    "win32": {
+        "系统默认": "Microsoft YaHei",
+        "微软雅黑": "Microsoft YaHei",
+        "宋体": "SimSun",
+        "黑体": "SimHei",
+        "楷体": "KaiTi",
+        "仿宋": "FangSong",
+    },
+    "darwin": {
+        "系统默认": "TkDefaultFont",
+        "苹方": "PingFang SC",
+        "冬青黑体": "Hiragino Sans GB",
+        "华文黑体": "STHeiti",
+        "宋体-简": "Songti SC",
+        "楷体-简": "Kaiti SC",
+    },
+    "linux": {
+        "系统默认": "TkDefaultFont",
+        "Noto Sans CJK": "Noto Sans CJK SC",
+        "文泉驿微米黑": "WenQuanYi Micro Hei",
+        "文泉驿正黑": "WenQuanYi Zen Hei",
+        "思源黑体": "Source Han Sans SC",
+        "思源宋体": "Source Han Serif SC",
+    },
+}
+
+
+# ==========================================================================
+# 区块 3：主应用
+# ==========================================================================
+
 class App(ctk.CTk):
-    PAD = 6
-    GAP = 6
-    ALIGNS = ["left", "center", "right"]
-    HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
-
-    # 行内间距（统一在这里改）
-    LABEL_PADX = (10, 6)
-    FIELD_PADX = (0, 10)
-    BTN_PADX = (6, 10)
-    ROW_PADY = 5
-
-    # 字号范围（设置窗用）
-    FONT_SIZES = [str(i) for i in range(9, 19)]
-
-    # 默认字号
-    DEFAULT_UI_SIZE = 13
-    DEFAULT_TOC_SIZE = 13
-
-    # 按系统分预设字体：显示名 → 实际字体族名
-    FONT_PRESETS_BY_OS = {
-        "win32": {
-            "系统默认": "TkDefaultFont",
-            "微软雅黑": "Microsoft YaHei",
-            "宋体": "SimSun",
-            "黑体": "SimHei",
-            "楷体": "KaiTi",
-            "仿宋": "FangSong",
-        },
-        "darwin": {
-            "系统默认": "TkDefaultFont",
-            "苹方": "PingFang SC",
-            "冬青黑体": "Hiragino Sans GB",
-            "华文黑体": "STHeiti",
-            "宋体-简": "Songti SC",
-            "楷体-简": "Kaiti SC",
-        },
-        "linux": {
-            "系统默认": "TkDefaultFont",
-            "Noto Sans CJK": "Noto Sans CJK SC",
-            "文泉驿微米黑": "WenQuanYi Micro Hei",
-            "文泉驿正黑": "WenQuanYi Zen Hei",
-            "思源黑体": "Source Han Sans SC",
-            "思源宋体": "Source Han Serif SC",
-        },
-    }
 
     def __init__(self):
         super().__init__()
@@ -83,15 +109,16 @@ class App(ctk.CTk):
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
 
-        # 当前字号与字体（设置窗改这些）
-        self.ui_size = self.DEFAULT_UI_SIZE
-        self.toc_size = self.DEFAULT_TOC_SIZE
-        self.font_family_label = "系统默认"  # 用户看到的显示名
-        self.font_family = "TkDefaultFont"  # 实际传给 tk 的族名
+        # ---- 运行时状态 ----
+        self.ui_size = DEFAULT_UI_SIZE
+        self.toc_size = DEFAULT_TOC_SIZE
+        self.font_family_label = "系统默认"
+        self.font_family = self._resolve_family("系统默认")
 
-        # 共享字体实例
+        # ---- 字体 ----
         self._init_fonts()
 
+        # ---- 布局 ----
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -99,24 +126,25 @@ class App(ctk.CTk):
         self._build_main()
         self._build_bottombar()
 
-        # 初始化目录表格的主题配色
         self._apply_toc_theme()
 
-    # ==================== 字体 ====================
+    # ======================================================================
+    # 区块 4：字体与主题
+    # ======================================================================
+
     def _font_presets(self) -> dict[str, str]:
-        """按当前系统返回预设字体表。"""
         if sys.platform == "win32":
-            return self.FONT_PRESETS_BY_OS["win32"]
+            return FONT_PRESETS_BY_OS["win32"]
         if sys.platform == "darwin":
-            return self.FONT_PRESETS_BY_OS["darwin"]
-        return self.FONT_PRESETS_BY_OS["linux"]
+            return FONT_PRESETS_BY_OS["darwin"]
+        return FONT_PRESETS_BY_OS["linux"]
 
     def _resolve_family(self, label: str) -> str:
-        """把显示名映射成实际字体族名；不在预设里就当作自定义字体名。"""
+        """显示名 → 实际字体族名；不在预设里就当用户自定义。"""
         return self._font_presets().get(label, label)
 
     def _init_fonts(self):
-        """创建共享 CTkFont。改它们的 family/size 即可全界面热更新。"""
+        """创建共享 CTkFont。改 family/size 即可全界面热更新。"""
         s = self.ui_size
         fam = self.font_family
         self.font_base = ctk.CTkFont(family=fam, size=s)
@@ -125,7 +153,6 @@ class App(ctk.CTk):
         self.font_tab = ctk.CTkFont(family=fam, size=max(s - 1, 9))
 
     def _apply_ui_font_size(self, size: int):
-        """把新的界面字号应用到所有共享字体实例。"""
         self.ui_size = size
         self.font_base.configure(size=size)
         self.font_bold.configure(size=size, weight="bold")
@@ -133,7 +160,6 @@ class App(ctk.CTk):
         self.font_tab.configure(size=max(size - 1, 9))
 
     def _apply_font_family(self, label: str):
-        """把新的字体族应用到所有共享字体实例。"""
         self.font_family_label = label
         self.font_family = self._resolve_family(label)
         fam = self.font_family
@@ -142,52 +168,93 @@ class App(ctk.CTk):
         self.font_title.configure(family=fam, weight="bold")
         self.font_tab.configure(family=fam)
 
-    # ==================== 顶部栏 ====================
+    def _apply_toc_font(self):
+        style = ttk.Style()
+        fam = self.font_family
+        style.configure(
+            "Toc.Treeview",
+            font=(fam, self.toc_size),
+            rowheight=max(self.toc_size + 16, 24),
+        )
+        style.configure("Toc.Treeview.Heading", font=(fam, self.toc_size))
+        self.toc_table.tag_configure(
+            "deleted", font=(fam, self.toc_size, "overstrike")
+        )
+
+    def _apply_toc_theme(self):
+        dark = ctk.get_appearance_mode() == "Dark"
+        style = ttk.Style()
+
+        if dark:
+            bg, fg, field = "#2b2b2b", "#e0e0e0", "#2b2b2b"
+            head_bg, head_fg = "#3a3a3a", "#e0e0e0"
+            sel_bg, sel_fg = "#1f538d", "#ffffff"
+            del_fg = "#8a8a8a"
+        else:
+            bg, fg, field = "#ffffff", "#000000", "#ffffff"
+            head_bg, head_fg = "#e5e5e5", "#000000"
+            sel_bg, sel_fg = "#3b8ed0", "#ffffff"
+            del_fg = "gray60"
+
+        style.configure(
+            "Toc.Treeview",
+            background=bg, foreground=fg, fieldbackground=field,
+        )
+        style.map(
+            "Toc.Treeview",
+            background=[("selected", sel_bg)],
+            foreground=[("selected", sel_fg)],
+        )
+        style.configure(
+            "Toc.Treeview.Heading", background=head_bg, foreground=head_fg,
+        )
+        self.toc_table.tag_configure("deleted", foreground=del_fg)
+
+    # ======================================================================
+    # 区块 5：顶部栏
+    # ======================================================================
+
     def _build_topbar(self):
         bar = ctk.CTkFrame(self, height=40, corner_radius=0)
         bar.grid(row=0, column=0, sticky="ew")
         bar.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            bar,
-            text="Simple Ebook Converter",
-            font=self.font_title,
+            bar, text="Simple Ebook Converter", font=self.font_title,
         ).grid(row=0, column=0, sticky="w", padx=14, pady=6)
 
         right = ctk.CTkFrame(bar, fg_color="transparent")
         right.grid(row=0, column=1, sticky="e", padx=14, pady=6)
 
         self.theme_seg = ctk.CTkSegmentedButton(
-            right,
-            values=["浅色", "深色"],
-            command=self._on_theme_change,
+            right, values=["浅色", "深色"], command=self._on_theme_change,
         )
         self.theme_seg.set("浅色")
         self.theme_seg.pack(side="left", padx=(0, 6))
 
         ctk.CTkButton(
-            right,
-            text="设置",
-            width=56,
-            command=self._open_settings,
+            right, text="设置", width=56, command=self._open_settings,
         ).pack(side="left")
 
     def _on_theme_change(self, value: str):
         ctk.set_appearance_mode("dark" if value == "深色" else "light")
         self._apply_toc_theme()
 
-    # ==================== 主体 ====================
+    # ======================================================================
+    # 区块 6：主体布局
+    # ======================================================================
+
     def _build_main(self):
         self.main = ctk.CTkFrame(self, fg_color="transparent")
         self.main.grid(
-            row=1, column=0, sticky="nsew", padx=self.PAD, pady=(self.PAD, 0)
+            row=1, column=0, sticky="nsew", padx=PAD, pady=(PAD, 0)
         )
         self.main.grid_rowconfigure(0, weight=1)
         self.main.grid_columnconfigure(0, weight=1, uniform="col")
         self.main.grid_columnconfigure(1, weight=1, uniform="col")
 
         self.tabs = ctk.CTkTabview(self.main, border_width=0)
-        self.tabs.grid(row=0, column=0, sticky="nsew", padx=(0, self.GAP // 2))
+        self.tabs.grid(row=0, column=0, sticky="nsew", padx=(0, GAP // 2))
         for name in ("基础", "规则", "排版", "替换"):
             self.tabs.add(name)
 
@@ -198,7 +265,10 @@ class App(ctk.CTk):
 
         self._build_toc_panel(self.main)
 
-    # ==================== 基础 Tab ====================
+    # ======================================================================
+    # 区块 7：基础 Tab
+    # ======================================================================
+
     def _build_basic_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
@@ -206,7 +276,8 @@ class App(ctk.CTk):
         self.input_entry = self._field_btn(f, 1, "源文件", self._pick_input)
         self.output_entry = self._field_btn(f, 2, "目标", self._pick_output)
         self.encoding_menu = self._field_menu(
-            f, 3, "编码", ["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"]
+            f, 3, "编码",
+            ["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"],
         )
 
         m = self._group(parent, "书籍信息", 1)
@@ -217,34 +288,31 @@ class App(ctk.CTk):
 
         c = self._group(parent, "封面", 2)
         self.cover_entry = self._field_btn(
-            c, 1, "路径", self._pick_cover, extra_btn=("查看", self._open_cover)
+            c, 1, "路径", self._pick_cover, extra_btn=("查看", self._open_cover),
         )
         self.text_cover_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            c,
-            text="无封面时生成文字封面",
-            variable=self.text_cover_var,
-            font=self.font_base,
+            c, text="无封面时生成文字封面",
+            variable=self.text_cover_var, font=self.font_base,
         ).grid(row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w")
 
         o = self._group(parent, "其他", 3)
         self.clean_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            o,
-            text="清理段首空格及空行",
-            variable=self.clean_var,
-            font=self.font_base,
+            o, text="清理段首空格及空行",
+            variable=self.clean_var, font=self.font_base,
         ).grid(row=1, column=0, columnspan=4, padx=10, pady=(0, 6), sticky="w")
 
         self.toc_in_book_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            o,
-            text="生成书内目录页",
-            variable=self.toc_in_book_var,
-            font=self.font_base,
+            o, text="生成书内目录页",
+            variable=self.toc_in_book_var, font=self.font_base,
         ).grid(row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="w")
 
-    # ==================== 规则 Tab ====================
+    # ======================================================================
+    # 区块 8：规则 Tab
+    # ======================================================================
+
     def _build_rules_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
@@ -253,12 +321,9 @@ class App(ctk.CTk):
         self.rule_entries: dict[str, ctk.CTkEntry] = {}
         for i, label in enumerate(rows, start=1):
             entry = self._field_btn(
-                b,
-                i,
-                label,
+                b, i, label,
                 command=lambda lbl=label: self._restore_rule_default(lbl),
-                btn_text="恢复默认",
-                btn_width=80,
+                btn_text="恢复默认", btn_width=80,
             )
             self.rule_entries[label] = entry
 
@@ -270,17 +335,11 @@ class App(ctk.CTk):
         btns = ctk.CTkFrame(a, fg_color="transparent")
         btns.grid(row=99, column=0, columnspan=4, pady=(4, 10))
         ctk.CTkButton(
-            btns,
-            text="＋ 添加",
-            width=90,
-            font=self.font_base,
+            btns, text="＋ 添加", width=90, font=self.font_base,
             command=self._add_extra_rule,
         ).pack(side="left", padx=4)
         ctk.CTkButton(
-            btns,
-            text="－ 删除",
-            width=90,
-            font=self.font_base,
+            btns, text="－ 删除", width=90, font=self.font_base,
             command=self._remove_extra_rule,
         ).pack(side="left", padx=4)
 
@@ -288,18 +347,17 @@ class App(ctk.CTk):
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.grid(row=r, column=0, columnspan=4, sticky="ew", padx=10, pady=4)
         row.grid_columnconfigure(2, weight=1)
+
         level = ctk.CTkOptionMenu(
-            row,
-            values=self.HEADINGS,
-            width=70,
-            anchor="center",
-            font=self.font_base,
-            dropdown_font=self.font_base,
+            row, values=HEADINGS, width=70, anchor="center",
+            font=self.font_base, dropdown_font=self.font_base,
         )
         level.set("h2")
         level.grid(row=0, column=0, padx=(0, 6))
+
         cls = ctk.CTkEntry(row, width=80, placeholder_text="class", font=self.font_base)
         cls.grid(row=0, column=1, padx=(0, 6))
+
         regex = ctk.CTkEntry(row, placeholder_text="正则", font=self.font_base)
         regex.grid(row=0, column=2, sticky="ew")
         return row
@@ -310,7 +368,10 @@ class App(ctk.CTk):
             return
         entry.delete(0, "end")
 
-    # ==================== 排版 Tab ====================
+    # ======================================================================
+    # 区块 9：排版 Tab
+    # ======================================================================
+
     def _build_layout_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
 
@@ -322,16 +383,16 @@ class App(ctk.CTk):
 
         al = self._group(parent, "对齐方式", 1)
         self.align_volume = self._field_menu(
-            al, 1, "卷", self.ALIGNS, default="center", col=0
+            al, 1, "卷", ALIGNS, default="center", col=0
         )
         self.align_chapter = self._field_menu(
-            al, 1, "章", self.ALIGNS, default="center", col=2
+            al, 1, "章", ALIGNS, default="center", col=2
         )
         self.align_section = self._field_menu(
-            al, 2, "节", self.ALIGNS, default="left", col=0
+            al, 2, "节", ALIGNS, default="left", col=0
         )
         self.align_body = self._field_menu(
-            al, 2, "正文", self.ALIGNS, default="left", col=2
+            al, 2, "正文", ALIGNS, default="left", col=2
         )
 
         fo = self._group(parent, "嵌入字体", 2)
@@ -347,6 +408,7 @@ class App(ctk.CTk):
         self.css_mode.grid(
             row=1, column=0, columnspan=4, padx=10, pady=(6, 4), sticky="w"
         )
+
         self.css_text = ctk.CTkTextbox(css, font=self.font_base)
         self.css_text.grid(
             row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="nsew"
@@ -354,7 +416,10 @@ class App(ctk.CTk):
 
         parent.grid_rowconfigure(3, weight=1)
 
-    # ==================== 替换 Tab ====================
+    # ======================================================================
+    # 区块 10：替换 Tab
+    # ======================================================================
+
     def _build_replace_tab(self, parent):
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(1, weight=1)
@@ -364,12 +429,10 @@ class App(ctk.CTk):
         top.grid_columnconfigure(0, weight=1)
 
         ctk.CTkButton(
-            top,
-            text="添加规则",
-            width=90,
-            font=self.font_base,
+            top, text="添加规则", width=90, font=self.font_base,
             command=self._add_replace_rule,
         ).grid(row=0, column=0, sticky="w")
+
         right_top = ctk.CTkFrame(top, fg_color="transparent")
         right_top.grid(row=0, column=1, sticky="e")
         ctk.CTkButton(right_top, text="导入", width=60, font=self.font_base).pack(
@@ -387,7 +450,6 @@ class App(ctk.CTk):
         self._add_replace_rule()
         self._add_replace_rule()
 
-    # ==================== 替换规则：卡片 ====================
     def _add_replace_rule(self):
         card = self._make_rule_card()
         self.rule_cards.append(card)
@@ -403,47 +465,34 @@ class App(ctk.CTk):
 
         enabled_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
-            head, text="启用", variable=enabled_var, font=self.font_base
+            head, text="启用", variable=enabled_var, font=self.font_base,
         ).grid(row=0, column=0, sticky="w")
 
         right = ctk.CTkFrame(head, fg_color="transparent")
         right.grid(row=0, column=1, sticky="e")
 
         stage_menu = ctk.CTkOptionMenu(
-            right,
-            values=["原文", "HTML"],
-            width=90,
-            anchor="center",
-            font=self.font_base,
-            dropdown_font=self.font_base,
+            right, values=STAGES, width=90, anchor="center",
+            font=self.font_base, dropdown_font=self.font_base,
         )
         stage_menu.set("原文")
         stage_menu.pack(side="left", padx=(0, 6))
 
         ctk.CTkButton(
-            right,
-            text="↑",
-            width=28,
-            font=self.font_base,
+            right, text="↑", width=28, font=self.font_base,
             command=lambda c=card: self._move_rule(c, -1),
         ).pack(side="left", padx=(0, 2))
         ctk.CTkButton(
-            right,
-            text="↓",
-            width=28,
-            font=self.font_base,
+            right, text="↓", width=28, font=self.font_base,
             command=lambda c=card: self._move_rule(c, +1),
         ).pack(side="left", padx=(0, 2))
         ctk.CTkButton(
-            right,
-            text="✕",
-            width=28,
-            font=self.font_base,
+            right, text="✕", width=28, font=self.font_base,
             command=lambda c=card: self._remove_rule(c),
         ).pack(side="left")
 
         ctk.CTkLabel(card, text="正则", anchor="w", font=self.font_base).grid(
-            row=1, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+            row=1, column=0, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
         )
         pattern_entry = ctk.CTkEntry(
             card,
@@ -451,11 +500,11 @@ class App(ctk.CTk):
             font=self.font_base,
         )
         pattern_entry.grid(
-            row=1, column=1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+            row=1, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew"
         )
 
         ctk.CTkLabel(card, text="替换为", anchor="w", font=self.font_base).grid(
-            row=2, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+            row=2, column=0, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
         )
         replace_entry = ctk.CTkEntry(
             card,
@@ -463,14 +512,13 @@ class App(ctk.CTk):
             font=self.font_base,
         )
         replace_entry.grid(
-            row=2, column=1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+            row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew"
         )
 
         card.enabled_var = enabled_var  # type: ignore[attr-defined]
         card.pattern_entry = pattern_entry  # type: ignore[attr-defined]
         card.replace_entry = replace_entry  # type: ignore[attr-defined]
         card.stage_menu = stage_menu  # type: ignore[attr-defined]
-
         return card
 
     def _relayout_rule_cards(self):
@@ -495,17 +543,18 @@ class App(ctk.CTk):
         card.destroy()
         self._relayout_rule_cards()
 
-    # ==================== 右侧目录面板 ====================
+    # ======================================================================
+    # 区块 11：目录面板
+    # ======================================================================
+
     def _build_toc_panel(self, parent):
         self.panel = ctk.CTkFrame(parent, corner_radius=4)
-        self.panel.grid(row=0, column=1, sticky="nsew", padx=(self.GAP // 2, 0))
+        self.panel.grid(row=0, column=1, sticky="nsew", padx=(GAP // 2, 0))
         self.panel.grid_rowconfigure(2, weight=1)
         self.panel.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            self.panel,
-            text="目录",
-            font=self.font_bold,
+            self.panel, text="目录", font=self.font_bold,
         ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 4))
 
         top = ctk.CTkFrame(self.panel, fg_color="transparent")
@@ -568,12 +617,8 @@ class App(ctk.CTk):
         left.grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(left, text="目录深度", font=self.font_base).pack(side="left")
         self.toc_depth = ctk.CTkOptionMenu(
-            left,
-            values=[str(i) for i in range(1, 7)],
-            width=70,
-            anchor="center",
-            font=self.font_base,
-            dropdown_font=self.font_base,
+            left, values=[str(i) for i in range(1, 7)], width=70,
+            anchor="center", font=self.font_base, dropdown_font=self.font_base,
         )
         self.toc_depth.set("6")
         self.toc_depth.pack(side="left", padx=(6, 0))
@@ -581,74 +626,14 @@ class App(ctk.CTk):
         right = ctk.CTkFrame(bottom, fg_color="transparent")
         right.grid(row=0, column=1, sticky="e")
         ctk.CTkButton(
-            right,
-            text="删除",
-            width=60,
-            font=self.font_base,
+            right, text="删除", width=60, font=self.font_base,
             command=self._mark_toc_deleted,
         ).pack(side="left", padx=(0, 4))
         ctk.CTkButton(
-            right,
-            text="恢复",
-            width=60,
-            font=self.font_base,
+            right, text="恢复", width=60, font=self.font_base,
             command=self._restore_toc_deleted,
         ).pack(side="left")
 
-    # ==================== 目录表格：字体与主题 ====================
-    def _apply_toc_font(self):
-        """按 self.font_family / self.toc_size 重配目录表格字体。"""
-        style = ttk.Style()
-        fam = self.font_family
-        style.configure(
-            "Toc.Treeview",
-            font=(fam, self.toc_size),
-            rowheight=max(self.toc_size + 14, 22),
-        )
-        style.configure(
-            "Toc.Treeview.Heading",
-            font=(fam, self.toc_size),
-        )
-        self.toc_table.tag_configure(
-            "deleted",
-            font=(fam, self.toc_size, "overstrike"),
-        )
-
-    def _apply_toc_theme(self):
-        """让目录表格配色跟随当前 CTk 主题。"""
-        dark = ctk.get_appearance_mode() == "Dark"
-        style = ttk.Style()
-
-        if dark:
-            bg, fg, field = "#2b2b2b", "#e0e0e0", "#2b2b2b"
-            head_bg, head_fg = "#3a3a3a", "#e0e0e0"
-            sel_bg, sel_fg = "#1f538d", "#ffffff"
-            del_fg = "#8a8a8a"
-        else:
-            bg, fg, field = "#ffffff", "#000000", "#ffffff"
-            head_bg, head_fg = "#e5e5e5", "#000000"
-            sel_bg, sel_fg = "#3b8ed0", "#ffffff"
-            del_fg = "gray60"
-
-        style.configure(
-            "Toc.Treeview",
-            background=bg,
-            foreground=fg,
-            fieldbackground=field,
-        )
-        style.map(
-            "Toc.Treeview",
-            background=[("selected", sel_bg)],
-            foreground=[("selected", sel_fg)],
-        )
-        style.configure(
-            "Toc.Treeview.Heading",
-            background=head_bg,
-            foreground=head_fg,
-        )
-        self.toc_table.tag_configure("deleted", foreground=del_fg)
-
-    # ==================== 目录：测试数据与删除标记 ====================
     def _load_toc_test_data(self):
         vol1 = self.toc_table.insert("", "end", values=("第一卷 起源", "第一卷 起源"))
         self.toc_table.insert(vol1, "end", values=("第一章 开端", "第一章 开端"))
@@ -656,7 +641,6 @@ class App(ctk.CTk):
         self.toc_table.insert(ch2, "end", values=("第一节 清晨", "第一节 清晨"))
         vol2 = self.toc_table.insert("", "end", values=("第二卷 风暴", "第二卷 风暴"))
         self.toc_table.insert(vol2, "end", values=("第三章 重逢", "第三章 重逢"))
-
         self.toc_table.item(vol1, open=True)
         self.toc_table.item(ch2, open=True)
         self.toc_table.item(vol2, open=True)
@@ -669,7 +653,10 @@ class App(ctk.CTk):
         for item_id in self.toc_table.selection():
             self.toc_table.item(item_id, tags=())
 
-    # ==================== 设置窗 ====================
+    # ======================================================================
+    # 区块 12：设置窗
+    # ======================================================================
+
     def _open_settings(self):
         win = ctk.CTkToplevel(self)
         win.title("设置")
@@ -678,44 +665,37 @@ class App(ctk.CTk):
         win.grab_set()
 
         body = ctk.CTkFrame(win, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=20, pady=20)
-        body.grid_columnconfigure(1, weight=1)
+        body.pack(fill="both", expand=True, padx=SETTINGS_PAD, pady=SETTINGS_PAD)
+        body.grid_columnconfigure(0, weight=1)
 
-        # 字体（ComboBox：预设可选、也可手输）
-        ctk.CTkLabel(body, text="字体").grid(row=0, column=0, sticky="w", pady=(0, 12))
+        def add_row(r, label, widget):
+            """一行：标签左、控件右，垂直居中对齐。"""
+            row = ctk.CTkFrame(body, fg_color="transparent")
+            row.grid(row=r, column=0, sticky="ew", pady=(0, SETTINGS_ROW_PADY))
+            row.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(row, text=label, anchor="w").grid(
+                row=0, column=0, sticky="w", padx=SETTINGS_LABEL_PADX
+            )
+            widget.grid(row=0, column=1, sticky="e")
+            return row
+
         font_combo = ctk.CTkComboBox(
-            body,
-            values=list(self._font_presets().keys()),
-            width=160,
+            body, values=list(self._font_presets().keys()), width=160,
         )
         font_combo.set(self.font_family_label)
-        font_combo.grid(row=0, column=1, sticky="e", pady=(0, 12))
+        add_row(0, "字体", font_combo)
 
-        # 界面字号
-        ctk.CTkLabel(body, text="界面字号").grid(
-            row=1, column=0, sticky="w", pady=(0, 12)
-        )
         ui_menu = ctk.CTkOptionMenu(
-            body,
-            values=self.FONT_SIZES,
-            width=160,
-            anchor="center",
+            body, values=FONT_SIZES, width=160, anchor="center",
         )
         ui_menu.set(str(self.ui_size))
-        ui_menu.grid(row=1, column=1, sticky="e", pady=(0, 12))
+        add_row(1, "界面字号", ui_menu)
 
-        # 目录字号
-        ctk.CTkLabel(body, text="目录字号").grid(
-            row=2, column=0, sticky="w", pady=(0, 12)
-        )
         toc_menu = ctk.CTkOptionMenu(
-            body,
-            values=self.FONT_SIZES,
-            width=160,
-            anchor="center",
+            body, values=FONT_SIZES, width=160, anchor="center",
         )
         toc_menu.set(str(self.toc_size))
-        toc_menu.grid(row=2, column=1, sticky="e", pady=(0, 12))
+        add_row(2, "目录字号", toc_menu)
 
         def apply_and_close():
             self._apply_font_family(font_combo.get())
@@ -725,7 +705,7 @@ class App(ctk.CTk):
             win.destroy()
 
         btns = ctk.CTkFrame(body, fg_color="transparent")
-        btns.grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        btns.grid(row=3, column=0, pady=(SETTINGS_ROW_PADY, 0))
         ctk.CTkButton(btns, text="应用", width=80, command=apply_and_close).pack(
             side="left", padx=4
         )
@@ -733,36 +713,37 @@ class App(ctk.CTk):
             side="left", padx=4
         )
 
-        # 居中于主窗：Toplevel 创建后尺寸要等一会才准，用 after 延后
+        # 居中于主窗
         def center():
             self.update_idletasks()
             win.update_idletasks()
             px, py = self.winfo_rootx(), self.winfo_rooty()
             pw, ph = self.winfo_width(), self.winfo_height()
             ww, wh = win.winfo_width(), win.winfo_height()
-            x = px + (pw - ww) // 2
-            y = py + (ph - wh) // 2
-            win.geometry(f"+{x}+{y}")
+            win.geometry(f"+{px + (pw - ww) // 2}+{py + (ph - wh) // 2}")
 
         self.after(20, center)
 
-    # ==================== 底部栏 ====================
+    # ======================================================================
+    # 区块 13：底部栏
+    # ======================================================================
+
     def _build_bottombar(self):
         bar = ctk.CTkFrame(self, height=44, corner_radius=0)
-        bar.grid(row=2, column=0, sticky="ew", pady=(self.GAP, 0))
+        bar.grid(row=2, column=0, sticky="ew", pady=(GAP, 0))
         bar.grid_columnconfigure(1, weight=1)
 
         ctk.CTkButton(
-            bar,
-            text="⚙  开始生成",
-            width=140,
-            height=28,
-            font=self.font_bold,
-            command=self._on_generate,
+            bar, text="⚙  开始生成", width=140, height=28,
+            font=self.font_bold, command=self._on_generate,
         ).grid(row=0, column=0, padx=14, pady=6, sticky="w")
 
-    # ==================== 封装组件 ====================
+    # ======================================================================
+    # 区块 14：封装控件
+    # ======================================================================
+
     def _group(self, parent, title, row):
+        """分组框。内部 4 列：0/1 左半区，2/3 右半区。"""
         frame = ctk.CTkFrame(parent, border_width=1, corner_radius=4)
         frame.grid(row=row, column=0, sticky="ew", padx=10, pady=(8, 0))
         frame.grid_columnconfigure(0, weight=0)
@@ -770,20 +751,18 @@ class App(ctk.CTk):
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
         ctk.CTkLabel(
-            frame,
-            text=title,
-            font=self.font_bold,
+            frame, text=title, font=self.font_bold,
             text_color=("gray30", "gray70"),
         ).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(6, 2))
         return frame
 
     def _field(self, parent, r, label, placeholder="", col=0):
         ctk.CTkLabel(parent, text=label, anchor="w", font=self.font_base).grid(
-            row=r, column=col, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+            row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
         )
         entry = ctk.CTkEntry(parent, placeholder_text=placeholder, font=self.font_base)
         entry.grid(
-            row=r, column=col + 1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+            row=r, column=col + 1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew"
         )
         return entry
 
@@ -791,16 +770,12 @@ class App(ctk.CTk):
         self, parent, r, label, command, extra_btn=None, btn_text="浏览", btn_width=56
     ):
         ctk.CTkLabel(parent, text=label, anchor="w", font=self.font_base).grid(
-            row=r, column=0, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+            row=r, column=0, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
         )
         box = ctk.CTkFrame(parent, fg_color="transparent")
         box.grid(
-            row=r,
-            column=1,
-            columnspan=3,
-            padx=self.FIELD_PADX,
-            pady=self.ROW_PADY,
-            sticky="ew",
+            row=r, column=1, columnspan=3,
+            padx=FIELD_PADX, pady=ROW_PADY, sticky="ew",
         )
         entry = ctk.CTkEntry(box, font=self.font_base)
         entry.pack(side="left", fill="x", expand=True)
@@ -808,37 +783,33 @@ class App(ctk.CTk):
         btn_box = ctk.CTkFrame(box, fg_color="transparent")
         btn_box.pack(side="right", padx=(8, 0))
         ctk.CTkButton(
-            btn_box,
-            text=btn_text,
-            width=btn_width,
-            font=self.font_base,
-            command=command,
+            btn_box, text=btn_text, width=btn_width, font=self.font_base, command=command,
         ).pack(side="left")
         if extra_btn:
             text, cmd = extra_btn
             ctk.CTkButton(
-                btn_box, text=text, width=56, font=self.font_base, command=cmd
+                btn_box, text=text, width=56, font=self.font_base, command=cmd,
             ).pack(side="left", padx=(6, 0))
         return entry
 
     def _field_menu(self, parent, r, label, values, default=None, col=0):
         ctk.CTkLabel(parent, text=label, anchor="w", font=self.font_base).grid(
-            row=r, column=col, padx=self.LABEL_PADX, pady=self.ROW_PADY, sticky="w"
+            row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
         )
         menu = ctk.CTkOptionMenu(
-            parent,
-            values=values,
-            anchor="center",
-            font=self.font_base,
-            dropdown_font=self.font_base,
+            parent, values=values, anchor="center",
+            font=self.font_base, dropdown_font=self.font_base,
         )
         menu.set(default if default is not None else values[0])
         menu.grid(
-            row=r, column=col + 1, padx=self.FIELD_PADX, pady=self.ROW_PADY, sticky="ew"
+            row=r, column=col + 1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew"
         )
         return menu
 
-    # ==================== 业务占位 ====================
+    # ======================================================================
+    # 区块 15：业务占位
+    # ======================================================================
+
     def _pick_input(self): ...
     def _pick_output(self): ...
     def _pick_cover(self): ...
