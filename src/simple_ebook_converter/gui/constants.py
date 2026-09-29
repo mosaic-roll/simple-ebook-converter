@@ -76,9 +76,16 @@ WINDOW_MIN = (720, 600)
 # 选项列表
 # ==========================================================================
 # 这些将来要跟 core 对齐（core.config.DEFAULTS / core.encoding.ENCODING_CHOICES /
-# core.replace.STAGE_LABELS），所以留在 constants 里作为项目级约定。
+# core.replace.STAGE_LABELS），所以留在 constants 里作为项目级约定。值与 core
+# 取值的对应关系也放这儿（见 FONT_PRESETS_BY_OS），界面上只显示中文。
 
-ALIGNS = ["left", "center", "right"]
+#: 对齐方式：界面文字 → core 取值（取值同 core.config.ALIGN_CHOICES）
+ALIGN_LABELS = {
+    "左对齐": "left",
+    "居中": "center",
+    "右对齐": "right",
+    "两端对齐": "justify",
+}
 HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
 STAGES = ["原文", "HTML"]
 ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"]

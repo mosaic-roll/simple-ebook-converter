@@ -12,7 +12,7 @@ import tkinter as tk
 import customtkinter as ctk
 
 from ..constants import (
-    ALIGNS,
+    ALIGN_LABELS,
     BTN_W_L,
     CHECK_PADX,
     CHECK_PADY_LAST,
@@ -42,11 +42,20 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     margin = make_field(p, 2, "页边距", ctx, "20", col=2)
 
     # ---- 对齐方式 ----
+    # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值
     al = make_group(parent, "对齐方式", 1, ctx)
-    align_volume = make_field_menu(al, 1, "卷", ALIGNS, ctx, default="center", col=0)
-    align_chapter = make_field_menu(al, 1, "章", ALIGNS, ctx, default="center", col=2)
-    align_section = make_field_menu(al, 2, "节", ALIGNS, ctx, default="left", col=0)
-    align_body = make_field_menu(al, 2, "正文", ALIGNS, ctx, default="left", col=2)
+    align_volume = make_field_menu(
+        al, 1, "卷", list(ALIGN_LABELS), ctx, default="居中", col=0
+    )
+    align_chapter = make_field_menu(
+        al, 1, "章", list(ALIGN_LABELS), ctx, default="居中", col=2
+    )
+    align_section = make_field_menu(
+        al, 2, "节", list(ALIGN_LABELS), ctx, default="左对齐", col=0
+    )
+    align_body = make_field_menu(
+        al, 2, "正文", list(ALIGN_LABELS), ctx, default="两端对齐", col=2
+    )
 
     # ---- 嵌入字体 ----
     fo = make_group(parent, "嵌入字体", 2, ctx)

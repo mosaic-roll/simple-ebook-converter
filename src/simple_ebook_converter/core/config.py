@@ -36,7 +36,7 @@ _CHAPTER_FRAGMENTS = (
 DEFAULT_CHAPTER_RE = "|".join(_CHAPTER_FRAGMENTS)
 
 #: 标题对齐方式，写进 CSS 的 `text-align`
-ALIGN_CHOICES = ("left", "center", "right")
+ALIGN_CHOICES = ("left", "center", "right", "justify")
 
 #: 预设层级：级别 → (class 名, 中文名, 内置正则)。空正则 = 默认不启用。
 LEVEL_PRESETS = (

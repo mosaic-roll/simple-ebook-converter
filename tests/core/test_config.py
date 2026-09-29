@@ -146,7 +146,7 @@ def test_css_file_and_css_append_are_mutually_exclusive(tmp_path):
 def test_align_choices_are_the_only_allowed():
     for value in ALIGN_CHOICES:
         Config(chapter_align=value, volume_align=value).validate()
-    assert set(ALIGN_CHOICES) == {"left", "center", "right"}
+    assert set(ALIGN_CHOICES) == {"left", "center", "right", "justify"}
 
 
 def test_book_title_falls_back_to_stem_then_constant(tmp_path):
