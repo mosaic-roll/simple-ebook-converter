@@ -32,6 +32,7 @@ from .constants import (
     GEN_BTN_H,
     GEN_BTN_W,
     PAD,
+    STATUS_COLORS,
     THEME_CHOICE_DARK,
     THEME_CHOICES,
     WINDOW_MIN,
@@ -82,6 +83,7 @@ class App(ctk.CTk):
             import_rules=self._import_rules,
             export_rules=self._export_rules,
             on_generate=self._on_generate,
+            set_status=self._set_status,
         )
 
         # ---- 控件引用（各 Tab / 面板交回的 dict） ----
@@ -167,6 +169,21 @@ class App(ctk.CTk):
             font=self.fonts.bold,
             command=self.ctx.cb("on_generate"),
         ).grid(row=0, column=0, padx=BAR_PADX, pady=BAR_PADY, sticky="w")
+
+        # 状态文字而不是进度条：pipeline 是同步的，没有分阶段回调就不知道真实进度，
+        # 硬画进度条只能靠猜。等 core 有了阶段回调，再换成「进度条 + 状态文字」。
+        self.status_label = ctk.CTkLabel(
+            bar, text="就绪", font=self.fonts.base, anchor="e"
+        )
+        self.status_label.grid(row=0, column=1, padx=BAR_PADX, pady=BAR_PADY, sticky="e")
+
+    def _set_status(self, text: str, kind: str = "info") -> None:
+        """更新底栏状态文字。`kind`：info / ok / error，配色见 `constants.STATUS_COLORS`。"""
+        self.status_label.configure(
+            text=text, text_color=STATUS_COLORS.get(kind, STATUS_COLORS["info"])
+        )
+        # 业务逻辑同步跑时，状态得先刷出来，不然等活干完才显示「正在生成」
+        self.update_idletasks()
 
     # ------------------------------------------------------------ 业务占位
     # TODO: 接 core 后逐一实现；在此之前都是空函数，点了没反应。

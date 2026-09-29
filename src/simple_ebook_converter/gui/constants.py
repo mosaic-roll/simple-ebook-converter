@@ -165,3 +165,11 @@ THEME_LIGHT = {
 THEME_CHOICES = ["浅色", "深色"]
 THEME_CHOICE_DARK = "深色"
 DEFAULT_THEME_CHOICE = "浅色"
+
+#: 状态文字配色：kind → (浅色, 深色)。CTk 外观模式二元组，由 CTk 自己按当前模式
+#: 取值，所以不走 theme.py 的调色板（那一套只喂 ttk 的目录表格）。
+STATUS_COLORS = {
+    "info": ("gray30", "gray70"),
+    "ok": ("green4", "lightgreen"),
+    "error": ("firebrick3", "salmon"),
+}
