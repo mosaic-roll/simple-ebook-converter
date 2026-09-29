@@ -40,9 +40,8 @@ class App(ctk.CTk):
     ROW_PADY = 8
     GROUP_PADY = (10, 0)
 
-    # Tab 外观
+    # Tab
     TAB_NAMES = ("基础", "规则", "排版", "替换")
-    TAB_HEIGHT = 32
 
     def __init__(self):
         super().__init__()
@@ -101,30 +100,21 @@ class App(ctk.CTk):
         pane.grid_rowconfigure(1, weight=1)
         pane.grid_columnconfigure(0, weight=1)
 
-        # 标签头条：一排按钮，无圆角，贴边
-        head = ctk.CTkFrame(pane, corner_radius=0, height=self.TAB_HEIGHT)
+        # 标签头条：普通 frame，内部放一个 CTkSegmentedButton，sticky="w"
+        # 只占按钮本身宽度，右边留白；配色全走主题。
+        head = ctk.CTkFrame(pane, corner_radius=0, height=36)
         head.grid(row=0, column=0, sticky="ew")
         head.grid_propagate(False)
-        for c in range(len(self.TAB_NAMES)):
-            head.grid_columnconfigure(c, weight=0)
+        head.grid_columnconfigure(0, weight=0)
+        head.grid_columnconfigure(1, weight=1)  # 右侧留白列
 
-        self._tab_buttons: dict[str, ctk.CTkButton] = {}
-        self._tab_frames: dict[str, ctk.CTkFrame] = {}
-
-        for i, name in enumerate(self.TAB_NAMES):
-            btn = ctk.CTkButton(
-                head,
-                text=name,
-                width=72,
-                height=self.TAB_HEIGHT,
-                corner_radius=0,
-                fg_color="transparent",
-                text_color=("gray20", "gray80"),
-                hover_color=("gray85", "gray25"),
-                command=lambda n=name: self._select_tab(n),
-            )
-            btn.grid(row=0, column=i, sticky="nsw")
-            self._tab_buttons[name] = btn
+        self.tab_bar = ctk.CTkSegmentedButton(
+            head,
+            values=list(self.TAB_NAMES),
+            command=self._select_tab,
+        )
+        self.tab_bar.set(self.TAB_NAMES[0])
+        self.tab_bar.grid(row=0, column=0, sticky="w", padx=(10, 0), pady=4)
 
         # 内容区：普通 frame，无圆角，与标签头严丝合缝
         body = ctk.CTkFrame(pane, corner_radius=0)
@@ -132,6 +122,7 @@ class App(ctk.CTk):
         body.grid_rowconfigure(0, weight=1)
         body.grid_columnconfigure(0, weight=1)
 
+        self._tab_frames: dict[str, ctk.CTkFrame] = {}
         for name in self.TAB_NAMES:
             frame = ctk.CTkFrame(body, corner_radius=0)
             frame.grid(row=0, column=0, sticky="nsew")
@@ -143,28 +134,13 @@ class App(ctk.CTk):
         self._build_layout_tab(self._tab_frames["排版"])
         self._build_replace_tab(self._tab_frames["替换"])
 
-        self._current_tab = None
-        self._select_tab(self.TAB_NAMES[0])
+        self._current_tab = self.TAB_NAMES[0]
 
     def _select_tab(self, name: str):
         if self._current_tab == name:
             return
         self._current_tab = name
-        for n, frame in self._tab_frames.items():
-            if n == name:
-                frame.tkraise()
-            # 其他 frame 留在原地，tkraise 负责层叠
-        for n, btn in self._tab_buttons.items():
-            if n == name:
-                btn.configure(
-                    fg_color=("gray75", "gray30"),
-                    text_color=("gray10", "gray90"),
-                )
-            else:
-                btn.configure(
-                    fg_color="transparent",
-                    text_color=("gray20", "gray80"),
-                )
+        self._tab_frames[name].tkraise()
 
     # ==================== 基础 Tab ====================
     def _build_basic_tab(self, parent):
