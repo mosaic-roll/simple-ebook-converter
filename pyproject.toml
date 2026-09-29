@@ -20,7 +20,6 @@ gui = [
 ]
 gui-ctk = [
     "customtkinter>=5.2",
-    "tksheet>=7.6.0",
 ]
 
 [project.scripts]
