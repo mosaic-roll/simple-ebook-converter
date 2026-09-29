@@ -320,7 +320,7 @@ class App(ctk.CTk):
         self.book_title = self._field(m, 1, "书名", "书名", col=0)
         self.book_author = self._field(m, 1, "作者", "作者", col=2)
         self.book_date = self._field(m, 2, "日期", "2024-05-13", col=0)
-        self.lang_menu = self._field_menu(m, 2, "语言", LANGUAGES, col=2)
+        self.lang_menu = self._field_combo(m, 2, "语言", LANGUAGES, col=2)
 
         c = self._group(parent, "封面", 2)
         self.cover_entry = self._field_btn(
@@ -957,6 +957,20 @@ class App(ctk.CTk):
                 command=cmd,
             ).pack(side="left", padx=(6, 0))
         return entry
+
+    def _field_combo(self, parent, r, label, values, default=None, col=0):
+        ctk.CTkLabel(parent, text=label, anchor="w", font=self.font_base).grid(
+            row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
+        )
+        combo = ctk.CTkComboBox(
+            parent,
+            values=values,
+            font=self.font_base,
+            dropdown_font=self.font_base,
+        )
+        combo.set(default if default is not None else values[0])
+        combo.grid(row=r, column=col + 1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
+        return combo
 
     def _field_menu(self, parent, r, label, values, default=None, col=0):
         ctk.CTkLabel(parent, text=label, anchor="w", font=self.font_base).grid(
