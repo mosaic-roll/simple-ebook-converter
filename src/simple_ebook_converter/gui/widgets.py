@@ -71,13 +71,15 @@ def make_field_btn(
     label: str,
     ctx: GuiContext,
     command: Callable[[], None],
-    extra_btn: tuple[str, Callable[[], None]] | None = None,
+    extra_btns: Sequence[tuple[str, Callable[[], None]]] | None = None,
     btn_text: str = "浏览",
     btn_width: int = BTN_W_S,
 ) -> ctk.CTkEntry:
-    """一行：标签 + 可输入路径的框 + 右侧按钮（可选第二个按钮）。
+    """一行：标签 + 可输入路径的框 + 右侧按钮。
 
-    `command` 是「浏览…」按钮的回调；`extra_btn` 是 `(文字, 回调)`，如「查看」。
+    `command` 是主按钮（文字 `btn_text`，默认「浏览」）的回调；`extra_btns` 是
+    排在主按钮右边的 `(文字, 回调)` 列表，如 `[("查看", open_cover)]`。
+    同一行所有按钮宽度都用 `btn_width`。
     """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="w", font=font).grid(
@@ -104,12 +106,11 @@ def make_field_btn(
         font=font,
         command=command,
     ).pack(side="left")
-    if extra_btn:
-        text, cmd = extra_btn
+    for text, cmd in extra_btns or []:
         ctk.CTkButton(
             btn_box,
             text=text,
-            width=BTN_W_S,
+            width=btn_width,
             font=font,
             command=cmd,
         ).pack(side="left", padx=(6, 0))
