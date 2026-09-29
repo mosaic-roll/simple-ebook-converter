@@ -123,7 +123,7 @@ class App(ctk.CTk):
         # 封面
         c = self._group(parent, "封面", 2)
         self.cover_entry = self._field_btn(
-            c, 1, "路径", self._pick_cover, extra_btn=("打开", self._open_cover)
+            c, 1, "路径", self._pick_cover, extra_btn=("查看", self._open_cover)
         )
         self.text_cover_var = tk.BooleanVar(value=True)
         ctk.CTkCheckBox(
