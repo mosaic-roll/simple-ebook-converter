@@ -12,20 +12,15 @@ dependencies = [
 
 [project.optional-dependencies]
 #: 只有图形界面需要。core 与命令行不装它也能用：
-#:   pip install simple-ebook-converter        # 仅 CLI
-#:   pip install "simple-ebook-converter[gui]" # 带图形界面（ttk/sv_ttk）
-#:   pip install "simple-ebook-converter[gui-ctk]"  # 带图形界面（customtkinter）
+#:   pip install simple-ebook-converter           # 仅 CLI
+#:   pip install "simple-ebook-converter[gui]"   # 带图形界面（customtkinter）
 gui = [
-    "sv-ttk>=2.4",
-]
-gui-ctk = [
     "customtkinter>=5.2",
 ]
 
 [project.scripts]
-simple-ebook-converter = "simple_ebook_converter.gui.__main__:main"
+simple-ebook-converter = "simple_ebook_converter.gui_ctk.__main__:main"
 simple-ebook-converter-cli = "simple_ebook_converter.cli.cli:main"
-simple-ebook-converter-ctk = "simple_ebook_converter.gui_ctk.__main__:main"
 
 [dependency-groups]
 dev = [

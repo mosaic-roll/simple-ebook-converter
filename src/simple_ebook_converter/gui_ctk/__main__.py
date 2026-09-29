@@ -1,8 +1,8 @@
-"""CTk GUI 入口：直接运行即可，无需依赖 CLI/core。
+"""图形界面入口：直接运行即可，无需依赖 CLI/core。
 
-    pip install "simple-ebook-converter[gui-ctk]"
+    pip install "simple-ebook-converter[gui]"
     python -m simple_ebook_converter.gui_ctk
-    simple-ebook-converter-ctk
+    simple-ebook-converter
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ def main() -> int:
         import customtkinter  # noqa: F401
     except ImportError:
         print(
-            "CTk 图形界面需要额外依赖 customtkinter。\n"
-            '请安装：pip install "simple-ebook-converter[gui-ctk]"\n'
+            "图形界面需要额外依赖 customtkinter。\n"
+            '请安装：pip install "simple-ebook-converter[gui]"\n'
             "（只用命令行的话：simple-ebook-converter-cli --help）",
             file=sys.stderr,
         )

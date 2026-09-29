@@ -6,7 +6,7 @@
 | ------------------------------- | --------------------------------------------------- |
 | `simple_ebook_converter.core`   | 核心库，不依赖任何前端；无状态，模块各管一件事        |
 | `simple_ebook_converter.cli`    | 命令行前端，入口点 `simple-ebook-converter-cli`     |
-| `simple_ebook_converter.gui`    | Tkinter 图形界面前端，入口点 `simple-ebook-converter` |
+| `simple_ebook_converter.gui_ctk` | 图形界面前端（customtkinter），入口点 `simple-ebook-converter` |
 
 版本号只有一处：根 `pyproject.toml` 的 `version`。`simple_ebook_converter.__version__`、
 `simple_ebook_converter.core.__version__` 等全部由 `simple_ebook_converter._meta` 里的
@@ -138,5 +138,4 @@ simple-ebook-converter-cli novel.txt --cover cover.png        # 显式给图
 uv run pytest                    # 全部用例
 uv run pytest tests/core         # 仅核心库
 uv run pytest tests/cli          # 仅命令行前端
-uv run pytest tests/gui          # 仅图形界面前端
 ```
