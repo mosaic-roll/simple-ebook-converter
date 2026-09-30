@@ -45,8 +45,13 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
+from .toc_panel import (
+    _TEST_ENTRIES,
+    entries_from_preview,
+    populate_toc,
+    preview_entries,
+)
 from .toc_panel import build as build_toc_panel
-from .toc_panel import entries_from_preview, populate_toc
 from .utils import open_with_default_app
 
 #: Tab 名 → (显示文字, 构建函数)
@@ -255,14 +260,7 @@ class App(ctk.CTk):
         self._refresh_toc_preview()
 
     def _refresh_toc_preview(self) -> None:
-        """用当前替换规则对已扫描的目录树做预览，刷新右侧表格。
-
-        还没扫过文件时什么都不做（保留现有内容 / 占位数据）。
-        """
-        result = self.ctx.scan_result
-        if result is None:
-            return
-        tree = result[0]
+        """用当前替换规则对已扫描的目录树（或测试条目）做预览，刷新右侧表格。"""
         cards = self.tab_widgets["replace"]["rule_cards"]
         rules_list = rules_from_rows(
             [
@@ -275,16 +273,28 @@ class App(ctk.CTk):
                 if card["pattern_entry"].get()
             ]
         )
-        try:
-            results = preview_titles(tree, rules_list)
-        except ValueError as e:
-            # rules_from_rows 会校验正则和阶段名，非法时抛 ValueError
-            messagebox.showerror("预览失败", str(e))
-            return
-        except Exception as e:  # noqa: BLE001
-            messagebox.showerror("预览失败", str(e))
-            return
-        entries = entries_from_preview(results)
+        result = self.ctx.scan_result
+        if result is not None:
+            tree = result[0]
+            try:
+                results = preview_titles(tree, rules_list)
+            except ValueError as e:
+                messagebox.showerror("预览失败", str(e))
+                return
+            except Exception as e:  # noqa: BLE001
+                messagebox.showerror("预览失败", str(e))
+                return
+            entries = entries_from_preview(results)
+        else:
+            # 还没扫描文件：用测试数据做预览，让用户能看到规则效果
+            try:
+                entries = preview_entries(_TEST_ENTRIES, rules_list)
+            except ValueError as e:
+                messagebox.showerror("预览失败", str(e))
+                return
+            except Exception as e:  # noqa: BLE001
+                messagebox.showerror("预览失败", str(e))
+                return
         table = self.toc_widgets["table"]
         table.delete(*table.get_children())
         populate_toc(table, entries)

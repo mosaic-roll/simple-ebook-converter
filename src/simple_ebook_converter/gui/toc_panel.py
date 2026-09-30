@@ -12,6 +12,7 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ..core.replace import Rule
 from .constants import (
     BTN_GAP,
     BTN_W_M,
@@ -236,6 +237,28 @@ def _label_row(parent: ctk.CTkFrame, label: str, font: ctk.CTkFont) -> ctk.CTkFr
     row.grid(row=0, column=0, sticky="w")
     ctk.CTkLabel(row, text=label, font=font).pack(side="left")
     return row
+
+
+def preview_entries(
+    entries: Iterable[Mapping[str, Any]], rules: Iterable[Rule]
+) -> list[dict[str, Any]]:
+    """对扁平条目列表应用替换规则，返回处理后的条目（供无扫描结果时的预览刷新用）。
+
+    内部把条目转成最小 `Node` 再调 `core.pipeline.preview_titles()`，不动传入的
+    原条目。
+    """
+    from ..core.parser import Node
+    from ..core.pipeline import preview_titles
+
+    nodes = [
+        Node(
+            title=str(e.get("raw_title", "")),
+            raw_title=str(e.get("raw_title", "")),
+            level=int(e.get("level", 0)),
+        )
+        for e in entries
+    ]
+    return entries_from_preview(preview_titles(nodes, rules))
 
 
 # TODO: 接 core 后删掉本表，改由 core.pipeline 的扫描结果填充 populate_toc()
