@@ -44,7 +44,7 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
-from .toc_panel import _TEST_ENTRIES, entries_from_preview, populate_toc
+from .toc_panel import TEST_ENTRIES, entries_from_preview, populate_toc
 from .toc_panel import build as build_toc_panel
 from .utils import open_with_default_app
 
@@ -54,7 +54,11 @@ def _entries_to_nodes(entries: list[dict]) -> list:
     from ..core.parser import Node
 
     return [
-        Node(title=str(e.get("raw_title", "")), raw_title=str(e.get("raw_title", "")), level=int(e.get("level", 0)))
+        Node(
+            title=str(e.get("raw_title", "")),
+            raw_title=str(e.get("raw_title", "")),
+            level=int(e.get("level", 0)),
+        )
         for e in entries
     ]
 
@@ -94,7 +98,7 @@ class App(ctk.CTk):
             clear_css=self._clear_css,
             load_builtin_css=self._load_builtin_css,
             open_cover=self._open_cover,
-            rescan_toc=self._rescan_toc,
+            rescan_toc=self._on_scan,
             import_toc=self._import_toc,
             export_toc=self._export_toc,
             import_rules=self._import_rules,
@@ -174,10 +178,8 @@ class App(ctk.CTk):
         # 初始化目录条目：用测试数据填充，等真实扫描后再替换
         self.ctx.toc_entries = [
             {"raw_title": e["raw_title"], "level": e["level"]}
-            for e in _TEST_ENTRIES
+            for e in TEST_ENTRIES
         ]
-        self.toc_widgets["table"].delete(*self.toc_widgets["table"].get_children())
-        populate_toc(self.toc_widgets["table"], _TEST_ENTRIES)
 
         # 替换规则变动 → 刷新目录预览（ctx._on_rules_changed 由 replace tab 触发）
         self.ctx._on_rules_changed.append(self._refresh_toc_preview)
@@ -283,6 +285,7 @@ class App(ctk.CTk):
         """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。
 
         收集逻辑收在 `tabs.replace.collect_rules()` 里（§5.3），此处只负责刷新。
+        刷新前保存展开状态，刷新后恢复，避免用户手动展开的节点全部折叠。
         """
         from .tabs.replace import collect_rules
 
@@ -291,15 +294,27 @@ class App(ctk.CTk):
             results = preview_titles(
                 _entries_to_nodes(self.ctx.toc_entries), rules_list
             )
-        except ValueError as e:
-            messagebox.showerror("预览失败", str(e))
-            return
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("预览失败", str(e))
             return
         table = self.toc_widgets["table"]
+        # 保存展开状态：按标题文本作 key（标题在目录中唯一，足以标识节点）
+        opened_titles: set[str] = set()
+        def _collect_opened(pid: str = "") -> None:
+            for cid in table.get_children(pid):
+                title = table.item(cid, "values")[0]
+                if table.item(cid, "open"):
+                    opened_titles.add(title)
+                _collect_opened(cid)
+        _collect_opened()
         table.delete(*table.get_children())
         populate_toc(table, entries_from_preview(results))
+        # 恢复展开状态
+        for title in opened_titles:
+            for cid in table.get_children():
+                if table.item(cid, "values")[0] == title:
+                    table.item(cid, open=True)
+                    break
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""

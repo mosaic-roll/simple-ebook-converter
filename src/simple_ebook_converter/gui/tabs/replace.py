@@ -64,8 +64,8 @@ def build(
         for cb in _triggers:
             try:
                 cb()
-            except Exception as e:  # noqa: BLE001
-                traceback.print_exc(e)
+            except Exception:  # noqa: BLE001
+                traceback.print_exc()
 
     def add_rule() -> None:
         card = _make_card(
@@ -222,8 +222,6 @@ def _make_card(
     replace_entry.grid(row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
 
     # 失焦时刷新预览：用户编辑完规则、移开焦点后应用。
-    # 注意：CTkTabview 复杂控件层级会拦截 <FocusOut> 事件，实际使用中需配合
-    # stage 切换（已有 command 回调）或后续接入真实文件扫描后自动刷新。
     pattern_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
     replace_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
 

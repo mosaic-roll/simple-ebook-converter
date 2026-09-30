@@ -42,13 +42,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     indent = make_field(p, 1, "缩进", ctx, default_text("indent"), col=0)
     line_height = make_field(p, 1, "行高", ctx, default_text("line_height"), col=2)
     para_spacing = make_field(p, 2, "段间距", ctx, default_text("para_spacing"), col=0)
-    for e, name in (
-        (indent, "indent"),
-        (line_height, "line_height"),
-        (para_spacing, "para_spacing"),
-    ):
-        e.delete(0, "end")
-        e.insert(0, default_text(name))
 
     # ---- 对齐方式 ----
     # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值；默认值也从 core 取

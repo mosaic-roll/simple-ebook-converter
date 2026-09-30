@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from tkinter import ttk
+
 import customtkinter as ctk
 
 from . import theme
@@ -31,7 +33,7 @@ BTN_ROW_PADY = (ROW_PADY, 0)
 _CORNER_TRANSPARENT = "transparent"
 
 
-def open(app: ctk.CTk, ctx: GuiContext, toc_table: ctk.CTkBaseClass) -> None:
+def open(app: ctk.CTk, ctx: GuiContext, toc_table: ttk.Treeview) -> None:
     """打开设置窗。`toc_table` 用于把新字号套到目录表格上。"""
     fonts = ctx.fonts
     win = ctk.CTkToplevel(app)

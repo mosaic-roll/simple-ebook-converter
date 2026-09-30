@@ -12,7 +12,6 @@ from typing import Any
 
 import customtkinter as ctk
 
-from ..core.replace import Rule
 from .constants import (
     BTN_GAP,
     BTN_W_M,
@@ -86,7 +85,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).pack(side="left")
 
     table = _make_table(panel)
-    populate_toc(table, _TEST_ENTRIES)
+    populate_toc(table, TEST_ENTRIES)
     apply_toc_font(table, ctx.fonts.family, ctx.fonts.toc_size)
 
     bottom = ctk.CTkFrame(panel, fg_color="transparent")
@@ -239,30 +238,9 @@ def _label_row(parent: ctk.CTkFrame, label: str, font: ctk.CTkFont) -> ctk.CTkFr
     return row
 
 
-def preview_entries(
-    entries: Iterable[Mapping[str, Any]], rules: Iterable[Rule]
-) -> list[dict[str, Any]]:
-    """对扁平条目列表应用替换规则，返回处理后的条目（供无扫描结果时的预览刷新用）。
-
-    内部把条目转成最小 `Node` 再调 `core.pipeline.preview_titles()`，不动传入的
-    原条目。
-    """
-    from ..core.parser import Node
-    from ..core.pipeline import preview_titles
-
-    nodes = [
-        Node(
-            title=str(e.get("raw_title", "")),
-            raw_title=str(e.get("raw_title", "")),
-            level=int(e.get("level", 0)),
-        )
-        for e in entries
-    ]
-    return entries_from_preview(preview_titles(nodes, rules))
-
-
-# TODO: 接 core 后删掉本表，改由 core.pipeline 的扫描结果填充 populate_toc()
-_TEST_ENTRIES: tuple[dict[str, Any], ...] = (
+    # 启动时用测试数据填充目录表（真实数据来自扫描，此表会被覆盖）。
+# 命名不加下划线前缀，因为跨模块导入使用。
+TEST_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第一卷 起源", "level": 2, "open": True},
     {"raw_title": "第一章 开端", "level": 3},
     {"raw_title": "第二章 离别", "level": 3, "open": True},
