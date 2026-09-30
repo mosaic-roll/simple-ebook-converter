@@ -39,7 +39,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     indent = make_field(p, 1, "缩进", ctx, "2", col=0)
     line_height = make_field(p, 1, "行高", ctx, "1.5", col=2)
     para_spacing = make_field(p, 2, "段间距", ctx, "1em", col=0)
-    margin = make_field(p, 2, "页边距", ctx, "20", col=2)
 
     # ---- 对齐方式 ----
     # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值
@@ -163,7 +162,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "indent": indent,
         "line_height": line_height,
         "para_spacing": para_spacing,
-        "margin": margin,
         "align_volume": align_volume,
         "align_chapter": align_chapter,
         "align_body": align_body,
