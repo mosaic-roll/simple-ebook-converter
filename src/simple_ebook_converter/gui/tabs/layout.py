@@ -36,11 +36,19 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     font = ctx.fonts.base
 
     # ---- 段落 ----
-    # 默认值来自 core，放在 placeholder 里：框留空即表示用默认值
+    # 默认值来自 core；启动时预填，框留空等价于用默认值（收集阶段实现）。
+    # placeholder 作为提示留着：用户清空后框变空，placeholder 重新显示默认。
     p = make_group(parent, "段落", 0, ctx)
     indent = make_field(p, 1, "缩进", ctx, default_text("indent"), col=0)
     line_height = make_field(p, 1, "行高", ctx, default_text("line_height"), col=2)
     para_spacing = make_field(p, 2, "段间距", ctx, default_text("para_spacing"), col=0)
+    for e, name in (
+        (indent, "indent"),
+        (line_height, "line_height"),
+        (para_spacing, "para_spacing"),
+    ):
+        e.delete(0, "end")
+        e.insert(0, default_text(name))
 
     # ---- 对齐方式 ----
     # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值；默认值也从 core 取
