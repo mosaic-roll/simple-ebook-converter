@@ -208,3 +208,20 @@ def test_classless_level_has_empty_class_name():
     assert tree[0].level == 1
     assert tree[0].class_name == ""
 
+
+def test_exclude_blocks_a_title_that_matches_levels():
+    """排除规则命中时，行降级为正文而不是标题。"""
+    levels = build_levels(["h3.chapter:^第.章"])
+    tree, _ = parse(
+        ["第一章 开端", "排除这条", "第二章 发展"],
+        levels,
+        fallback_title="书名",
+        exclude="^排除",
+    )
+    titles = [n.title for n in walk(tree)]
+    assert "第一章 开端" in titles
+    assert "排除这条" not in titles
+    assert "第二章 发展" in titles
+    # 被排除的行成了上一章的正文
+    assert "排除这条" in tree[0].paragraphs
+

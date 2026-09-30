@@ -70,6 +70,7 @@ def test_library_defaults_come_from_config():
     params = inspect.signature(parse).parameters
     assert params["max_title_len"].default == DEFAULTS.max_title_len
     assert params["preface_title"].default == DEFAULTS.preface_title
+    assert params["exclude"].default == DEFAULTS.exclude
     for fn in (to_json, to_text):
         assert inspect.signature(fn).parameters["depth"].default == DEFAULTS.toc_depth
 

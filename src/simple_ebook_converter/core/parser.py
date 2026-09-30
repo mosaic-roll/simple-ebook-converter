@@ -80,6 +80,7 @@ def parse(
     fallback_title: str,
     max_title_len: int = DEFAULTS.max_title_len,
     preface_title: str = DEFAULTS.preface_title,
+    exclude: str = DEFAULTS.exclude,
 ) -> tuple[list[Node], ParseStats]:
     """把行切分为章节树，返回 (顶层节点列表, 统计信息)。
 
@@ -96,6 +97,7 @@ def parse(
     if not rules:
         raise NoEnabledRulesError("没有启用的标题规则：卷/章/节至少要有一个非空正则")
     compiled = [(r, re.compile(r.pattern)) for r in rules]
+    compiled_exclude = [re.compile(exclude)] if exclude else []
 
     stats = ParseStats(total_lines=len(lines))
     builder = TreeBuilder()
@@ -105,6 +107,12 @@ def parse(
         title = line.strip()
         # 超长行不可能是标题，直接归正文，连正则都不试
         rule = _match(title, compiled) if title and len(title) <= max_title_len else None
+        # 标题命中后再过一遍排除规则，任一条命中就当正文
+        if rule is not None:
+            for pat in compiled_exclude:
+                if pat.match(title):
+                    rule = None
+                    break
         if rule is None:
             if builder.last is not None:
                 node = builder.last

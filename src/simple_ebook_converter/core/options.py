@@ -127,6 +127,11 @@ OPTIONS: tuple[Option, ...] = (
         "章节识别", multiple=True,
     ),
     Option("max_title_len", "标题最长字数", "超过这个字数的行直接当正文，不参与匹配", "章节识别"),
+    Option(
+        "exclude", "排除规则",
+        "排除规则；行命中该正则时不作为标题",
+        "章节识别",
+    ),
     Option("preface_title", "前言标题", "首个标题之前那些无标题段落归到这一节", "章节识别"),
     # ---- 清理与替换 ----
     Option("clean", "清理文本", "去掉段首段尾空格并删除空行（默认清理）", "清理与替换", negative=True),
