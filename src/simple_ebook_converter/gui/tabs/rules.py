@@ -72,7 +72,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
 
     # row=0 组标题，字段从 row=1 起
     for i, (label, opt_name, mode) in enumerate(BUILTIN_ROWS, start=1):
-        text = default_text(opt_name)
+        text = default_text(opt_name)  # 纯 core 默认值：placeholder 与「恢复默认」用
         row_defaults[label] = text
         entry = make_field_btn(
             b,
@@ -84,8 +84,10 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
             btn_width=BTN_W_L,
             placeholder=text if mode == HINT else "",
         )
-        if mode == PREFILL:
-            entry.insert(0, text)
+        # 预填行（卷/章/排除）总是填：有存档用存档，否则 core 默认；
+        # 提示行（字数/前言）只在有存档时才填，否则留空让 placeholder 显示默认值。
+        if mode == PREFILL or opt_name in ctx.saved:
+            entry.insert(0, default_text(opt_name, ctx.saved))
         rule_entries[label] = entry
 
     # ---- 额外规则：组标题 + 按钮条（都左对齐） + 滚动容器 ----

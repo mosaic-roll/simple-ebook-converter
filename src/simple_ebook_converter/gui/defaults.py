@@ -7,6 +7,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from ..core.options import OPTIONS, option_default
 from .constants import ALIGN_LABELS
 
@@ -16,20 +19,29 @@ _OPTION_BY_NAME = {opt.name: opt for opt in OPTIONS}
 _ALIGN_LABEL_BY_VALUE = {value: label for label, value in ALIGN_LABELS.items()}
 
 
-def default_text(name: str) -> str:
-    """core 里某个选项的默认值，转成输入框能直接显示的文本。
+def default_text(name: str, saved: Mapping[str, Any] | None = None) -> str:
+    """某个选项的初始文本：存档里有就用存档值，否则 core 的默认值。
 
     `Config` 里可能是 int（如 `max_title_len`）、`None`（如 `cover`），统一转成字符串；
     `None` 当空串。未知选项名抛 `KeyError`。
+
+    传 `saved`（配置文件内容）时优先取存档值——这是「启动时读配置」的入口；
+    「恢复默认」要的是 core 默认值，调用时不传 `saved`。
     """
+    if saved is not None and name in saved:
+        value = saved[name]
+        return "" if value is None else str(value)
     value = option_default(_OPTION_BY_NAME[name])
     return "" if value is None else str(value)
 
 
-def default_align_label(name: str) -> str:
-    """core 的对齐默认值 → 选项菜单里的中文标签。
+def default_align_label(name: str, saved: Mapping[str, Any] | None = None) -> str:
+    """对齐菜单的初始中文标签：存档值非法时退回 core 默认值。
 
     菜单存中文、收集时换回 core 取值，所以默认值也要走中文这一侧，不能直接喂
-    `center` 这种 core 取值。
+    `center` 这种 core 取值。配置文件是用户可手改的，非法值不该让启动崩掉。
     """
-    return _ALIGN_LABEL_BY_VALUE[default_text(name)]
+    value = default_text(name, saved)
+    if value not in _ALIGN_LABEL_BY_VALUE:
+        value = default_text(name)
+    return _ALIGN_LABEL_BY_VALUE[value]

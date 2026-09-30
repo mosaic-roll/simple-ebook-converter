@@ -39,9 +39,13 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     # 默认值来自 core；启动时预填，框留空等价于用默认值（收集阶段实现）。
     # placeholder 作为提示留着：用户清空后框变空，placeholder 重新显示默认。
     p = make_group(parent, "段落", 0, ctx)
-    indent = make_field(p, 1, "缩进", ctx, default_text("indent"), col=0)
-    line_height = make_field(p, 1, "行高", ctx, default_text("line_height"), col=2)
-    para_spacing = make_field(p, 2, "段间距", ctx, default_text("para_spacing"), col=0)
+    indent = make_field(p, 1, "缩进", ctx, default_text("indent", ctx.saved), col=0)
+    line_height = make_field(
+        p, 1, "行高", ctx, default_text("line_height", ctx.saved), col=2
+    )
+    para_spacing = make_field(
+        p, 2, "段间距", ctx, default_text("para_spacing", ctx.saved), col=0
+    )
 
     # ---- 对齐方式 ----
     # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值；默认值也从 core 取
@@ -52,7 +56,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "卷",
         list(ALIGN_LABELS),
         ctx,
-        default=default_align_label("volume_align"),
+        default=default_align_label("volume_align", ctx.saved),
         col=0,
     )
     align_chapter = make_field_menu(
@@ -61,7 +65,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "章",
         list(ALIGN_LABELS),
         ctx,
-        default=default_align_label("chapter_align"),
+        default=default_align_label("chapter_align", ctx.saved),
         col=2,
     )
     align_body = make_field_menu(
@@ -70,7 +74,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "正文",
         list(ALIGN_LABELS),
         ctx,
-        default=default_align_label("body_align"),
+        default=default_align_label("body_align", ctx.saved),
         col=0,
     )
 

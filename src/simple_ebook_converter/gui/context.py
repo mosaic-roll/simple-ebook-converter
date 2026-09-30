@@ -37,6 +37,8 @@ class GuiContext:
     #: 当前目录条目列表：扁平 `dict` 列表，每项含 `raw_title` / `level` 等键；
     #: 由扫描结果或示例数据填充，规则变动时直接在此数据上预览
     toc_entries: list[dict[str, Any]] = field(default_factory=list)
+    #: 启动时从配置文件读到的用户配置（core 字段名 → 值）；表单初值的覆盖来源
+    saved: dict[str, Any] = field(default_factory=dict)
     #: 替换规则变动时触发的回调列表（app 注册，replace tab 触发）
     rules_changed: list[Callable[..., Any]] = field(default_factory=list)
 

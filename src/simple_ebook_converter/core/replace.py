@@ -19,6 +19,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 #: 替换阶段：取值 → 中文标签
 STAGES = {
@@ -68,6 +69,15 @@ def rules_from_json(text: str) -> list[Rule]:
         data = json.loads(text)
     except json.JSONDecodeError as e:
         raise ValueError(f"替换规则不是合法 JSON：{e}") from e
+    return rules_from_list(data)
+
+
+def rules_from_list(data: object) -> list[Rule]:
+    """已解析的普通结构（应为列表）→ 规则，错误消息同 `rules_from_json`。
+
+    给的是「已经是 Python 对象」的规则列表，省掉一次 `json.dumps` 往返——GUI 把规则
+    直接存进配置文件的一层数组，读回来直接喂这里。
+    """
     if not isinstance(data, list):
         raise ValueError("替换规则必须是 JSON 列表")
     rules: list[Rule] = []
@@ -128,21 +138,22 @@ def rules_from_file(path: str | Path | None) -> list[Rule]:
     return rules_from_json(text) if text.strip() else []
 
 
+def rules_to_list(rules: Iterable[Rule]) -> list[dict[str, Any]]:
+    """序列化成可再喂 `rules_from_list()` 的普通结构（`stage` / `enabled` 总是显式写出）。"""
+    return [
+        {
+            "pattern": r.pattern,
+            "replace": r.replace,
+            "stage": r.stage,
+            "enabled": r.enabled,
+        }
+        for r in rules
+    ]
+
+
 def rules_to_json(rules: Iterable[Rule]) -> str:
-    """序列化成 JSON 文本（`stage` / `enabled` 总是显式写出）。"""
-    return json.dumps(
-        [
-            {
-                "pattern": r.pattern,
-                "replace": r.replace,
-                "stage": r.stage,
-                "enabled": r.enabled,
-            }
-            for r in rules
-        ],
-        ensure_ascii=False,
-        indent=2,
-    )
+    """序列化成 JSON 文本。"""
+    return json.dumps(rules_to_list(rules), ensure_ascii=False, indent=2)
 
 
 @dataclass(frozen=True)

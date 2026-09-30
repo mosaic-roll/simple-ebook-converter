@@ -15,15 +15,19 @@ from __future__ import annotations
 
 from pathlib import Path
 from tkinter import filedialog, messagebox
+from typing import Any
 
 import customtkinter as ctk
 
 from ..core.config import DEFAULTS
 from ..core.encoding import EncodingError, read_lines
+from ..core.options import CONFIG_KINDS
 from ..core.parser import Node, walk
 from ..core.pipeline import preview_titles, scan_toc
-from . import settings_dialog, theme
+from ..core.replace import rules_from_list, rules_to_list
+from . import config, settings_dialog, theme
 from .constants import (
+    ALIGN_LABELS,
     BAR_HEIGHT_BOTTOM,
     BAR_HEIGHT_TOP,
     BAR_PADX,
@@ -47,7 +51,12 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
-from .tabs.replace import export_rules_json, import_rules_json
+from .tabs.replace import (
+    collect_rules,
+    export_rules_json,
+    fill_rules,
+    import_rules_json,
+)
 from .toc_panel import (
     SAMPLE_ENTRIES,
     entries_from_preview,
@@ -72,6 +81,18 @@ def _entries_to_nodes(entries: list[dict]) -> list[Node]:
     ]
 
 
+def _as_stored(name: str, text: str) -> Any:
+    """界面文本 → 落盘值：`int` 字段存成数字，其余存字符串。
+
+    按 `CONFIG_KINDS`（core 字段类型真源）判断，避免 JSON 里 `"indent": "2"` 这种
+    和 `Config` 类型不一致的写法。空文本对 `int` 字段返回 `None`（调用方跳过不存）。
+    """
+    if CONFIG_KINDS.get(name) is int:
+        text = text.strip()
+        return int(text) if text else None
+    return text
+
+
 #: Tab 名 → (显示文字, 构建函数)
 _TABS = (
     ("basic", "基础", basic.build),
@@ -85,7 +106,7 @@ class App(ctk.CTk):
     """主窗口。`tab_widgets` / `toc_widgets` 收着各模块交回的控件引用，
     业务逻辑接入后 `_collect_config()` 从这里读值构造 `core.config.Config`。"""
 
-    def __init__(self) -> None:
+    def __init__(self, config_dir: Path | None = None) -> None:
         super().__init__()
         self.title(WINDOW_TITLE)
         self.geometry(WINDOW_SIZE)
@@ -95,9 +116,17 @@ class App(ctk.CTk):
         ctk.set_appearance_mode("dark" if dark else "light")
         ctk.set_default_color_theme("blue")
 
+        # ---- 用户配置：启动时读一次，关闭时写一次 ----
+        self._config_dir = (
+            Path(config_dir) if config_dir is not None else config.default_dir()
+        )
+        self._saved_settings = config.load(self._config_dir)
+
         # ---- 运行时状态 ----
         self.fonts = FontManager(DEFAULT_UI_SIZE, DEFAULT_FONT_LABEL, DEFAULT_TOC_SIZE)
-        self.ctx = GuiContext(fonts=self.fonts, callbacks={})
+        self.ctx = GuiContext(
+            fonts=self.fonts, callbacks={}, saved=self._saved_settings
+        )
         self.ctx.callbacks.update(
             pick_input=self._pick_input,
             pick_output=self._pick_output,
@@ -127,10 +156,15 @@ class App(ctk.CTk):
         self._build_topbar()
         self._build_main()
         self._build_bottombar()
+        self._apply_saved_rules()
+        # 存档规则为空时 _apply_saved_rules 提前返回、不触发刷新，这里统一刷首屏一次
+        self._refresh_toc_preview()
 
         table = self.toc_widgets["table"]
         theme.apply_toc_theme(table)
         theme.apply_toc_font(table, self.fonts.family, self.fonts.toc_size)
+
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     # ---------------------------------------------------------------- 顶栏
 
@@ -192,8 +226,7 @@ class App(ctk.CTk):
 
         # 替换规则变动 → 刷新目录预览（回调链由 replace tab 触发）
         self.ctx.rules_changed.append(self._refresh_toc_preview)
-        # 注册后立即刷一次，否则首屏「替换结果」列始终为空
-        self._refresh_toc_preview()
+        # 首屏预览在 __init__ 里存档规则填好后统一刷一次，这里不刷
 
     # ---------------------------------------------------------------- 底栏
 
@@ -379,6 +412,66 @@ class App(ctk.CTk):
         table = self.toc_widgets["table"]
         table.delete(*table.get_children())
         populate_toc(table, entries)
+
+    # ------------------------------------------------------------ 配置持久化
+
+    def _apply_saved_rules(self) -> None:
+        """启动时若有存档的替换规则，重建卡片；没有就保留默认那张空卡。
+
+        这里不触发预览刷新（`fire` 传空操作 → 批量建卡、不逐卡触发），
+        由 `__init__` 末尾统一刷一次，避免首屏白刷两遍。
+        """
+        saved = self._saved_settings.get("replacements")
+        if not saved:
+            return
+        try:
+            saved_rules = rules_from_list(saved)
+        except ValueError as e:
+            self._set_status(f"配置里的替换规则无效：{e}", "error")
+            return
+        replace_tab = self.tab_widgets["replace"]
+        fill_rules(
+            replace_tab["rule_cards"],
+            saved_rules,
+            replace_tab["add_card"],
+            fire=lambda: None,
+        )
+
+    def _collect_saved(self) -> dict[str, Any]:
+        """收集要落盘的配置子集（其余项每次启动只用默认值）。
+
+        `int` 字段按类型存成数字；提示型字段（`max_title_len` / `preface_title`）
+        留空表示「用默认」，直接不写进文件，免得 JSON 里一堆空串噪音。
+        """
+        layout_tab = self.tab_widgets["layout"]
+        data: dict[str, Any] = {
+            "indent": _as_stored("indent", layout_tab["indent"].get()),
+            "line_height": layout_tab["line_height"].get(),
+            "para_spacing": layout_tab["para_spacing"].get(),
+            "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
+            "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
+            "body_align": ALIGN_LABELS[layout_tab["align_body"].get()],
+            "replacements": rules_to_list(
+                collect_rules(self.tab_widgets["replace"]["rule_cards"])
+            ),
+        }
+        rule_entries = self.tab_widgets["rules"]["rule_entries"]
+        for label, opt_name, mode in rules.BUILTIN_ROWS:
+            value = _as_stored(opt_name, rule_entries[label].get())
+            # 提示型字段空 = 用默认，跳过；预填型（卷/章/排除）空 = 用户主动清空，保留
+            if value is None or (value == "" and mode == rules.HINT):
+                continue
+            data[opt_name] = value
+        return {key: value for key, value in data.items() if value is not None}
+
+    def _on_close(self) -> None:
+        """关闭窗口前把当前配置写盘；写失败只提示，不挡关闭。"""
+        try:
+            config.save(self._config_dir, self._collect_saved())
+        except OSError as e:
+            messagebox.showwarning("配置保存失败", str(e))
+        finally:
+            self.destroy()
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""

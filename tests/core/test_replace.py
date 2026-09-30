@@ -13,8 +13,10 @@ from simple_ebook_converter.core.replace import (
     replacers_by_stage,
     rules_from_file,
     rules_from_json,
+    rules_from_list,
     rules_from_rows,
     rules_to_json,
+    rules_to_list,
 )
 
 
@@ -201,3 +203,14 @@ def test_rules_to_json_always_writes_stage():
 def test_rules_to_json_round_trips():
     rules = [Rule("a", "1", "html"), Rule("b", "2", "raw")]
     assert rules_from_json(rules_to_json(rules)) == rules
+
+
+def test_rules_to_list_equals_json_payload():
+    rules = [Rule("a", "1", "html", enabled=False), Rule("b", "2")]
+    assert rules_from_list(rules_to_list(rules)) == rules
+    assert rules_to_list(rules) == json.loads(rules_to_json(rules))
+
+
+def test_rules_from_list_rejects_non_list():
+    with pytest.raises(ValueError, match="必须是 JSON 列表"):
+        rules_from_list({"pattern": "a"})

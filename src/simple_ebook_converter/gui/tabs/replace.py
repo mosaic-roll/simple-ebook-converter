@@ -317,22 +317,32 @@ def import_rules_json(
 ) -> None:
     """从 JSON 文件加载替换规则并填充到卡片。
 
-    清空现有卡片，按 JSON 顺序创建新卡片；读不了或格式非法抛 `ValueError`。
+    读不了或格式非法抛 `ValueError`。填充细节见 `fill_rules()`。
+    """
+    from ...core.replace import rules_from_file
+
+    fill_rules(cards, rules_from_file(path), add_card, fire)
+
+
+def fill_rules(
+    cards: list[dict[str, Any]],
+    rules: list[Rule],
+    add_card=None,
+    fire=None,
+) -> None:
+    """用 `rules` 重建卡片：清空现有卡片后按顺序创建。
+
     `add_card` 由 app 层传入（build() 中定义的 _add_card 闭包），为空时仅清空。
     传了 `fire`（app 层传 build 交回的 `_fire`）时走批量模式：逐卡不触发，重建完
     统一调一次 `fire()`，避免 N 条规则触发 N 次预览刷新；不传则退回逐卡触发。
     """
-    from ...core.replace import rules_from_file
-
-    rules = rules_from_file(path)
     # 清空现有卡片
-    for card in cards:
+    for card in list(cards):
         card["frame"].destroy()
     cards.clear()
     if add_card is None:
         # 防御性分支：app 侧永远从 build() 的返回值里传 add_card，正常不会走到。
         return
-    batch = fire is not None
     immediate = fire is None  # 非批量模式：逐卡触发；批量模式攒到最后统一 fire()
     # 按规则重建卡片；没有规则时保留一张空卡方便用户立即开始编辑
     if not rules:
@@ -346,5 +356,5 @@ def import_rules_json(
                 enabled=r.enabled,
                 fire=immediate,
             )
-    if batch:
+    if fire is not None:
         fire()
