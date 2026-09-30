@@ -142,6 +142,7 @@ OPTIONS: tuple[Option, ...] = (
     Option("para_spacing", "段间距", "段间距，带单位，如 1em / 12px", "排版"),
     Option("chapter_align", "章对齐", "章标题对齐方式", "排版", choices=ALIGN_CHOICES),
     Option("volume_align", "卷对齐", "卷标题对齐方式", "排版", choices=ALIGN_CHOICES),
+    Option("body_align", "正文对齐", "正文默认对齐方式", "排版", choices=ALIGN_CHOICES),
     Option("font", "正文字体", "嵌入到书里的正文字体（ttf/otf/woff/woff2）", "排版"),
     Option(
         "css_file", "外部 CSS 文件",

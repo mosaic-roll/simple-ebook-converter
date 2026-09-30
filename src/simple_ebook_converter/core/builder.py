@@ -73,6 +73,9 @@ h1, h2, h3, h4, h5, h6 {{
 }}
 .chapter {{
   text-align: {cfg.chapter_align};
+}}
+body {{
+  text-align: {cfg.body_align};
 }}"""
     )
     # 整本书只有封面页的 body 里直接挂 section，章节页没有，所以这组结构选择器

@@ -74,6 +74,7 @@ def test_blank_is_treated_as_absent(tmp_path):
         para_spacing="",
         chapter_align="",
         volume_align="",
+        body_align="",
         preface_title="",
         out="",
         dump_css="",
@@ -85,6 +86,7 @@ def test_blank_is_treated_as_absent(tmp_path):
     assert cfg.para_spacing == DEFAULTS.para_spacing
     assert cfg.chapter_align == DEFAULTS.chapter_align
     assert cfg.volume_align == DEFAULTS.volume_align
+    assert cfg.body_align == DEFAULTS.body_align
     assert cfg.preface_title == DEFAULTS.preface_title
     assert (cfg.out, cfg.dump_css) == (None, None)
 

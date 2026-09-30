@@ -94,6 +94,7 @@ def test_css_content_applies_settings(tmp_path):
         para_spacing="0.5em",
         chapter_align="left",
         volume_align="left",
+        body_align="left",
     )
     out = _build(tmp_path, cfg=cfg)
     entries = _entries(out)
@@ -103,6 +104,7 @@ def test_css_content_applies_settings(tmp_path):
     assert "0.5em" in css
     assert ".chapter {\n  text-align: left;" in css
     assert ".volume {\n  text-align: left;" in css
+    assert "body {\n  text-align: left;" in css
 
 
 def test_build_epub_structure(tmp_path):

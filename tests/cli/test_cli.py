@@ -659,6 +659,7 @@ _SCALAR_OPTIONS = (
     "para_spacing",
     "chapter_align",
     "volume_align",
+    "body_align",
     "toc_depth",
     "toc_format",
 )

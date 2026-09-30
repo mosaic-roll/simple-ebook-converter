@@ -119,6 +119,7 @@ def test_validate_rejects_out_of_range():
         ({"indent": -1}, "段落缩进"),
         ({"chapter_align": "middle"}, "章对齐"),
         ({"volume_align": "MIDDLE"}, "卷对齐"),
+        ({"body_align": "mid"}, "正文对齐"),
         ({"date": "2024/13/05"}, "日期格式错误"),
         ({"date": "not-a-date"}, "日期格式错误"),
     ]
@@ -144,7 +145,7 @@ def test_css_file_and_css_append_are_mutually_exclusive(tmp_path):
 
 def test_align_choices_are_the_only_allowed():
     for value in ALIGN_CHOICES:
-        Config(chapter_align=value, volume_align=value).validate()
+        Config(chapter_align=value, volume_align=value, body_align=value).validate()
     assert set(ALIGN_CHOICES) == {"left", "center", "right", "justify"}
 
 
