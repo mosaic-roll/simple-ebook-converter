@@ -93,10 +93,10 @@ class Config:
 
     # 章节识别
     levels: list[LevelRule] = field(default_factory=default_levels)
-    max_title_len: int = 35
-    preface_title: str = "前言"
     #: 排除规则；行命中该正则时不作为标题。留空表示不排除任何行。
     exclude: str = DEFAULT_EXCLUDE_RE
+    max_title_len: int = 35
+    preface_title: str = "前言"
 
     # 文本处理
     clean: bool = True
