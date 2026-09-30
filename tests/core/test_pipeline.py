@@ -313,25 +313,25 @@ def test_preview_without_html_rules_shows_unescaped_text():
     """没有 html 规则时 `title_html` 只是转义结果，界面该显示未转义的 `title`。"""
     volume = _preview([Rule("第一卷", "<b>")])[1]
     assert (volume.title, volume.title_html) == ("<b> 风起", "&lt;b&gt; 风起")
-    assert volume.html_applied is False
+    assert volume.html_hit is False
 
 
 def test_preview_flags_an_html_rule_that_fired():
     chapter = _preview([Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")])[2]
     assert chapter.title == "第一章 初遇"
     assert chapter.title_html == '第<span class="num">一</span>章 初遇'
-    assert chapter.html_applied is True
+    assert chapter.html_hit is True
 
 
 def test_preview_flags_an_html_rule_that_changed_nothing():
     """替换文本与原文相同也算命中：这条规则确实作用过，界面照样标蓝。"""
     chapter = _preview([Rule("初遇", "初遇", "html")])[2]
-    assert chapter.html_applied is True
+    assert chapter.html_hit is True
 
 
 def test_preview_flags_only_the_titles_a_rule_reached():
     results = _preview([Rule("离别", "别离", "html")])
-    assert [r.html_applied for r in results] == [False, False, False, True]
+    assert [r.html_hit for r in results] == [False, False, False, True]
 
 
 def test_preview_agrees_with_what_process_writes(tmp_path):

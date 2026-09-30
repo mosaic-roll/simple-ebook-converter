@@ -141,16 +141,15 @@ def set_deleted(table: ttk.Treeview, deleted: bool) -> None:
 def entries_from_preview(results: Iterable[Any]) -> list[dict[str, Any]]:
     """`core.pipeline.preview_titles()` 的结果 → `populate_toc()` 吃的条目。
 
-    html 阶段命中过的标题：`result` 填 `title_html`（那段 HTML 源码），整行标蓝。
-    没命中就填未转义的 `title`——此时 `title_html` 只是转义结果，显示它满屏 `&amp;`
-    噪声。蓝色落在整行（`html_applied`）上，不是某一列。
+    命中过 html 规则的标题：`result` 填 `title_html`（HTML 源码），整行标蓝；没命中
+    填未转义的 `title`——那时 `title_html` 只是转义结果，显示它满屏 `&amp;` 噪声。
     """
     return [
         {
             "level": r.level,
             "raw_title": r.raw_title,
-            "result": r.title_html if r.html_applied else r.title,
-            "html_applied": r.html_applied,
+            "result": r.title_html if r.html_hit else r.title,
+            "html_hit": r.html_hit,
         }
         for r in results
     ]
@@ -160,8 +159,8 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
     """扁平目录树条目 → 表格里的层级树。
 
     每条 entry 需要 `raw_title` / `level`；`result` 缺省与 `raw_title` 相同，
-    `deleted` 为真时画删除线，`html_applied` 为真时整行标蓝（html 阶段命中过），
-    `open` 为真时默认展开。`result` / `html_applied` 由 `entries_from_preview()` 算好。
+    `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过），
+    `open` 为真时默认展开。`result` / `html_hit` 由 `entries_from_preview()` 算好。
 
     两个 tag 会叠加：一条标题既删除又被 html 规则命中时，删除线照画，颜色归删除线
     （见 `theme.apply_toc_theme()` 里两个 tag 的配置顺序）。
@@ -178,7 +177,7 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
         tags: tuple[str, ...] = ()
         if entry.get("deleted"):
             tags += (_TAG_DELETED,)
-        if entry.get("html_applied"):
+        if entry.get("html_hit"):
             tags += (_TAG_HTML,)
         if tags:
             table.item(item_id, tags=tags)

@@ -161,16 +161,16 @@ class Replacer:
         return self.apply(value)[0]
 
     def apply(self, value: str) -> tuple[str, bool]:
-        """替换并报告是否有规则真的命中（替换文本与原文相同也算命中）。
+        """依次替换，返回 (结果, 命中次数 > 0)。
 
-        命中与否取 `subn` 的替换次数，而不是比对新旧字符串：`<b>` 换成 `<b>` 文本没
-        变，规则却确实作用过，界面需要据此标出来（见 `pipeline.preview_titles`）。
+        命中看 `subn` 的次数而非文本差异：`<b>` 换成 `<b>` 文本没变也算命中，界面靠
+        这个标出被 html 规则动过的标题（见 `pipeline.preview_titles`）。
         """
-        applied = False
+        hits = 0
         for rule, pattern in zip(self.rules, self.patterns):
             value, count = pattern.subn(rule.replace, value)
-            applied = applied or count > 0
-        return value, applied
+            hits += count
+        return value, hits > 0
 
 
 def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:

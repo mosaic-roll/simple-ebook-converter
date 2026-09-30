@@ -95,7 +95,7 @@ def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
     for node in walk(tree):
         if cfg.clean:
             node.paragraphs = clean_lines(node.paragraphs)
-        result = transform_title(node, raw_replacer, html_replacer)
+        result = _transform_title(node, raw_replacer, html_replacer)
         node.title = result.title
         node.title_html = result.title_html
     return tree, stats
@@ -111,32 +111,30 @@ class TitleResult:
     title: str
     #: 转义 + `html` 阶段替换后的书页标题
     title_html: str
-    #: `html` 阶段有规则真的命中过（替换文本与原文相同也算）；界面据此把**整行**标蓝
-    html_applied: bool
+    #: `html` 阶段有过命中（哪怕替换文本与原文相同）；界面据此把**整行**标蓝
+    html_hit: bool
 
 
-def transform_title(node: Node, raw: Replacer, html: Replacer) -> TitleResult:
+def _transform_title(node: Node, raw: Replacer, html: Replacer) -> TitleResult:
     """一个标题过完整条链：raw 替换 → 转义 → html 替换。
 
-    `process()` 与 `preview_titles()` 共用这一条，预览不会跟实际生成跑偏。
+    `process()` 与 `preview_titles()` 共用这一条。两个替换器由调用方先经
+    `replacers_by_stage()` 分好（循环 N 条标题只分流一次），故不对外。
     """
-    title, _ = raw.apply(node.title)
-    title_html, applied = html.apply(escape(title))
-    return TitleResult(node.level, node.raw_title, title, title_html, applied)
+    title = raw.text(node.title)
+    title_html, hit = html.apply(escape(title))
+    return TitleResult(node.level, node.raw_title, title, title_html, hit)
 
 
 def preview_titles(tree: list[Node], replacements: Iterable[Rule]) -> list[TitleResult]:
     """整棵目录树 → 每个标题的替换结果，按文档序扁平返回（与 `walk` 同序）。
 
-    界面单独调它预览（传入阶段一扫出来的树，规则改动后重调即可），生成时 `process()`
-    自己再算一遍。纯函数，不动传入的树。
-
-    `html_applied` 为真表示这个标题被 html 规则动过，界面把**整行**染蓝并显示
-    `title_html`；没有 `html` 规则时 `title_html` 只是转义结果，显示未转义的 `title`
-    更干净。
+    界面单独调它预览（传入阶段一扫出来的树，规则改动后重调即可），纯函数不动传入的
+    树。`html_hit` 为真表示被 html 规则动过，界面把整行染蓝并显示 `title_html`；
+    没命中就显示未转义的 `title`——那时 `title_html` 只是转义结果。
     """
     raw_replacer, html_replacer = replacers_by_stage(replacements)
-    return [transform_title(node, raw_replacer, html_replacer) for node in walk(tree)]
+    return [_transform_title(node, raw_replacer, html_replacer) for node in walk(tree)]
 
 
 def read_book(cfg: Config) -> Book:
