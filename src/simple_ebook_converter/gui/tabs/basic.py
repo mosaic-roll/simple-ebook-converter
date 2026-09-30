@@ -31,9 +31,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     input_entry = make_field_btn(f, 1, "源文件", ctx, command=ctx.cb("pick_input"))
     output_entry = make_field_btn(f, 2, "目标", ctx, command=ctx.cb("pick_output"))
     # 菜单存中文，收集时用 ENCODING_LABELS 换回 codec 名（core 只认 codec 名）
-    encoding_menu = make_field_menu(
-        f, 3, "编码", list(ENCODING_LABELS), ctx, stretch=False
-    )
+    encoding_menu = make_field_menu(f, 4, "编码", list(ENCODING_LABELS), ctx)
 
     m = make_group(parent, "书籍信息", 1, ctx)
     book_title = make_field(m, 1, "书名", ctx, "书名", col=0)
