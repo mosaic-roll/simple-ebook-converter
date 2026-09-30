@@ -49,6 +49,8 @@ from .tabs.replace import export_rules_json, import_rules_json
 from .toc_panel import (
     TEST_ENTRIES,
     entries_from_preview,
+    export_toc_json,
+    import_toc_json,
     populate_toc,
 )
 from .toc_panel import build as build_toc_panel
@@ -106,6 +108,8 @@ class App(ctk.CTk):
             load_builtin_css=self._load_builtin_css,
             open_cover=self._open_cover,
             rescan_toc=self._on_scan,
+            import_toc=self._import_toc,
+            export_toc=self._export_toc,
             import_rules=self._import_rules,
             export_rules=self._export_rules,
             on_generate=self._on_generate,
@@ -244,6 +248,40 @@ class App(ctk.CTk):
 
     def _rescan_toc(self) -> None: ...
 
+    def _import_toc(self) -> None:
+        """导入目录 JSON：弹出文件选择框，加载后替换 ctx.toc_entries 并刷新预览。"""
+        from tkinter import filedialog
+
+        path = filedialog.askopenfilename(
+            title="导入目录",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            entries = import_toc_json(Path(path))
+        except (ValueError, TypeError) as e:
+            messagebox.showerror("导入失败", str(e))
+            return
+        self.ctx.toc_entries = entries
+        self._refresh_toc_preview()
+
+    def _export_toc(self) -> None:
+        """导出目录 JSON：弹出保存框，用 core.toc.to_json 序列化后写入文件。"""
+        from tkinter import filedialog
+
+        path = filedialog.asksaveasfilename(
+            title="导出目录",
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            export_toc_json(self.ctx.toc_entries, Path(path))
+        except (OSError, ValueError) as e:
+            messagebox.showerror("导出失败", str(e))
+
     def _import_rules(self) -> None:
         """导入替换规则 JSON：弹出文件选择框，加载后填充到卡片。"""
         from tkinter import filedialog
@@ -307,9 +345,15 @@ class App(ctk.CTk):
             messagebox.showerror("扫描失败", str(e))
             return
         # 把扫描结果转成扁平条目列表，供 preview_titles 和 populate_toc 使用；
-        # `line` 留给后续生成（被删条目当正文）用，`deleted` 由删除/恢复按钮改
+        # `line` / `class_name` 留给导出与后续生成用，`deleted` 由删除/恢复按钮改
         self.ctx.toc_entries = [
-            {"raw_title": n.raw_title, "level": n.level, "line": n.line, "deleted": False}
+            {
+                "raw_title": n.raw_title,
+                "level": n.level,
+                "class_name": n.class_name,
+                "line": n.line,
+                "deleted": False,
+            }
             for n in core_walk(tree)
         ]
         self._refresh_toc_preview()
@@ -337,8 +381,9 @@ class App(ctk.CTk):
         for i, entry in enumerate(entries):
             prev = old_entries[i] if i < len(old_entries) else {}
             entry["deleted"] = bool(prev.get("deleted", False))
-            if "line" in prev:
-                entry["line"] = prev["line"]
+            for key in ("line", "class_name"):
+                if key in prev:
+                    entry[key] = prev[key]
         self.ctx.toc_entries = entries
         table = self.toc_widgets["table"]
         table.delete(*table.get_children())

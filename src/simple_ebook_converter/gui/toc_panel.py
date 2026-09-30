@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from tkinter import ttk
 from typing import Any
 
@@ -65,6 +67,23 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         font=font,
         command=ctx.cb("rescan_toc"),
     ).grid(row=0, column=0, sticky="w")
+
+    right_top = ctk.CTkFrame(top, fg_color="transparent")
+    right_top.grid(row=0, column=1, sticky="e")
+    ctk.CTkButton(
+        right_top,
+        text="导入",
+        width=BTN_W_M,
+        font=font,
+        command=ctx.cb("import_toc"),
+    ).pack(side="left", padx=(0, BTN_GAP))
+    ctk.CTkButton(
+        right_top,
+        text="导出",
+        width=BTN_W_M,
+        font=font,
+        command=ctx.cb("export_toc"),
+    ).pack(side="left")
 
     table = _make_table(panel)
     populate_toc(table, TEST_ENTRIES)
@@ -225,7 +244,7 @@ def _label_row(parent: ctk.CTkFrame, label: str, font: ctk.CTkFont) -> ctk.CTkFr
     return row
 
 
-    # 启动时用测试数据填充目录表（真实数据来自扫描，此表会被覆盖）。
+# 启动时用测试数据填充目录表（真实数据来自扫描，此表会被覆盖）。
 # 命名不加下划线前缀，因为跨模块导入使用。
 TEST_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第一卷 起源", "level": 2, "open": True},
@@ -235,3 +254,73 @@ TEST_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第二卷 风暴", "level": 2, "open": True},
     {"raw_title": "第三章 重逢", "level": 3},
 )
+
+
+def export_toc_json(entries: list[dict], path: Path) -> None:
+    """导出目录 JSON：由 entries 重建 Node 后调 `core.toc.to_json` 序列化。
+
+    格式与 `--toc-only --toc-format json` 完全一致（raw_title / level /
+    class_name / line，`deleted` 为真时才写）。条目缺行号（未扫描）时报 ValueError。
+    """
+    from ..core.parser import Node
+    from ..core.toc import to_json
+
+    nodes = [
+        Node(
+            title=str(e.get("raw_title", "")),
+            raw_title=str(e.get("raw_title", "")),
+            level=int(e.get("level", 0)),
+            class_name=str(e.get("class_name", "")),
+            line=int(e.get("line", 0)),
+            deleted=bool(e.get("deleted", False)),
+        )
+        for e in entries
+    ]
+    if any(n.line < 1 for n in nodes):
+        raise ValueError("目录条目缺少行号，请先「重新扫描」再导出")
+    depth = max((n.level for n in nodes), default=6)
+    data = to_json(nodes, depth=depth)
+    Path(path).write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def import_toc_json(path: Path) -> list[dict]:
+    """从 JSON 文件加载目录条目（与 `to_json` 导出一致），返回扁平条目列表。
+
+    只做读取与字段校验，不挂树、不切正文——界面要的是 raw_title / level /
+    class_name / line / deleted，生成阶段再由 core 从这些条目重建。
+    读不了、不是列表或字段非法时抛 `ValueError`。
+    """
+    from ..core.toc import load_toc
+
+    data = load_toc(path)
+    entries: list[dict] = []
+    for i, item in enumerate(data, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"第 {i} 个条目不是 JSON 对象")
+        title = item.get("raw_title")
+        level = item.get("level")
+        line = item.get("line")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError(f"第 {i} 个条目缺少标题（raw_title）")
+        if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
+            raise ValueError(f"第 {i} 个条目的层级不合法：{level!r}")
+        if not isinstance(line, int) or isinstance(line, bool) or line < 1:
+            raise ValueError(f"第 {i} 个条目的行号不合法：{line!r}")
+        class_name = item.get("class_name", "")
+        if not isinstance(class_name, str):
+            raise ValueError(f"第 {i} 个条目的 class_name 不合法：{class_name!r}")
+        deleted = item.get("deleted", False)
+        if not isinstance(deleted, bool):
+            raise ValueError(f"第 {i} 个条目的 deleted 只能是 true/false")
+        entries.append(
+            {
+                "raw_title": title.strip(),
+                "level": level,
+                "class_name": class_name,
+                "line": line,
+                "deleted": deleted,
+            }
+        )
+    return entries
