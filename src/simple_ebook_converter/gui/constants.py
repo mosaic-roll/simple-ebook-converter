@@ -107,8 +107,6 @@ ENCODING_LABELS: dict[str, str] = {
     "日文 CP932（微软扩展）": "cp932",
     "日文 Shift_JIS（标准）": "shift_jis",
 }
-#: 语言下拉的取值：EPUB 3 的 `dc:language` 用 BCP 47 / ISO 639-1，所以日文是 `ja`
-#: 而不是 `jp`（`jp` 是日本的地区代码）。跟 core 的 `Config.language` 同一套。
 LANGUAGES = ["zh", "en", "ja"]
 TOC_DEPTHS = [str(i) for i in range(1, 7)]
 

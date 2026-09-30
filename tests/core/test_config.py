@@ -170,10 +170,6 @@ def test_align_choices_are_the_only_allowed():
 
 
 def test_volume_align_defaults_to_center():
-    """卷默认居中，和 GUI「卷」那一栏的默认项一致。
-
-    两边默认值不一样时，用户在界面看到的和 CLI 直接跑出来的排版会有差。
-    """
     assert DEFAULTS.volume_align == "center"
     assert DEFAULTS.chapter_align == "center"
 
