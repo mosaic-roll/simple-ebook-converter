@@ -6,6 +6,7 @@ CTk 控件的配色由 `ctk.set_appearance_mode()` 管，不需要这里插手�
 
 from __future__ import annotations
 
+from tkinter import font as tkfont
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -21,8 +22,9 @@ from .constants import (
 _STYLE_NAME = "Toc.Treeview"
 _HEADING_STYLE = f"{_STYLE_NAME}.Heading"
 
-# 目录表格行高派生：ttk 的 rowheight 是像素，不随字号线性缩放，给个下限兜底
-ROW_EXTRA = 16
+# 目录表格行高 = 字体实际像素高 + 上下留白。ttk 的 rowheight 只认像素，而字号是 pt，
+# 两者不能直接相加；量字体实际高度才能对上（见 apply_toc_font）。
+ROW_EXTRA = 8
 ROW_MIN = 24
 
 
@@ -70,12 +72,17 @@ def apply_toc_theme(toc_table: ttk.Treeview) -> None:
 
 
 def apply_toc_font(toc_table: ttk.Treeview, family: str, size: int) -> None:
-    """把界面字体族名/字号套到目录表格上（设置窗应用、主题切换时调用）。"""
+    """把界面字体族名/字号套到目录表格上（设置窗应用、主题切换时调用）。
+
+    行高量字体的实际像素高，不拿 pt 直接加常数：`rowheight` 只认像素，字号却是 pt，
+    两者相加在 150% 缩放下会明显偏小（pt→px 的换算 Tk 自己按 `tk scaling` 做）。
+    """
+    linespace = tkfont.Font(family=family, size=size).metrics("linespace")
     style = ttk.Style()
     style.configure(
         _STYLE_NAME,
         font=(family, size),
-        rowheight=max(size + ROW_EXTRA, ROW_MIN),
+        rowheight=max(linespace + ROW_EXTRA, ROW_MIN),
     )
     style.configure(_HEADING_STYLE, font=(family, size))
     toc_table.tag_configure(TAG_DELETED, font=(family, size, "overstrike"))
