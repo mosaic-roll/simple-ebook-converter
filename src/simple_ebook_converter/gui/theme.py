@@ -76,6 +76,10 @@ def apply_toc_font(toc_table: ttk.Treeview, family: str, size: int) -> None:
 
     行高量字体的实际像素高，不拿 pt 直接加常数：`rowheight` 只认像素，字号却是 pt，
     两者相加在 150% 缩放下会明显偏小（pt→px 的换算 Tk 自己按 `tk scaling` 做）。
+
+    已知边界：这里只在调用时算一次，运行中显示器缩放比变了不会重算（拖到另一块不同
+    DPI 的屏幕时行框偏小）。CTk 会自动跟着变，但它的回调不覆盖 ttk。真要支持就自己挂
+    DPI 变化监听再调一次本函数——目前没有这个使用场景，先不写。
     """
     linespace = tkfont.Font(family=family, size=size).metrics("linespace")
     style = ttk.Style()
