@@ -148,6 +148,32 @@ def test_preface_built(tmp_path):
     assert any("preface.xhtml" in n for n in names)
 
 
+def test_preface_and_fallback_use_h3(tmp_path):
+    """前言/兜底单章（level 0）按章级渲染 h3；h1 留给书名（文字封面页）。"""
+    cfg = Config(input=tmp_path / "novel.txt")
+    tree, _ = parse(
+        ["开篇语", "第1章 一", "正文"],
+        cfg.levels,
+        preface_title="前言",
+        fallback_title="x",
+    )
+    out = tmp_path / "out.epub"
+    build_epub(cfg, tree, build_css(cfg), out)
+    with zipfile.ZipFile(out) as z:
+        page = z.read("EPUB/text/preface.xhtml").decode("utf-8")
+    assert '<h3 class="preface">前言</h3>' in page
+    assert "<h1" not in page
+
+    # 整篇无标题：兜底单章同样 h3（anchor 也是 preface）
+    fb_tree, _ = parse(["正文一", "正文二"], cfg.levels, fallback_title="书名")
+    fb_out = tmp_path / "fb.epub"
+    build_epub(cfg, fb_tree, build_css(cfg), fb_out)
+    with zipfile.ZipFile(fb_out) as z:
+        fb_page = z.read("EPUB/text/preface.xhtml").decode("utf-8")
+    assert '<h3 class="chapter">书名</h3>' in fb_page
+    assert "<h1" not in fb_page
+
+
 def test_cover_packaged(tmp_path):
     cover = tmp_path / "c.png"
     cover.write_bytes(b"\x89PNG\r\n\x1a\nfake")

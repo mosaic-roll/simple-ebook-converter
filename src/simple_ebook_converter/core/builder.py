@@ -244,7 +244,9 @@ def _render_page(root: Node) -> str:
 
 
 def _heading(node: Node, *, with_id: bool) -> str:
-    level = max(1, node.level)
+    # 前言/兜底单章（level 0）没有标题行，按「章」渲染成 h3；h1 归一保留给书名，
+    # 只在文字封面页出现。level 1~6 照常映射 h1~h6。
+    level = node.level if node.level > 0 else 3
     # `title_html` 是 `process()` 转义并跑完 html 阶段替换的结果；没有时按原文转义。
     title = node.title_html or escape(node.title)
     # class 省略的层级（`--level h2:…`）不加 class，直接落到 `hN` 标签选择器上。
