@@ -285,7 +285,7 @@ class App(ctk.CTk):
         """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。
 
         收集逻辑收在 `tabs.replace.collect_rules()` 里（§5.3），此处只负责刷新。
-        刷新前保存展开状态，刷新后恢复，避免用户手动展开的节点全部折叠。
+        所有节点默认展开（无主键，按标题恢复不可靠）。
         """
         from .tabs.replace import collect_rules
 
@@ -298,23 +298,8 @@ class App(ctk.CTk):
             messagebox.showerror("预览失败", str(e))
             return
         table = self.toc_widgets["table"]
-        # 保存展开状态：按标题文本作 key（标题在目录中唯一，足以标识节点）
-        opened_titles: set[str] = set()
-        def _collect_opened(pid: str = "") -> None:
-            for cid in table.get_children(pid):
-                title = table.item(cid, "values")[0]
-                if table.item(cid, "open"):
-                    opened_titles.add(title)
-                _collect_opened(cid)
-        _collect_opened()
         table.delete(*table.get_children())
         populate_toc(table, entries_from_preview(results))
-        # 恢复展开状态
-        for title in opened_titles:
-            for cid in table.get_children():
-                if table.item(cid, "values")[0] == title:
-                    table.item(cid, open=True)
-                    break
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""

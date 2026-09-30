@@ -191,12 +191,10 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
         while stack and stack[-1][0] >= level:
             stack.pop()
         parent = stack[-1][1] if stack else ""
-        item_id = table.insert(parent, "end", values=(title, result))
+        item_id = table.insert(parent, "end", values=(title, result), open=True)
         tags = _tags_for(bool(entry.get("deleted")), bool(entry.get("html_hit")))
         if tags:
             table.item(item_id, tags=tags)
-        if entry.get("open"):
-            table.item(item_id, open=True)
         stack.append((level, item_id))
 
 
