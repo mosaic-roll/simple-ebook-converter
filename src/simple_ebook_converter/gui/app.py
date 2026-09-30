@@ -45,14 +45,20 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
-from .toc_panel import (
-    _TEST_ENTRIES,
-    entries_from_preview,
-    populate_toc,
-    preview_entries,
-)
 from .toc_panel import build as build_toc_panel
+from .toc_panel import entries_from_preview, populate_toc
 from .utils import open_with_default_app
+
+
+#: 扁平条目列表 → `preview_titles` 需要的 `list[Node]`
+def _entries_to_nodes(entries: list[dict]) -> list:
+    from ..core.parser import Node
+
+    return [
+        Node(title=str(e.get("raw_title", "")), raw_title=str(e.get("raw_title", "")), level=int(e.get("level", 0)))
+        for e in entries
+    ]
+
 
 #: Tab 名 → (显示文字, 构建函数)
 _TABS = (
@@ -166,6 +172,18 @@ class App(ctk.CTk):
 
         self.toc_widgets = build_toc_panel(self.main, self.ctx)
 
+        # 初始化目录条目：用测试数据填充，等真实扫描后再替换
+        from ..gui.toc_panel import _TEST_ENTRIES
+
+        self.ctx.toc_entries = [
+            {"raw_title": e["raw_title"], "level": e["level"]}
+            for e in _TEST_ENTRIES
+        ]
+        self.toc_widgets["table"].delete(*self.toc_widgets["table"].get_children())
+        from .toc_panel import populate_toc
+
+        populate_toc(self.toc_widgets["table"], _TEST_ENTRIES)
+
         # 替换规则变动 → 刷新目录预览（ctx._on_rules_changed 由 replace tab 触发）
         self.ctx._on_rules_changed.append(self._refresh_toc_preview)
 
@@ -233,18 +251,19 @@ class App(ctk.CTk):
     def _on_generate(self) -> None: ...
 
     def _on_scan(self) -> None:
-        """扫描输入文件，把扫描结果缓存到 `ctx.scan_result`，然后触发目录预览刷新。
+        """扫描输入文件，更新 `ctx.toc_entries`，然后触发目录预览刷新。
 
         目前 `ctx.config` 为空（TODO），先用 core 的 `DEFAULTS` 作为参数模板，等
         收集阶段接上后再换成用户表单的实际值。
         """
         from ..core.config import DEFAULTS
+        from ..core.parser import walk as core_walk
 
         input_path = self.tab_widgets["basic"]["input_entry"].get().strip()
         if not input_path:
             return
         try:
-            lines, encoding = read_lines(input_path)
+            lines, _encoding = read_lines(input_path)
         except OSError as e:
             messagebox.showerror("读取失败", f"无法读取输入文件：{e}")
             return
@@ -252,15 +271,19 @@ class App(ctk.CTk):
             messagebox.showerror("编码错误", str(e))
             return
         try:
-            tree, stats = scan_toc(lines, DEFAULTS)
+            tree, _stats = scan_toc(lines, DEFAULTS)
         except ValueError as e:
             messagebox.showerror("扫描失败", str(e))
             return
-        self.ctx.scan_result = (tree, lines, encoding, stats)
+        # 把扫描结果转成扁平条目列表，供 preview_titles 和 populate_toc 使用
+        self.ctx.toc_entries = [
+            {"raw_title": n.raw_title, "level": n.level}
+            for n in core_walk(tree)
+        ]
         self._refresh_toc_preview()
 
     def _refresh_toc_preview(self) -> None:
-        """用当前替换规则对已扫描的目录树（或测试条目）做预览，刷新右侧表格。"""
+        """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。"""
         cards = self.tab_widgets["replace"]["rule_cards"]
         rules_list = rules_from_rows(
             [
@@ -273,31 +296,19 @@ class App(ctk.CTk):
                 if card["pattern_entry"].get()
             ]
         )
-        result = self.ctx.scan_result
-        if result is not None:
-            tree = result[0]
-            try:
-                results = preview_titles(tree, rules_list)
-            except ValueError as e:
-                messagebox.showerror("预览失败", str(e))
-                return
-            except Exception as e:  # noqa: BLE001
-                messagebox.showerror("预览失败", str(e))
-                return
-            entries = entries_from_preview(results)
-        else:
-            # 还没扫描文件：用测试数据做预览，让用户能看到规则效果
-            try:
-                entries = preview_entries(_TEST_ENTRIES, rules_list)
-            except ValueError as e:
-                messagebox.showerror("预览失败", str(e))
-                return
-            except Exception as e:  # noqa: BLE001
-                messagebox.showerror("预览失败", str(e))
-                return
+        try:
+            results = preview_titles(
+                _entries_to_nodes(self.ctx.toc_entries), rules_list
+            )
+        except ValueError as e:
+            messagebox.showerror("预览失败", str(e))
+            return
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("预览失败", str(e))
+            return
         table = self.toc_widgets["table"]
         table.delete(*table.get_children())
-        populate_toc(table, entries)
+        populate_toc(table, entries_from_preview(results))
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""
