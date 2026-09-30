@@ -76,6 +76,9 @@ class App(ctk.CTk):
             pick_output=self._pick_output,
             pick_cover=self._pick_cover,
             pick_font=self._pick_font,
+            pick_css=self._pick_css,
+            clear_css=self._clear_css,
+            load_builtin_css=self._load_builtin_css,
             open_cover=self._open_cover,
             rescan_toc=self._rescan_toc,
             import_toc=self._import_toc,
@@ -198,6 +201,12 @@ class App(ctk.CTk):
     def _pick_cover(self) -> None: ...
 
     def _pick_font(self) -> None: ...
+
+    def _pick_css(self) -> None: ...
+
+    def _clear_css(self) -> None: ...
+
+    def _load_builtin_css(self) -> None: ...
 
     def _rescan_toc(self) -> None: ...
 

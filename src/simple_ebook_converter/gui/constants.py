@@ -88,9 +88,35 @@ ALIGN_LABELS = {
 }
 HEADINGS = ["h1", "h2", "h3", "h4", "h5", "h6"]
 STAGES = ["原文", "HTML"]
-ENCODINGS = ["auto", "utf-8", "gb18030", "big5", "shift_jis", "euc_jp"]
+
+#: 编码预设：显示名 -> Python codec 名（收集时用 `.get(显示名, 显示名)` 换回值，同 `ALIGN_LABELS`）。
+#: 显示用大家习惯的叫法，存值必须是 codec 名。
+#: 标签长度不影响控件宽度——CTkOptionMenu 的自然宽度固定（约 210px），`width` 选项对它
+#: 无效；下拉菜单按这个宽度画，所以标签写长一点正好把空白填掉，别为了"窄"砍描述。
+#: cp932 与 shift_jis 是两个 codec（前者是微软扩展，多解一批 NEC/IBM 字符），两个都列，
+#: 才选得到。跟 core 的 `FALLBACK_ENCODINGS` **不是一回事**：
+#: 那是探测失败时的回退顺序（策略），这是给人挑的常用选项（界面），不用 import core。
+#: **这张表不是白名单**：它只管显示，列表外的编码照样能用——core 的 `validate()` 只查
+#: `codecs.lookup()` 解不解析得开，解得开就放行；解不开才报错。所以 chardet 报的、
+#: 用户自己填的 codec 名都能继续走，只是界面显示不出对应的中文标签。
+ENCODING_LABELS: dict[str, str] = {
+    "自动探测": "auto",
+    "UTF-8": "utf-8",
+    "简体中文 GB18030": "gb18030",
+    "繁体中文 Big5": "big5",
+    "日文 CP932（微软扩展）": "cp932",
+    "日文 Shift_JIS（标准）": "shift_jis",
+    "日文 EUC-JP": "euc_jp",
+}
 LANGUAGES = ["zh", "en", "jp"]
 TOC_DEPTHS = [str(i) for i in range(1, 7)]
+
+#: 目录表的 ttk tag 名。`theme.py` 按这三个名字配色、`toc_panel.py` 按同三个名字挂载，
+#: 只写一份。「既删除又命中 html」单独一个 tag，是为了删线和变色能同时看见，
+#: 不去赌 Tk 多 tag 时哪个的颜色生效。
+TAG_DELETED = "deleted"
+TAG_HTML = "html"
+TAG_HTML_DELETED = "html_deleted"
 
 # ==========================================================================
 # 字号

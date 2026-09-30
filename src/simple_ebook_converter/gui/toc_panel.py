@@ -19,6 +19,9 @@ from .constants import (
     GAP,
     GROUP_PADX,
     OPTION_W_S,
+    TAG_DELETED,
+    TAG_HTML,
+    TAG_HTML_DELETED,
     TOC_DEPTHS,
 )
 from .context import GuiContext
@@ -31,8 +34,6 @@ RESULT_WIDTH = 150
 TABLE_HEIGHT = 16
 
 _STYLE_NAME = "Toc.Treeview"
-_TAG_DELETED = "deleted"
-_TAG_HTML = "html"
 
 _CORNER_RADIUS = 4
 _PADX_LABEL = 12
@@ -127,15 +128,34 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     }
 
 
-def set_deleted(table: ttk.Treeview, deleted: bool) -> None:
-    """给选中条目加/去删除线标记。
+def _tags_for(deleted: bool, html_hit: bool) -> tuple[str, ...]:
+    """一个条目最终该挂哪些 tag。
 
-    删除**不是**从列表里移除：原标题要留着显示删除线，组装时正文自动并入上文、
-    子章节自动合并（见 CLI 设计「目录树 JSON 与 --toc-file」的编辑语义）。
+    删除优先：既被标记删除又命中 html 规则时走 `TAG_HTML_DELETED`（灰字 + 删除线），
+    蓝色等恢复后才回来。用第三个 tag 而不是让 `TAG_DELETED` / `TAG_HTML` 抢前景色，
+    不依赖 Tk 的多 tag 优先级。
     """
-    tags = (_TAG_DELETED,) if deleted else ()
+    if deleted and html_hit:
+        return (TAG_HTML_DELETED,)
+    if deleted:
+        return (TAG_DELETED,)
+    if html_hit:
+        return (TAG_HTML,)
+    return ()
+
+
+def set_deleted(table: ttk.Treeview, deleted: bool) -> None:
+    """给选中的条目打/去删除线。
+
+    删除**不删**正文也不把条目从树上摘下来，原样留着显示删除线，装配时再自动融合到
+    前一条（和 CLI 的「目录树 JSON → --toc-file」那条路一样）。
+
+    这里读—改—写而不是直接覆盖 `tags`：覆盖会把 html 命中的蓝色一起抹掉。
+    """
     for item_id in table.selection():
-        table.item(item_id, tags=tags)
+        current = set(table.item(item_id, "tags") or ())
+        html_hit = bool(current & {TAG_HTML, TAG_HTML_DELETED})
+        table.item(item_id, tags=_tags_for(deleted, html_hit))
 
 
 def entries_from_preview(results: Iterable[Any]) -> list[dict[str, Any]]:
@@ -162,8 +182,7 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
     `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过），
     `open` 为真时默认展开。`result` / `html_hit` 由 `entries_from_preview()` 算好。
 
-    两个 tag 会叠加：一条标题既删除又被 html 规则命中时，删除线照画，颜色归删除线
-    （见 `theme.apply_toc_theme()` 里两个 tag 的配置顺序）。
+    tag 由 `_tags_for()` 统一算：删除优先，既删除又命中时灰字带删除线，蓝色等恢复后回来。
     """
     stack: list[tuple[int, str]] = []  # (level, item_id)，栈顶是当前父节点
     for entry in entries:
@@ -174,11 +193,7 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
             stack.pop()
         parent = stack[-1][1] if stack else ""
         item_id = table.insert(parent, "end", values=(title, result))
-        tags: tuple[str, ...] = ()
-        if entry.get("deleted"):
-            tags += (_TAG_DELETED,)
-        if entry.get("html_hit"):
-            tags += (_TAG_HTML,)
+        tags = _tags_for(bool(entry.get("deleted")), bool(entry.get("html_hit")))
         if tags:
             table.item(item_id, tags=tags)
         if entry.get("open"):

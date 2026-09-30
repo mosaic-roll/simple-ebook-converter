@@ -10,12 +10,16 @@ from tkinter import ttk
 
 import customtkinter as ctk
 
-from .constants import THEME_DARK, THEME_LIGHT
+from .constants import (
+    TAG_DELETED,
+    TAG_HTML,
+    TAG_HTML_DELETED,
+    THEME_DARK,
+    THEME_LIGHT,
+)
 
 _STYLE_NAME = "Toc.Treeview"
 _HEADING_STYLE = f"{_STYLE_NAME}.Heading"
-_TAG_DELETED = "deleted"
-_TAG_HTML = "html"
 
 # 目录表格行高派生：ttk 的 rowheight 是像素，不随字号线性缩放，给个下限兜底
 ROW_EXTRA = 16
@@ -56,9 +60,12 @@ def apply_toc_theme(toc_table: ttk.Treeview) -> None:
         foreground=[("!active", palette["head_fg"]), ("active", palette["head_fg"])],
     )
     # html 阶段命中过的标题：整行染蓝（tag 是 item 级的，所有列一起）
-    toc_table.tag_configure(_TAG_HTML, foreground=palette["html_fg"])
-    # 删除线在后配置：一条标题既被删除又被 html 规则命中时，灰字删除线优先于蓝色
-    toc_table.tag_configure(_TAG_DELETED, foreground=palette["del_fg"])
+    toc_table.tag_configure(TAG_HTML, foreground=palette["html_fg"])
+    # 删除线由 apply_toc_font() 挂，这里只管字色
+    toc_table.tag_configure(TAG_DELETED, foreground=palette["del_fg"])
+    # 「既删除又命中 html」单独一个 tag：删除优先，灰字 + 删除线，蓝色等恢复后才回来。
+    # 单独一个 tag 就不用赌 Tk 里多个 tag 哪个的前景色生效
+    toc_table.tag_configure(TAG_HTML_DELETED, foreground=palette["del_fg"])
     toc_table.update_idletasks()
 
 
@@ -71,4 +78,5 @@ def apply_toc_font(toc_table: ttk.Treeview, family: str, size: int) -> None:
         rowheight=max(size + ROW_EXTRA, ROW_MIN),
     )
     style.configure(_HEADING_STYLE, font=(family, size))
-    toc_table.tag_configure(_TAG_DELETED, font=(family, size, "overstrike"))
+    toc_table.tag_configure(TAG_DELETED, font=(family, size, "overstrike"))
+    toc_table.tag_configure(TAG_HTML_DELETED, font=(family, size, "overstrike"))

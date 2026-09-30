@@ -151,8 +151,13 @@ def make_field_menu(
     ctx: GuiContext,
     default: str | None = None,
     col: int = 0,
+    stretch: bool = True,
 ) -> ctk.CTkOptionMenu:
-    """一行：标签 + 只能选的选项菜单。"""
+    """一行：标签 + 只能选的选项菜单。
+
+    `stretch=False` 就不跟着格子撑满（`sticky="w"`）。CTkOptionMenu 的自然宽度固定，
+    选项多或标签长的话撑满格子会留一大片空白，这时关掉撑满更好看。
+    """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="w", font=font).grid(
         row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
@@ -165,5 +170,11 @@ def make_field_menu(
         dropdown_font=font,
     )
     menu.set(default if default is not None else values[0])
-    menu.grid(row=r, column=col + 1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
+    menu.grid(
+        row=r,
+        column=col + 1,
+        padx=FIELD_PADX,
+        pady=ROW_PADY,
+        sticky="ew" if stretch else "w",
+    )
     return menu
