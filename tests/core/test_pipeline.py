@@ -10,6 +10,7 @@ import pytest
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
 from simple_ebook_converter.core.parser import NoEnabledRulesError, walk
 from simple_ebook_converter.core.pipeline import (
+    preview_titles,
     process,
     read_book,
     resolve,
@@ -274,6 +275,72 @@ def test_stages_apply_independently_in_one_pass(tmp_path):
     # html 阶段不改纯文本标题，只改书页标题
     assert volume.children[1].title == "第二章 离别"
     assert volume.children[1].title_html == "第二章 别离"
+
+
+# ---------- 预览：界面单独跑一遍标题替换 ----------
+
+
+def _preview(replacements=()):
+    tree, _ = scan_toc(SAMPLE, Config())
+    return preview_titles(tree, list(replacements))
+
+
+def test_preview_lists_every_title_in_document_order():
+    results = _preview()
+    assert [(r.level, r.raw_title) for r in results] == [
+        (0, "前言"),
+        (2, "第一卷 风起"),
+        (3, "第一章 初遇"),
+        (3, "第二章 离别"),
+    ]
+
+
+def test_preview_leaves_the_scanned_tree_untouched():
+    """预览是纯函数：生成阶段还要拿这棵树自己再算一遍。"""
+    tree, _ = scan_toc(SAMPLE, Config())
+    preview_titles(tree, [Rule("风起", "起风")])
+    assert tree[1].title == "第一卷 风起"
+    assert tree[1].title_html == ""
+
+
+def test_preview_applies_the_raw_stage():
+    volume = _preview([Rule("风起", "起风")])[1]
+    assert volume.title == "第一卷 起风"
+    assert volume.raw_title == "第一卷 风起"
+
+
+def test_preview_without_html_rules_shows_unescaped_text():
+    """没有 html 规则时 `title_html` 只是转义结果，界面该显示未转义的 `title`。"""
+    volume = _preview([Rule("第一卷", "<b>")])[1]
+    assert (volume.title, volume.title_html) == ("<b> 风起", "&lt;b&gt; 风起")
+    assert volume.html_applied is False
+
+
+def test_preview_flags_an_html_rule_that_fired():
+    chapter = _preview([Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")])[2]
+    assert chapter.title == "第一章 初遇"
+    assert chapter.title_html == '第<span class="num">一</span>章 初遇'
+    assert chapter.html_applied is True
+
+
+def test_preview_flags_an_html_rule_that_changed_nothing():
+    """替换文本与原文相同也算命中：这条规则确实作用过，界面照样标蓝。"""
+    chapter = _preview([Rule("初遇", "初遇", "html")])[2]
+    assert chapter.html_applied is True
+
+
+def test_preview_flags_only_the_titles_a_rule_reached():
+    results = _preview([Rule("离别", "别离", "html")])
+    assert [r.html_applied for r in results] == [False, False, False, True]
+
+
+def test_preview_agrees_with_what_process_writes(tmp_path):
+    """预览与生成走同一条链，同一份规则下结果必须一致。"""
+    replacements = [Rule("风起", "起风"), Rule("离别", "<i>别离</i>", "html")]
+    tree, _ = process(SAMPLE, _cfg(tmp_path, replacements=replacements))
+    results = preview_titles(scan_toc(SAMPLE, Config())[0], replacements)
+    for node, result in zip(walk(tree), results):
+        assert (result.title, result.title_html) == (node.title, node.title_html)
 
 
 # ---------- 目录 ----------

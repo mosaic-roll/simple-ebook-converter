@@ -148,6 +148,7 @@ THEME_DARK = {
     "sel_bg": "#1f538d",
     "sel_fg": "#ffffff",
     "del_fg": "#8a8a8a",
+    "html_fg": "#4a9eff",
 }
 
 THEME_LIGHT = {
@@ -159,6 +160,7 @@ THEME_LIGHT = {
     "sel_bg": "#3b8ed0",
     "sel_fg": "#ffffff",
     "del_fg": "gray60",
+    "html_fg": "#1668c4",
 }
 
 #: 主题切换分段按钮的取值

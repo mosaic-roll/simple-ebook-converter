@@ -33,6 +33,33 @@ def test_empty_replacer_is_identity():
     assert Replacer.of([]).text("原样") == "原样"
 
 
+def test_apply_reports_a_hit():
+    assert Replacer.of([Rule("起", "起风")]).apply("风起") == ("风起风", True)
+
+
+def test_apply_reports_a_miss():
+    assert Replacer.of([Rule("起", "起风")]).apply("云散") == ("云散", False)
+
+
+def test_apply_counts_a_hit_that_changes_nothing():
+    """替换文本与原文相同也算命中：规则确实作用过，界面要标出来。"""
+    assert Replacer.of([Rule("<b>", "<b>")]).apply("<b>") == ("<b>", True)
+
+
+def test_apply_reports_a_hit_from_any_rule_in_the_chain():
+    replacer = Replacer.of([Rule("无", "有"), Rule("云", "风")])
+    assert replacer.apply("云散") == ("风散", True)
+
+
+def test_apply_on_empty_replacer_is_a_miss():
+    assert Replacer.of([]).apply("原样") == ("原样", False)
+
+
+def test_text_is_the_apply_result_without_the_flag():
+    replacer = Replacer.of([Rule("起", "起风")])
+    assert replacer.text("风起") == replacer.apply("风起")[0]
+
+
 # ---------- 阶段 ----------
 
 

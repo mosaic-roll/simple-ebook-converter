@@ -15,6 +15,7 @@ from .constants import THEME_DARK, THEME_LIGHT
 _STYLE_NAME = "Toc.Treeview"
 _HEADING_STYLE = f"{_STYLE_NAME}.Heading"
 _TAG_DELETED = "deleted"
+_TAG_HTML = "html"
 
 # 目录表格行高派生：ttk 的 rowheight 是像素，不随字号线性缩放，给个下限兜底
 ROW_EXTRA = 16
@@ -54,6 +55,9 @@ def apply_toc_theme(toc_table: ttk.Treeview) -> None:
         background=[("!active", palette["head_bg"]), ("active", palette["head_bg"])],
         foreground=[("!active", palette["head_fg"]), ("active", palette["head_fg"])],
     )
+    # html 阶段命中过的标题：整行染蓝（tag 是 item 级的，所有列一起）
+    toc_table.tag_configure(_TAG_HTML, foreground=palette["html_fg"])
+    # 删除线在后配置：一条标题既被删除又被 html 规则命中时，灰字删除线优先于蓝色
     toc_table.tag_configure(_TAG_DELETED, foreground=palette["del_fg"])
     toc_table.update_idletasks()
 

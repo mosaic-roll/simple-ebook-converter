@@ -158,9 +158,19 @@ class Replacer:
         return cls(rules, tuple(re.compile(r.pattern) for r in rules))
 
     def text(self, value: str) -> str:
+        return self.apply(value)[0]
+
+    def apply(self, value: str) -> tuple[str, bool]:
+        """替换并报告是否有规则真的命中（替换文本与原文相同也算命中）。
+
+        命中与否取 `subn` 的替换次数，而不是比对新旧字符串：`<b>` 换成 `<b>` 文本没
+        变，规则却确实作用过，界面需要据此标出来（见 `pipeline.preview_titles`）。
+        """
+        applied = False
         for rule, pattern in zip(self.rules, self.patterns):
-            value = pattern.sub(rule.replace, value)
-        return value
+            value, count = pattern.subn(rule.replace, value)
+            applied = applied or count > 0
+        return value, applied
 
 
 def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
