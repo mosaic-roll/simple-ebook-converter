@@ -17,7 +17,8 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
-from ..core.pipeline import preview_titles
+from ..core.encoding import EncodingError, read_lines
+from ..core.pipeline import preview_titles, scan_toc
 from ..core.replace import rules_from_rows
 from . import settings_dialog, theme
 from .constants import (
@@ -233,24 +234,21 @@ class App(ctk.CTk):
         收集阶段接上后再换成用户表单的实际值。
         """
         from ..core.config import DEFAULTS
-        from ..core.pipeline import scan_toc
 
         input_path = self.tab_widgets["basic"]["input_entry"].get().strip()
         if not input_path:
             return
         try:
-            from ..core.encoding import read_lines
-
             lines, encoding = read_lines(input_path)
         except OSError as e:
             messagebox.showerror("读取失败", f"无法读取输入文件：{e}")
             return
-        except Exception as e:  # noqa: BLE001
+        except EncodingError as e:
             messagebox.showerror("编码错误", str(e))
             return
         try:
             tree, stats = scan_toc(lines, DEFAULTS)
-        except Exception as e:  # noqa: BLE001
+        except ValueError as e:
             messagebox.showerror("扫描失败", str(e))
             return
         self.ctx.scan_result = (tree, lines, encoding, stats)
@@ -279,6 +277,10 @@ class App(ctk.CTk):
         )
         try:
             results = preview_titles(tree, rules_list)
+        except ValueError as e:
+            # rules_from_rows 会校验正则和阶段名，非法时抛 ValueError
+            messagebox.showerror("预览失败", str(e))
+            return
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("预览失败", str(e))
             return

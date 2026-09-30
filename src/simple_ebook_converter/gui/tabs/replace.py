@@ -56,12 +56,12 @@ def build(
 
     rule_cards: list[dict[str, Any]] = []
     # 持有对 ctx 的闭包引用；ctx._on_rules_changed 由 app 层注册，这里是触发方。
-    _callbacks = (
+    _triggers = (
         list(ctx._on_rules_changed) if on_rules_changed is None else [on_rules_changed]
     )
 
     def _fire() -> None:
-        for cb in _callbacks:
+        for cb in _triggers:
             try:
                 cb()
             except Exception:  # noqa: BLE001, S110
@@ -215,7 +215,9 @@ def _make_card(
     )
     replace_entry.grid(row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
 
-    # 用户编辑完规则、移开焦点时刷新目录预览，避免打字过程中频繁重算
+    # 用户编辑完规则、移开焦点时刷新目录预览，避免打字过程中频繁重算。
+    # 注意：CTkEntry 不暴露 public 焦点追踪 API（bindtags 拦截了 <FocusOut>），
+    # 只能直接操作底层 tkinter Entry；CTk 升级后 _entry 实现若变更需同步调整。
     pattern_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
     replace_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
 
