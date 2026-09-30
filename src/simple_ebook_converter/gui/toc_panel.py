@@ -86,7 +86,8 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).pack(side="left")
 
     table = _make_table(panel)
-    populate_toc(table, TEST_ENTRIES)
+    # 不在这里填初始数据：面板建好后由 app 负责（ctx.toc_entries → _refresh_toc_preview），
+    # 在此填充只会被立即覆盖一次。
     apply_toc_font(table, ctx.fonts.family, ctx.fonts.toc_size)
 
     bottom = ctk.CTkFrame(panel, fg_color="transparent")
@@ -183,8 +184,8 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
     """扁平目录树条目 → 表格里的层级树。
 
     每条 entry 需要 `raw_title` / `level`；`result` 默认与 `raw_title` 相同，
-    `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过），
-    `open` 为真时默认展开。`result` / `html_hit` 由 `entries_from_preview()` 算好。
+    `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过）。
+    `result` / `html_hit` 由 `entries_from_preview()` 算好。
 
     item 的 iid 用条目下标，`set_deleted()` 靠它把删除标记写回对应 entry。
     tag 由 `_tags_for()` 统一算：删除优先，既删除又命中时灰字带删除线，蓝色等恢复后回来。
@@ -197,6 +198,8 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
         while stack and stack[-1][0] >= level:
             stack.pop()
         parent = stack[-1][1] if stack else ""
+        # 全部默认展开：每次刷新重建整棵树，保留展开态需要额外状态；
+        # 目录通常几十条，全展开比记住用户折叠了哪几节更简单。
         item_id = table.insert(
             parent, "end", iid=str(index), values=(title, result), open=True
         )
@@ -244,9 +247,9 @@ def _label_row(parent: ctk.CTkFrame, label: str, font: ctk.CTkFont) -> ctk.CTkFr
     return row
 
 
-# 启动时用测试数据填充目录表（真实数据来自扫描，此表会被覆盖）。
+# 面板初始展示的示例目录（真实数据来自扫描，app 启动时会立即用它覆盖此表）。
 # 命名不加下划线前缀，因为跨模块导入使用。
-TEST_ENTRIES: tuple[dict[str, Any], ...] = (
+SAMPLE_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第一卷 起源", "level": 2},
     {"raw_title": "第一章 开端", "level": 3},
     {"raw_title": "第二章 离别", "level": 3},

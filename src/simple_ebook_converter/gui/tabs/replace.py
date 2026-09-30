@@ -85,6 +85,7 @@ def build(
                 traceback.print_exc()
 
     def add_rule() -> None:
+        """用户点「添加规则」按钮：追加一张空卡片。"""
         _add_card()
 
     # 供 import_rules_json() 复用：不依赖 build 闭包直接建卡片。
@@ -329,11 +330,13 @@ def import_rules_json(
         card["frame"].destroy()
     cards.clear()
     if add_card is None:
+        # 防御性分支：app 侧永远从 build() 的返回值里传 add_card，正常不会走到。
         return
     batch = fire is not None
+    immediate = fire is None  # 非批量模式：逐卡触发；批量模式攒到最后统一 fire()
     # 按规则重建卡片；没有规则时保留一张空卡方便用户立即开始编辑
     if not rules:
-        add_card(fire=not batch)
+        add_card(fire=immediate)
     else:
         for r in rules:
             add_card(
@@ -341,7 +344,7 @@ def import_rules_json(
                 replace=r.replace,
                 stage=r.stage_label,
                 enabled=r.enabled,
-                fire=not batch,
+                fire=immediate,
             )
     if batch:
         fire()

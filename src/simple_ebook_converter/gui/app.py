@@ -14,12 +14,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from ..core.config import DEFAULTS
 from ..core.encoding import EncodingError, read_lines
-from ..core.parser import Node
+from ..core.parser import Node, walk
 from ..core.pipeline import preview_titles, scan_toc
 from . import settings_dialog, theme
 from .constants import (
@@ -48,7 +49,7 @@ from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
 from .tabs.replace import export_rules_json, import_rules_json
 from .toc_panel import (
-    TEST_ENTRIES,
+    SAMPLE_ENTRIES,
     entries_from_preview,
     export_toc_json,
     import_toc_json,
@@ -183,10 +184,10 @@ class App(ctk.CTk):
 
         self.toc_widgets = build_toc_panel(self.main, self.ctx)
 
-        # 初始化目录条目：用测试数据填充，等真实扫描后再替换
+        # 初始化目录条目：用示例数据填充，等真实扫描后再替换
         self.ctx.toc_entries = [
             {"raw_title": e["raw_title"], "level": e["level"], "deleted": False}
-            for e in TEST_ENTRIES
+            for e in SAMPLE_ENTRIES
         ]
 
         # 替换规则变动 → 刷新目录预览（回调链由 replace tab 触发）
@@ -247,8 +248,6 @@ class App(ctk.CTk):
 
     def _import_toc(self) -> None:
         """导入目录 JSON：弹出文件选择框，加载后替换 ctx.toc_entries 并刷新预览。"""
-        from tkinter import filedialog
-
         path = filedialog.askopenfilename(
             title="导入目录",
             filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
@@ -265,8 +264,6 @@ class App(ctk.CTk):
 
     def _export_toc(self) -> None:
         """导出目录 JSON：弹出保存框，用 core.toc.to_json 序列化后写入文件。"""
-        from tkinter import filedialog
-
         path = filedialog.asksaveasfilename(
             title="导出目录",
             defaultextension=".json",
@@ -281,8 +278,6 @@ class App(ctk.CTk):
 
     def _import_rules(self) -> None:
         """导入替换规则 JSON：弹出文件选择框，加载后填充到卡片。"""
-        from tkinter import filedialog
-
         path = filedialog.askopenfilename(
             title="导入替换规则",
             filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
@@ -301,8 +296,6 @@ class App(ctk.CTk):
 
     def _export_rules(self) -> None:
         """导出替换规则 JSON：弹出保存框，将当前规则写入文件。"""
-        from tkinter import filedialog
-
         path = filedialog.asksaveasfilename(
             title="导出替换规则",
             defaultextension=".json",
@@ -323,9 +316,6 @@ class App(ctk.CTk):
         目前 `ctx.config` 为空（TODO），先用 core 的 `DEFAULTS` 作为参数模板，等
         收集阶段接上后再换成用户表单的实际值。
         """
-        from ..core.config import DEFAULTS
-        from ..core.parser import walk as core_walk
-
         input_path = self.tab_widgets["basic"]["input_entry"].get().strip()
         if not input_path:
             return
@@ -352,7 +342,7 @@ class App(ctk.CTk):
                 "line": n.line,
                 "deleted": False,
             }
-            for n in core_walk(tree)
+            for n in walk(tree)
         ]
         self._refresh_toc_preview()
 
@@ -362,7 +352,8 @@ class App(ctk.CTk):
         收集逻辑收在 `tabs.replace.collect_rules()` 里，此处只负责刷新。
         预览条目与 `toc_entries` 文档序一一对应，按序号把用户手标的 `deleted` 与扫描
         得到的 `line` 带过来——否则每次规则变动重建表格都会把删除线抹掉。
-        所有节点默认展开（无主键，按标题恢复不可靠）。
+        所有节点默认展开：每次刷新重建整棵树，保留展开态需要额外状态；目录通常几十条，
+        全展开比记住用户折叠了哪几节更简单。
 
         保持纯函数语义：无论谁调用、规则是否真的变了，都无条件执行一次。
         「规则是否变了」的判断由 replace tab 的 `_fire()` 在触发点完成，
