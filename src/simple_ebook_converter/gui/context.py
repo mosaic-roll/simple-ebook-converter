@@ -24,6 +24,9 @@ class GuiContext:
     - `fonts`：共享字体实例与字号/字体族状态
     - `callbacks`：名字 → 无参可调用，由 app 层注册；Tab 用 `ctx.cb()` 取
     - `config` / `pipeline`：接 core 后的扩展位，现在留空
+    - `scan_result`：`scan_toc()` 的结果缓存；`preview_titles()` 需要它，规则变动时
+      不用再重扫
+    - `_on_rules_changed`：替换规则列表变动时的回调链（由 app 注册）
     """
 
     fonts: FontManager
@@ -32,6 +35,10 @@ class GuiContext:
     config: Any | None = None
     #: TODO: 接 core 后填 core.pipeline 模块引用（扫描 / 预览 / 生成）
     pipeline: Any | None = None
+    #: scan_toc() 的产物缓存：(tree, lines, encoding, stats)；None 表示还没扫
+    scan_result: tuple[Any, list[str], str, Any] | None = None
+    #: 替换规则变动时触发的回调列表（app 注册，replace tab 触发）
+    _on_rules_changed: list[Callable[..., Any]] = field(default_factory=list)
 
     def cb(self, name: str) -> Callable[..., Any]:
         """取回调；没注册就返回空实现。Tab 里统一走这里，不写 `lambda: None`。"""

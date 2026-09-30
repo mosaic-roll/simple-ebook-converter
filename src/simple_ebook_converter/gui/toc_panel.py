@@ -85,7 +85,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).pack(side="left")
 
     table = _make_table(panel)
-
     populate_toc(table, _TEST_ENTRIES)
     apply_toc_font(table, ctx.fonts.family, ctx.fonts.toc_size)
 

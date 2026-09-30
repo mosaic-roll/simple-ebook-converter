@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from typing import Any
 
 import customtkinter as ctk
@@ -30,10 +31,16 @@ CARD_PADY = (0, 6)
 _STAGE_DEFAULT = STAGES[0]
 
 
-def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
+def build(
+    parent: ctk.CTkFrame,
+    ctx: GuiContext,
+    *,
+    on_rules_changed: Callable[[], None] | None = None,
+) -> dict:
     """构建替换 Tab，返回控件引用。
 
     `rule_cards` 是活列表：增删卡片时它就地变更，app 层拿到的就是同一个对象。
+    变动时触发 `on_rules_changed`（若提供），app 侧用它刷新目录预览。
     """
     font = ctx.fonts.base
     parent.grid_columnconfigure(0, weight=1)
@@ -48,11 +55,25 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     holder.grid_columnconfigure(0, weight=1)
 
     rule_cards: list[dict[str, Any]] = []
+    # 持有对 ctx 的闭包引用；ctx._on_rules_changed 由 app 层注册，这里是触发方。
+    _callbacks = (
+        list(ctx._on_rules_changed) if on_rules_changed is None else [on_rules_changed]
+    )
+
+    def _fire() -> None:
+        for cb in _callbacks:
+            try:
+                cb()
+            except Exception:  # noqa: BLE001, S110
+                pass  # app 侧的刷新逻辑出错不应阻断卡片操作
 
     def add_rule() -> None:
-        card = _make_card(holder, ctx, on_move=_move_rule, on_remove=_remove_rule)
+        card = _make_card(
+            holder, ctx, on_move=_move_rule, on_remove=_remove_rule, on_change=_fire
+        )
         rule_cards.append(card)
         _relayout(rule_cards)
+        _fire()
 
     def _move_rule(card: dict[str, Any], delta: int) -> None:
         if card not in rule_cards:
@@ -62,12 +83,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         if 0 <= j < len(rule_cards):
             rule_cards[i], rule_cards[j] = rule_cards[j], rule_cards[i]
             _relayout(rule_cards)
+            _fire()
 
     def _remove_rule(card: dict[str, Any]) -> None:
         if card in rule_cards:
             rule_cards.remove(card)
             card["frame"].destroy()
             _relayout(rule_cards)
+            _fire()
 
     add_rule()
 
@@ -124,6 +147,7 @@ def _make_card(
     ctx: GuiContext,
     on_move: Any,
     on_remove: Any,
+    on_change: Callable[[], None] | None = None,
 ) -> dict[str, Any]:
     """一张规则卡片。返回各控件引用，供 `collect_rules()` 读值。"""
     font = ctx.fonts.base
@@ -149,6 +173,7 @@ def _make_card(
         anchor="center",
         font=font,
         dropdown_font=font,
+        command=lambda _: on_change(),
     )
     stage_menu.set(_STAGE_DEFAULT)
     stage_menu.pack(side="left", padx=(0, 6))
@@ -189,6 +214,10 @@ def _make_card(
         font=font,
     )
     replace_entry.grid(row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
+
+    # 用户编辑完规则、移开焦点时刷新目录预览，避免打字过程中频繁重算
+    pattern_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
+    replace_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
 
     ref.update(
         frame=card,

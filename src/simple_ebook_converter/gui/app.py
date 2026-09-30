@@ -17,6 +17,8 @@ from tkinter import messagebox
 
 import customtkinter as ctk
 
+from ..core.pipeline import preview_titles
+from ..core.replace import rules_from_rows
 from . import settings_dialog, theme
 from .constants import (
     BAR_HEIGHT_BOTTOM,
@@ -43,6 +45,7 @@ from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
 from .toc_panel import build as build_toc_panel
+from .toc_panel import entries_from_preview, populate_toc
 from .utils import open_with_default_app
 
 #: Tab 名 → (显示文字, 构建函数)
@@ -157,6 +160,9 @@ class App(ctk.CTk):
 
         self.toc_widgets = build_toc_panel(self.main, self.ctx)
 
+        # 替换规则变动 → 刷新目录预览（ctx._on_rules_changed 由 replace tab 触发）
+        self.ctx._on_rules_changed.append(self._refresh_toc_preview)
+
     # ---------------------------------------------------------------- 底栏
 
     def _build_bottombar(self) -> None:
@@ -219,6 +225,67 @@ class App(ctk.CTk):
     def _export_rules(self) -> None: ...
 
     def _on_generate(self) -> None: ...
+
+    def _on_scan(self) -> None:
+        """扫描输入文件，把扫描结果缓存到 `ctx.scan_result`，然后触发目录预览刷新。
+
+        目前 `ctx.config` 为空（TODO），先用 core 的 `DEFAULTS` 作为参数模板，等
+        收集阶段接上后再换成用户表单的实际值。
+        """
+        from ..core.config import DEFAULTS
+        from ..core.pipeline import scan_toc
+
+        input_path = self.tab_widgets["basic"]["input_entry"].get().strip()
+        if not input_path:
+            return
+        try:
+            from ..core.encoding import read_lines
+
+            lines, encoding = read_lines(input_path)
+        except OSError as e:
+            messagebox.showerror("读取失败", f"无法读取输入文件：{e}")
+            return
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("编码错误", str(e))
+            return
+        try:
+            tree, stats = scan_toc(lines, DEFAULTS)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("扫描失败", str(e))
+            return
+        self.ctx.scan_result = (tree, lines, encoding, stats)
+        self._refresh_toc_preview()
+
+    def _refresh_toc_preview(self) -> None:
+        """用当前替换规则对已扫描的目录树做预览，刷新右侧表格。
+
+        还没扫过文件时什么都不做（保留现有内容 / 占位数据）。
+        """
+        result = self.ctx.scan_result
+        if result is None:
+            return
+        tree = result[0]
+        cards = self.tab_widgets["replace"]["rule_cards"]
+        rules_list = rules_from_rows(
+            [
+                (
+                    card["pattern_entry"].get(),
+                    card["replace_entry"].get(),
+                    card["stage_menu"].get(),
+                )
+                for card in cards
+                if card["pattern_entry"].get()
+            ]
+        )
+        try:
+            results = preview_titles(tree, rules_list)
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("预览失败", str(e))
+            return
+        entries = entries_from_preview(results)
+        table = self.toc_widgets["table"]
+        table.delete(*table.get_children())
+        populate_toc(table, entries)
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""
