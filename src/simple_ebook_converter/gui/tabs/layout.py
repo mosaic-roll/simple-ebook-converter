@@ -51,7 +51,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         al, 1, "章", list(ALIGN_LABELS), ctx, default="居中", col=2
     )
     align_body = make_field_menu(
-        al, 2, "正文", list(ALIGN_LABELS), ctx, default="两端对齐", col=2
+        al, 2, "正文", list(ALIGN_LABELS), ctx, default="两端对齐", col=0
     )
 
     # ---- 嵌入字体 ----
