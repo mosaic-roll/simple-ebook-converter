@@ -352,6 +352,20 @@ def test_preview_agrees_with_what_process_writes(tmp_path):
         assert (result.title, result.title_html) == (node.title, node.title_html)
 
 
+def test_title_replacement_is_idempotent(tmp_path):
+    """对已 process 过的同一棵树再预览，title / title_html 不再变化。
+
+    raw 阶段读 `raw_title`（原文），重复跑只作用一次。这里特意选「换完仍匹配」的
+    规则（`第` → `第X`），若哪天改回读 `node.title`，第二次会叠加成 `第XX…`，
+    这条测试立刻失败。
+    """
+    replacements = [Rule("第", "第X"), Rule("初遇", "<i>初遇</i>", "html")]
+    tree, _ = process(SAMPLE, _cfg(tmp_path, replacements=replacements))
+    results = preview_titles(tree, replacements)  # 注意：传入的是已处理的树
+    for node, result in zip(walk(tree), results):
+        assert (result.title, result.title_html) == (node.title, node.title_html)
+
+
 # ---------- 目录 ----------
 
 
