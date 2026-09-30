@@ -70,7 +70,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
             _relayout(rule_cards)
 
     add_rule()
-    add_rule()
 
     ctk.CTkButton(
         top,
