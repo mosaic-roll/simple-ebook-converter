@@ -169,6 +169,15 @@ def test_align_choices_are_the_only_allowed():
     assert set(ALIGN_CHOICES) == {"left", "center", "right", "justify"}
 
 
+def test_volume_align_defaults_to_center():
+    """卷默认居中，和 GUI「卷」那一栏的默认项一致。
+
+    两边默认值不一样时，用户在界面看到的和 CLI 直接跑出来的排版会有差。
+    """
+    assert DEFAULTS.volume_align == "center"
+    assert DEFAULTS.chapter_align == "center"
+
+
 def test_book_title_falls_back_to_stem_then_constant(tmp_path):
     assert Config(title="书名", input=tmp_path / "x.txt").book_title == "书名"
     assert Config(input=tmp_path / "我的小说.txt").book_title == "我的小说"

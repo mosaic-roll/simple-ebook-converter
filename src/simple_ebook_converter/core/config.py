@@ -114,7 +114,7 @@ class Config:
     line_height: str = "1.5"
     para_spacing: str = "1em"
     chapter_align: str = "center"
-    volume_align: str = "right"
+    volume_align: str = "center"
     body_align: str = "justify"
     font: Path | None = None
     #: 整份替代内置样式（与 `css_append` 互斥）
