@@ -368,9 +368,9 @@ def test_image_cover_wins_over_text_cover(tmp_path):
 
 def test_cover_css_rules_present():
     css = build_css(Config())
-    assert "body > section" in css
-    assert "body > section img" in css
-    assert "body > section p" in css
+    assert ".cover" in css
+    assert ".cover img" in css
+    assert ".cover p" in css
 
 
 def test_css_file_replaces_builtin(tmp_path):
@@ -380,7 +380,7 @@ def test_css_file_replaces_builtin(tmp_path):
     css = build_css(Config(input=tmp_path / "novel.txt", css_file=extra))
     assert css == "body { color: red; }"
     assert "text-indent" not in css  # 内置正文样式没有混进来
-    assert "body > section" not in css  # 内置封面样式也没了
+    assert ".cover" not in css  # 内置封面样式也没了
 
 
 def test_builtin_css_is_unaffected_by_css_file(tmp_path):
@@ -394,7 +394,7 @@ def test_builtin_css_is_unaffected_by_css_file(tmp_path):
 def test_css_append_adds_to_builtin(tmp_path):
     """`--css-append` 加在内置样式之后，所以能覆盖内置规则。"""
     extra = tmp_path / "extra.css"
-    extra.write_text("body > section h1 { color: red; }", encoding="utf-8")
+    extra.write_text(".cover h1 { color: red; }", encoding="utf-8")
     cfg = Config(input=tmp_path / "novel.txt", css_append=extra)
     css = build_css(cfg)
     assert css.index("color: red;") > css.index("max-height: 100vh;")  # 追加在内置之后
@@ -432,11 +432,12 @@ def test_cover_section_type_is_epub_standard():
 
 
 def test_image_body_uses_standard_cover_section():
+    """封面用标准语义角色 + 显式 class="cover"，不自造 class。"""
     body = image_cover_body("images/cover.png", alt="书名")
-    assert body.startswith('<section epub:type="cover">')
+    assert body.startswith('<section class="cover" epub:type="cover">')
     assert '<img src="images/cover.png" alt="书名"/>' in body
     assert body.rstrip().endswith("</section>")
-    assert "class=" not in body
+    assert 'class="cover"' in body
 
 
 def test_image_body_escapes_src_and_alt():
@@ -448,11 +449,11 @@ def test_image_body_escapes_src_and_alt():
 
 def test_text_body_title_and_author():
     body = text_cover_body("书名", "作者")
-    assert '<section epub:type="cover">' in body
+    assert '<section class="cover" epub:type="cover">' in body
     assert "<h1>书名</h1>" in body
     assert "<p>作者</p>" in body
     assert "<img" not in body
-    assert "class=" not in body
+    assert 'class="cover"' in body
 
 
 def test_text_body_omits_missing_parts():
@@ -461,7 +462,7 @@ def test_text_body_omits_missing_parts():
 
 
 def test_text_body_empty_still_valid_section():
-    assert text_cover_body("", "") == '<section epub:type="cover">\n</section>'
+    assert text_cover_body("", "") == '<section class="cover" epub:type="cover">\n</section>'
 
 
 def test_text_body_escapes_markup():

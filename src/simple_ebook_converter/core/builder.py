@@ -76,22 +76,23 @@ h1, h2, h3, h4, h5, h6 {{
 }}"""
     )
     # 整本书只有封面页的 body 里直接挂 section，章节页没有，所以这组结构选择器
-    # 只命中封面页。不用 epub|type 属性选择器：各家阅读器对它的支持并不一致。
+    # 只命中封面页。不用 epub|type 属性选择器：各家阅读器对它的支持并不一致；
+    # 加 class="cover" 让 CSS 意图更明确。
     css.append(
-        """body > section {
+        """.cover {
   margin: 0;
   text-align: center;
 }
-body > section h1 {
+.cover h1 {
   margin: 2em 0 0.5em;
   font-size: 2em;
   text-indent: 0;
 }
-body > section p {
+.cover p {
   margin: 0;
   text-indent: 0;
 }
-body > section img {
+.cover img {
   display: block;
   margin: 0 auto;
   max-width: 100%;
@@ -109,9 +110,9 @@ def _read_css(path: Path) -> str:
 
 
 def image_cover_body(image_name: str, alt: str = "封面") -> str:
-    """图片封面页的 body 片段：一个指向封面图的 cover section。"""
+    """图片封面页的 body 片段：一个带 class="cover" 的封面容器。"""
     return (
-        f'<section epub:type="{COVER_SECTION_TYPE}">\n'
+        f'<section class="cover" epub:type="{COVER_SECTION_TYPE}">\n'
         f'  <img src="{escape(image_name)}" alt="{escape(alt)}"/>\n'
         "</section>"
     )
@@ -122,7 +123,7 @@ def text_cover_body(title: str, author: str = "") -> str:
 
     用 `h1` / `p` 而不是自定义 class——这一页的标题层级与署名段落本身就是那个意思。
     """
-    parts = [f'<section epub:type="{COVER_SECTION_TYPE}">']
+    parts = [f'<section class="cover" epub:type="{COVER_SECTION_TYPE}">']
     if title:
         parts.append(f"  <h1>{escape(title)}</h1>")
     if author:
