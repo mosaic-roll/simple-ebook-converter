@@ -1,6 +1,8 @@
 """规则 Tab：内置层级正则 + 额外层级行。
 
-内置层级只是预填项：整条正则可编辑，恢复默认时回填 `DEFAULTS` 里的原值。
+内置层级的默认值统一取自 core 的 `option_default()`（唯一真源，界面不手抄正则或字面
+量）。卷/章是长正则，启动时直接填进框；字数上限/无标题章节的默认值放进 placeholder，
+框留空即表示用默认值。「恢复默认」回填的也是同一处。
 
 额外层级行没有选中态：添加就是往末尾加一行，删除就是去掉最后一行，行号不会
 出现空洞，所以每次只需要摆好新行那一行。行数多了在滚动容器里上下滚。默认 hN
@@ -21,10 +23,22 @@ from ..constants import (
     OPTION_W_S,
 )
 from ..context import GuiContext
+from ..defaults import default_text
 from ..widgets import make_field_btn, make_group
 
-#: 预置行标签 → DEFAULTS 的键；TODO: 接 core 后由 core.config.DEFAULTS 补全
-BUILTIN_ROWS = ("卷", "章", "排除", "字数上限", "无标题章节")
+#: 预置行取值方式：`PREFILL` 启动时把默认值填进框（卷/章是长正则，placeholder 放不下）；
+#: `HINT` 框留空、placeholder 显示默认值，留空即表示用默认值（字数/前言的默认值很短）。
+PREFILL = "prefill"
+HINT = "hint"
+
+#: 预置行：(标签, core 选项名, 取值方式)。默认值一律走 core 的 `option_default()`。
+BUILTIN_ROWS: tuple[tuple[str, str, str], ...] = (
+    ("卷", "volume", PREFILL),
+    ("章", "chapter", PREFILL),
+    ("排除", "exclude", PREFILL),  # core 默认就是空，等于不填
+    ("字数上限", "max_title_len", HINT),
+    ("无标题章节", "preface_title", HINT),
+)
 
 #: 额外层级的默认 hN：第 1~3 行分别预填 h4/h5/h6，之后新增的行都 h6
 EXTRA_LEVEL_DEFAULTS = ("h4", "h5", "h6")
@@ -46,16 +60,21 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     b = make_group(parent, "基础规则", 0, ctx)
 
     rule_entries: dict[str, ctk.CTkEntry] = {}
+    row_defaults: dict[str, str] = {}
 
     def restore_default(label: str) -> None:
-        # TODO: 接 core 后回填 core.config.option_default(<该行的键>) 而不是清空
+        """回填该行的 core 默认值——「恢复默认」不是清空。"""
         entry = rule_entries.get(label)
-        if entry is not None:
-            entry.delete(0, "end")
+        if entry is None:
+            return
+        entry.delete(0, "end")
+        entry.insert(0, row_defaults.get(label, ""))
 
     # row=0 组标题，字段从 row=1 起
-    for i, label in enumerate(BUILTIN_ROWS, start=1):
-        rule_entries[label] = make_field_btn(
+    for i, (label, opt_name, mode) in enumerate(BUILTIN_ROWS, start=1):
+        text = default_text(opt_name)
+        row_defaults[label] = text
+        entry = make_field_btn(
             b,
             i,
             label,
@@ -63,7 +82,11 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
             command=lambda lbl=label: restore_default(lbl),
             btn_text="恢复默认",
             btn_width=BTN_W_L,
+            placeholder=text if mode == HINT else "",
         )
+        if mode == PREFILL:
+            entry.insert(0, text)
+        rule_entries[label] = entry
 
     # ---- 额外规则：组标题 + 按钮条（都左对齐） + 滚动容器 ----
     a = make_group(parent, "额外规则", 1, ctx)

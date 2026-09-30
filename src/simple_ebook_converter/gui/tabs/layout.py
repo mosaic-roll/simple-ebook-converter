@@ -19,6 +19,7 @@ from ..constants import (
     SEG_PADY,
 )
 from ..context import GuiContext
+from ..defaults import default_align_label, default_text
 from ..widgets import make_field, make_field_btn, make_field_menu, make_group
 
 #: CSS 模式取值 → core 侧对应项：追加=`--css-append`，覆盖=`--css-file`
@@ -35,22 +36,41 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     font = ctx.fonts.base
 
     # ---- 段落 ----
+    # 默认值来自 core，放在 placeholder 里：框留空即表示用默认值
     p = make_group(parent, "段落", 0, ctx)
-    indent = make_field(p, 1, "缩进", ctx, "2", col=0)
-    line_height = make_field(p, 1, "行高", ctx, "1.5", col=2)
-    para_spacing = make_field(p, 2, "段间距", ctx, "1em", col=0)
+    indent = make_field(p, 1, "缩进", ctx, default_text("indent"), col=0)
+    line_height = make_field(p, 1, "行高", ctx, default_text("line_height"), col=2)
+    para_spacing = make_field(p, 2, "段间距", ctx, default_text("para_spacing"), col=0)
 
     # ---- 对齐方式 ----
-    # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值
+    # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值；默认值也从 core 取
     al = make_group(parent, "对齐方式", 1, ctx)
     align_volume = make_field_menu(
-        al, 1, "卷", list(ALIGN_LABELS), ctx, default="居中", col=0
+        al,
+        1,
+        "卷",
+        list(ALIGN_LABELS),
+        ctx,
+        default=default_align_label("volume_align"),
+        col=0,
     )
     align_chapter = make_field_menu(
-        al, 1, "章", list(ALIGN_LABELS), ctx, default="居中", col=2
+        al,
+        1,
+        "章",
+        list(ALIGN_LABELS),
+        ctx,
+        default=default_align_label("chapter_align"),
+        col=2,
     )
     align_body = make_field_menu(
-        al, 2, "正文", list(ALIGN_LABELS), ctx, default="两端对齐", col=0
+        al,
+        2,
+        "正文",
+        list(ALIGN_LABELS),
+        ctx,
+        default=default_align_label("body_align"),
+        col=0,
     )
 
     # ---- 嵌入字体 ----
