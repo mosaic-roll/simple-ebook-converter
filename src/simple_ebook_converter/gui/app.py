@@ -19,6 +19,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from ..core.encoding import EncodingError, read_lines
+from ..core.parser import Node
 from ..core.pipeline import preview_titles, scan_toc
 from . import settings_dialog, theme
 from .constants import (
@@ -59,9 +60,7 @@ from .utils import open_with_default_app
 
 #: 扁平条目列表 → `preview_titles` 需要的 `list[Node]`（仅供预览；`line` / `deleted`
 #: 不参与标题替换预览，留给后续生成路径）
-def _entries_to_nodes(entries: list[dict]) -> list:
-    from ..core.parser import Node
-
+def _entries_to_nodes(entries: list[dict]) -> list[Node]:
     return [
         Node(
             title=str(e.get("raw_title", "")),
@@ -190,9 +189,9 @@ class App(ctk.CTk):
             for e in TEST_ENTRIES
         ]
 
-        # 替换规则变动 → 刷新目录预览（ctx._on_rules_changed 由 replace tab 触发）
-        self.ctx._on_rules_changed.append(self._refresh_toc_preview)
-        # §6.4：注册后立即刷一次，否则首屏「替换结果」列始终为空
+        # 替换规则变动 → 刷新目录预览（回调链由 replace tab 触发）
+        self.ctx.rules_changed.append(self._refresh_toc_preview)
+        # 注册后立即刷一次，否则首屏「替换结果」列始终为空
         self._refresh_toc_preview()
 
     # ---------------------------------------------------------------- 底栏
@@ -246,8 +245,6 @@ class App(ctk.CTk):
 
     def _load_builtin_css(self) -> None: ...
 
-    def _rescan_toc(self) -> None: ...
-
     def _import_toc(self) -> None:
         """导入目录 JSON：弹出文件选择框，加载后替换 ctx.toc_entries 并刷新预览。"""
         from tkinter import filedialog
@@ -297,6 +294,7 @@ class App(ctk.CTk):
                 self.tab_widgets["replace"]["rule_cards"],
                 Path(path),
                 self.tab_widgets["replace"].get("add_card"),
+                self.tab_widgets["replace"].get("fire"),
             )
         except (ValueError, TypeError) as e:
             messagebox.showerror("导入失败", str(e))
@@ -361,7 +359,7 @@ class App(ctk.CTk):
     def _refresh_toc_preview(self) -> None:
         """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。
 
-        收集逻辑收在 `tabs.replace.collect_rules()` 里（§5.3），此处只负责刷新。
+        收集逻辑收在 `tabs.replace.collect_rules()` 里，此处只负责刷新。
         预览条目与 `toc_entries` 文档序一一对应，按序号把用户手标的 `deleted` 与扫描
         得到的 `line` 带过来——否则每次规则变动重建表格都会把删除线抹掉。
         所有节点默认展开（无主键，按标题恢复不可靠）。
@@ -370,10 +368,8 @@ class App(ctk.CTk):
         「规则是否变了」的判断由 replace tab 的 `_fire()` 在触发点完成，
         app 层不掺杂缓存状态。
         """
-        from .tabs.replace import collect_rules
-
         old_entries = self.ctx.toc_entries
-        rules_list = collect_rules(self.tab_widgets["replace"]["rule_cards"])
+        rules_list = replace.collect_rules(self.tab_widgets["replace"]["rule_cards"])
         try:
             results = preview_titles(
                 _entries_to_nodes(old_entries), rules_list

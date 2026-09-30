@@ -247,11 +247,11 @@ def _label_row(parent: ctk.CTkFrame, label: str, font: ctk.CTkFont) -> ctk.CTkFr
 # 启动时用测试数据填充目录表（真实数据来自扫描，此表会被覆盖）。
 # 命名不加下划线前缀，因为跨模块导入使用。
 TEST_ENTRIES: tuple[dict[str, Any], ...] = (
-    {"raw_title": "第一卷 起源", "level": 2, "open": True},
+    {"raw_title": "第一卷 起源", "level": 2},
     {"raw_title": "第一章 开端", "level": 3},
-    {"raw_title": "第二章 离别", "level": 3, "open": True},
+    {"raw_title": "第二章 离别", "level": 3},
     {"raw_title": "第一节 清晨", "level": 4},
-    {"raw_title": "第二卷 风暴", "level": 2, "open": True},
+    {"raw_title": "第二卷 风暴", "level": 2},
     {"raw_title": "第三章 重逢", "level": 3},
 )
 

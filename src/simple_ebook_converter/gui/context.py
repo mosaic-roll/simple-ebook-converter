@@ -25,7 +25,7 @@ class GuiContext:
     - `callbacks`：名字 → 无参可调用，由 app 层注册；Tab 用 `ctx.cb()` 取
     - `config` / `pipeline`：接 core 后的扩展位，现在留空
     - `toc_entries`：当前目录条目列表（扁平 dict 列表），由扫描或测试数据填充
-    - `_on_rules_changed`：替换规则列表变动时的回调链（由 app 注册）
+    - `rules_changed`：替换规则列表变动时的回调链（由 app 注册）
     """
 
     fonts: FontManager
@@ -38,7 +38,7 @@ class GuiContext:
     #: 由扫描结果或测试数据填充，规则变动时直接在此数据上预览
     toc_entries: list[dict[str, Any]] = field(default_factory=list)
     #: 替换规则变动时触发的回调列表（app 注册，replace tab 触发）
-    _on_rules_changed: list[Callable[..., Any]] = field(default_factory=list)
+    rules_changed: list[Callable[..., Any]] = field(default_factory=list)
 
     def cb(self, name: str) -> Callable[..., Any]:
         """取回调；没注册就返回空实现。Tab 里统一走这里，不写 `lambda: None`。"""

@@ -58,8 +58,9 @@ def build(
     holder.grid_columnconfigure(0, weight=1)
 
     rule_cards: list[dict[str, Any]] = []
-    # 存引用而非值快照：app 层后续 append 的回调必须被 _fire 感知到（§4.1 根因）
-    _triggers = ctx._on_rules_changed if on_rules_changed is None else [on_rules_changed]
+    # 存引用而非值快照：app 层后续 append 的回调必须被 _fire 感知到，
+    # 因为回调链是在 build() 之后才由 app 注册的。
+    _triggers = ctx.rules_changed if on_rules_changed is None else [on_rules_changed]
     # 规则字段快照：用于在 _fire 里做「规则是否真的变了」的比较。
     # 基于 collect_rules 的输出：空 pattern 的卡片不计入，
     # 增删空卡不会误触发刷新。
@@ -91,12 +92,14 @@ def build(
         _relayout(rule_cards)
         _fire()
 
-    # 供 import_rules_json() 复用：不依赖 build 闭包直接建卡片
+    # 供 import_rules_json() 复用：不依赖 build 闭包直接建卡片。
+    # `fire=False` 用于批量导入——逐卡触发会让 N 条规则刷 N 次，攒到最后统一 fire 一次。
     def _add_card(
         pattern: str = "",
         replace: str = "",
         stage: str = "原文",
         enabled: bool = True,
+        fire: bool = True,
     ) -> dict[str, Any]:
         card = _make_card(
             holder, ctx, on_move=_move_rule, on_remove=_remove_rule, on_change=_fire
@@ -109,7 +112,8 @@ def build(
         card["enabled_var"].set(enabled)
         rule_cards.append(card)
         _relayout(rule_cards)
-        _fire()
+        if fire:
+            _fire()
         return card
 
     def _move_rule(card: dict[str, Any], delta: int) -> None:
@@ -160,6 +164,7 @@ def build(
         "rule_cards": rule_cards,
         "add_rule": add_rule,
         "add_card": _add_card,
+        "fire": _fire,
     }
 
 
@@ -308,11 +313,18 @@ def export_rules_json(cards: list[dict[str, Any]], path: Path) -> None:
     Path(path).write_text(rules_to_json(rules), encoding="utf-8")
 
 
-def import_rules_json(cards: list[dict[str, Any]], path: Path, add_card=None) -> None:
+def import_rules_json(
+    cards: list[dict[str, Any]],
+    path: Path,
+    add_card=None,
+    fire=None,
+) -> None:
     """从 JSON 文件加载替换规则并填充到卡片。
 
     清空现有卡片，按 JSON 顺序创建新卡片；读不了或格式非法抛 `ValueError`。
     `add_card` 由 app 层传入（build() 中定义的 _add_card 闭包），为空时仅清空。
+    传了 `fire`（app 层传 build 交回的 `_fire`）时走批量模式：逐卡不触发，重建完
+    统一调一次 `fire()`，避免 N 条规则触发 N 次预览刷新；不传则退回逐卡触发。
     """
     from ...core.replace import rules_from_json
 
@@ -322,16 +334,20 @@ def import_rules_json(cards: list[dict[str, Any]], path: Path, add_card=None) ->
     for card in cards:
         card["frame"].destroy()
     cards.clear()
+    if add_card is None:
+        return
+    batch = fire is not None
     # 按规则重建卡片；没有规则时保留一张空卡方便用户立即开始编辑
     if not rules:
-        if add_card:
-            add_card()
+        add_card(fire=not batch)
     else:
         for r in rules:
-            if add_card:
-                add_card(
-                    pattern=r.pattern,
-                    replace=r.replace,
-                    stage=r.stage_label,
-                    enabled=r.enabled,
-                )
+            add_card(
+                pattern=r.pattern,
+                replace=r.replace,
+                stage=r.stage_label,
+                enabled=r.enabled,
+                fire=not batch,
+            )
+    if batch:
+        fire()
