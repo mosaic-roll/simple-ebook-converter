@@ -16,19 +16,30 @@ FAMILY = "Microsoft YaHei"
 SIZES = (9, 13, 16, 20, 24)
 
 
-@pytest.fixture
-def table():
-    """建一个 Tk 根窗口和目录表格；无图形环境就跳过。"""
+@pytest.fixture(scope="module")
+def root():
+    """整个模块共用一个 Tk 根窗口；无图形环境就跳过。
+
+    用完就 `destroy()` 的话，紧跟着再建 `Tk()` 有时抛 TclError（同一进程里反复
+    销毁/重建根窗口不稳），表现为后面的用例随机 skip。共用一个更省也更稳。
+    """
     try:
-        root = tk.Tk()
+        window = tk.Tk()
     except tk.TclError:
         pytest.skip("没有图形环境")
-    root.withdraw()
+    window.withdraw()
+    yield window
+    window.destroy()
+
+
+@pytest.fixture
+def table(root):
+    """目录表格。每个用例建自己一棵，用完销毁。"""
     tree = ttk.Treeview(root, columns=("a",), show="headings", height=4)
     tree.heading("a", text="标题")
     tree.insert("", "end", values=("第一卷", "第一卷"))
     yield tree
-    root.destroy()
+    tree.destroy()
 
 
 def test_row_height_fits_font_at_every_size(table):
