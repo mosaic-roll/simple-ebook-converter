@@ -35,7 +35,7 @@ def _option(name: str) -> Option:
     return next(opt for opt in OPTIONS if opt.name == name)
 
 
-# ---------- 缺省 ----------
+# ---------- 默认 ----------
 
 
 def test_defaults_to_config_is_the_default_config(tmp_path):
@@ -126,7 +126,7 @@ def test_switches_take_positive_values(tmp_path):
 
 
 def test_switches_default_to_on(tmp_path):
-    """`--no-xxx` 关掉的是默认开启的功能，所以缺省都是 True。"""
+    """`--no-xxx` 关掉的是默认开启的功能，所以默认都是 True。"""
     cfg = _config(tmp_path)
     for name in ("overwrite", "toc_in_spine", "clean", "text_cover"):
         assert getattr(cfg, name) is True, name
@@ -343,7 +343,7 @@ def test_option_kinds_come_from_config_annotations():
 
 
 def test_option_defaults_come_from_config():
-    """选项缺省值就是 `Config` 的字段缺省值：改一处，两个前端一起变。"""
+    """选项默认值就是 `Config` 的字段默认值：改一处，两个前端一起变。"""
     for opt in OPTIONS:
         if opt.in_config:
             assert option_default(opt) == getattr(DEFAULTS, opt.name), opt.name
@@ -357,7 +357,7 @@ def test_empty_defaults_for_options_outside_config():
 
 
 def test_build_config_never_mutates_the_shared_defaults(tmp_path):
-    """`DEFAULTS` 只是缺省值模板：谁都不许改它，否则两次调用会互相污染。"""
+    """`DEFAULTS` 只是默认值模板：谁都不许改它，否则两次调用会互相污染。"""
     rules = tmp_path / "rules.json"
     rules.write_text('[{"pattern": "甲"}]', encoding="utf-8")
     before = [(r.level, r.pattern) for r in DEFAULTS.levels]

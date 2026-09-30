@@ -178,7 +178,7 @@ def entries_from_preview(results: Iterable[Any]) -> list[dict[str, Any]]:
 def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> None:
     """扁平目录树条目 → 表格里的层级树。
 
-    每条 entry 需要 `raw_title` / `level`；`result` 缺省与 `raw_title` 相同，
+    每条 entry 需要 `raw_title` / `level`；`result` 默认与 `raw_title` 相同，
     `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过），
     `open` 为真时默认展开。`result` / `html_hit` 由 `entries_from_preview()` 算好。
 

@@ -71,7 +71,7 @@ def _click_default(opt: Option):
     不给默认值，`--help` 里印一条几百字的正则没人看得下去。
     """
     if opt.kind is bool:
-        # 旗标未给 = 功能维持缺省；「给旗标」的语义转换（含 negative 取反）在 _convert
+        # 旗标未给 = 功能维持默认；「给旗标」的语义转换（含 negative 取反）在 _convert
         return False
     if opt.multiple:
         return ()
@@ -82,7 +82,7 @@ def _click_default(opt: Option):
 
 
 def _click_option(opt: Option) -> click.Option:
-    """一条 `Option` → 一个 click 参数。默认值与 `Config` 字段的缺省值同源。"""
+    """一条 `Option` → 一个 click 参数。默认值与 `Config` 字段的默认值同源。"""
     default = _click_default(opt)
     attrs: dict[str, object] = {"help": opt.help, "default": default}
     if opt.kind is bool:

@@ -2,7 +2,7 @@
 
 表里只写「前端要什么」——选项名、中文标签、说明、分组、旗标形态；其余一律从真源推出：
 
-- `name` 就是 `Config` 的字段名，取值类型与缺省值按字段注解取；名字不是 `Config`
+- `name` 就是 `Config` 的字段名，取值类型与默认值按字段注解取；名字不是 `Config`
   字段的选项不进 `Config`，值在前端收集后合成（`--volume/--chapter/--level`
   合成 `levels`，`--replace-rules` 合成 `replacements`，`--no-volume`
   表示无卷模式）；
@@ -252,7 +252,7 @@ def option_groups() -> list[tuple[str, tuple[Option, ...]]]:
 
 
 def option_default(opt: Option) -> Any:
-    """选项的缺省值：Config 字段取 `DEFAULTS`，其余按形态给空值。"""
+    """选项的默认值：Config 字段取 `DEFAULTS`，其余按形态给空值。"""
     if opt.level:
         return next(rule.pattern for rule in DEFAULTS.levels if rule.level == opt.level)
     if opt.in_config:
@@ -272,7 +272,7 @@ def build_config(values: Mapping[str, Any]) -> Config:
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
     值的语义与 `Config` 字段一致：反面选项（`--no-clean`）收上来时已经是 `False`。
-    留空一律表示「用缺省值」，取值范围由 `Config.validate()` 负责。
+    留空一律表示「用默认值」，取值范围由 `Config.validate()` 负责。
     """
     values = dict(values)
     if values.pop("no_volume", None) and values.get("volume") is None:

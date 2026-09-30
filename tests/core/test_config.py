@@ -71,7 +71,7 @@ def test_option_flags_are_derived_from_name():
 
 
 def test_library_defaults_come_from_config():
-    """`parse()` / `to_json()` / `to_text()` 的缺省值也必须跟着 Config 走。"""
+    """`parse()` / `to_json()` / `to_text()` 的默认值也必须跟着 Config 走。"""
     params = inspect.signature(parse).parameters
     assert params["max_title_len"].default == DEFAULTS.max_title_len
     assert params["preface_title"].default == DEFAULTS.preface_title
