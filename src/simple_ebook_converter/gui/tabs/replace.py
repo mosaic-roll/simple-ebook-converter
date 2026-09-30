@@ -85,12 +85,7 @@ def build(
                 traceback.print_exc()
 
     def add_rule() -> None:
-        card = _make_card(
-            holder, ctx, on_move=_move_rule, on_remove=_remove_rule, on_change=_fire
-        )
-        rule_cards.append(card)
-        _relayout(rule_cards)
-        _fire()
+        _add_card()
 
     # 供 import_rules_json() 复用：不依赖 build 闭包直接建卡片。
     # `fire=False` 用于批量导入——逐卡触发会让 N 条规则刷 N 次，攒到最后统一 fire 一次。
@@ -326,10 +321,9 @@ def import_rules_json(
     传了 `fire`（app 层传 build 交回的 `_fire`）时走批量模式：逐卡不触发，重建完
     统一调一次 `fire()`，避免 N 条规则触发 N 次预览刷新；不传则退回逐卡触发。
     """
-    from ...core.replace import rules_from_json
+    from ...core.replace import rules_from_file
 
-    text = path.read_text(encoding="utf-8")
-    rules = rules_from_json(text) if text.strip() else []
+    rules = rules_from_file(path)
     # 清空现有卡片
     for card in cards:
         card["frame"].destroy()
