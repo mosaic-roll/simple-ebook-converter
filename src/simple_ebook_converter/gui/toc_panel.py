@@ -250,29 +250,65 @@ TEST_ENTRIES: tuple[dict[str, Any], ...] = (
 )
 
 
-def export_toc_json(toc_entries: list[dict], path: Path) -> None:
-    """把当前目录条目列表序列化为 JSON 文件（与 core.toc.to_json 同格式）。"""
-    entries = [
-        {"raw_title": e["raw_title"], "level": e["level"]}
-        for e in toc_entries
-    ]
-    Path(path).write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+def export_toc_json(entries: list[dict], lines: list[str], path: Path) -> None:
+    """导出目录 JSON：用 core.toc.to_json 对 entries+lines 重建 Node 树后序列化。
 
-
-def import_toc_json(path: Path) -> list[dict]:
-    """从 JSON 文件加载目录条目，格式与 `to_json` 导出一致。
-
-    不重建 line 范围（纯展示用），仅取 raw_title / level / deleted 三字段。
-    读不了或格式非法抛 `ValueError`。
+    导出格式与 core.toc.to_json 完全一致（含 raw_title / level / class_name / lines）。
     """
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except OSError as e:
-        raise ValueError(f"无法读取目录文件：{e}") from e
-    except json.JSONDecodeError as e:
-        raise ValueError(f"目录文件不是合法 JSON：{e}") from e
-    if not isinstance(data, list):
-        raise TypeError("目录文件必须是 JSON 列表")
+    from ..core.parser import Node
+    from ..core.toc import to_json
+
+    nodes = [
+        Node(
+            title=str(e.get("raw_title", "")),
+            raw_title=str(e.get("raw_title", "")),
+            level=int(e.get("level", 0)),
+            class_name=str(e.get("class_name", "")),
+            lines=(int(e.get("lines", [0, 0])[0]), int(e.get("lines", [0, 0])[1])),
+            deleted=bool(e.get("deleted", False)),
+        )
+        for e in entries
+    ]
+    data = to_json(nodes, depth=max(int(e.get("level", 0)) for e in entries) if entries else 6)
+    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def import_toc_json(path: Path, lines: list[str]) -> tuple[list[dict], list[str]]:
+    """导入目录 JSON：用 core.toc.tree_from_json 重建 Node 树，返回 (entries, lines)。
+
+    若有原始行（lines 非空），通过 tree_from_json 重建完整 Node 树并返回新条目；
+    若无原始行（测试模式），直接解析 JSON 条目，lines 保持原样。
+    返回的 entries 含 raw_title / level / class_name / lines / deleted 全字段。
+    """
+    from ..core.toc import load_toc
+
+    data = load_toc(path)
+    if lines:
+        from ..core.parser import walk
+        from ..core.toc import tree_from_json
+
+        tree = tree_from_json(data, lines)
+        entries = [
+            {
+                "raw_title": n.raw_title,
+                "level": n.level,
+                "class_name": n.class_name,
+                "lines": list(n.lines),
+                "deleted": n.deleted,
+            }
+            for n in walk(tree)
+        ]
+    else:
+        # 无原始行（测试模式）：直接解析，校验必要字段
+        entries = _parse_toc_entries(data)
+    return entries, lines
+
+
+def _parse_toc_entries(data: list) -> list[dict]:
+    """无原始行时的 JSON 条目解析（测试模式用）。
+
+    校验必要字段，返回扁平条目列表。
+    """
     entries: list[dict] = []
     for i, item in enumerate(data, start=1):
         if not isinstance(item, dict):
@@ -283,10 +319,15 @@ def import_toc_json(path: Path) -> list[dict]:
             raise TypeError(f"第 {i} 个条目标题必须是字符串，收到：{title!r}")
         if not isinstance(level, int) or isinstance(level, bool):
             raise TypeError(f"第 {i} 个条目 level 必须是整数，收到：{level!r}")
+        span = item.get("lines", [0, 0])
+        if not isinstance(span, list) or len(span) != 2:
+            raise TypeError(f"第 {i} 个条目 lines 必须是 [起, 止]，收到：{span!r}")
         entries.append(
             {
                 "raw_title": title,
                 "level": level,
+                "class_name": item.get("class_name", ""),
+                "lines": [int(span[0]), int(span[1])],
                 "deleted": bool(item.get("deleted", False)),
             }
         )

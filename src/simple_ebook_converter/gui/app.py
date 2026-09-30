@@ -248,7 +248,7 @@ class App(ctk.CTk):
     def _rescan_toc(self) -> None: ...
 
     def _import_toc(self) -> None:
-        """导入目录 JSON：弹出文件选择框，加载后替换 ctx.toc_entries 并刷新预览。"""
+        """导入目录 JSON：弹出文件选择框，用 tree_from_json 重建 Node 树并刷新。"""
         from tkinter import filedialog
 
         path = filedialog.askopenfilename(
@@ -258,15 +258,16 @@ class App(ctk.CTk):
         if not path:
             return
         try:
-            entries = import_toc_json(Path(path))
+            entries, lines = import_toc_json(Path(path), self.ctx.toc_lines)
         except (ValueError, TypeError) as e:
             messagebox.showerror("导入失败", str(e))
             return
         self.ctx.toc_entries = entries
+        self.ctx.toc_lines = lines
         self._refresh_toc_preview()
 
     def _export_toc(self) -> None:
-        """导出目录 JSON：弹出保存框，将 ctx.toc_entries 写入文件。"""
+        """导出目录 JSON：弹出保存框，用 core.toc.to_json 序列化后写入文件。"""
         from tkinter import filedialog
 
         path = filedialog.asksaveasfilename(
@@ -277,7 +278,7 @@ class App(ctk.CTk):
         if not path:
             return
         try:
-            export_toc_json(self.ctx.toc_entries, Path(path))
+            export_toc_json(self.ctx.toc_entries, self.ctx.toc_lines, Path(path))
         except OSError as e:
             messagebox.showerror("导出失败", str(e))
 
@@ -348,6 +349,7 @@ class App(ctk.CTk):
             {"raw_title": n.raw_title, "level": n.level}
             for n in core_walk(tree)
         ]
+        self.ctx.toc_lines = lines
         self._refresh_toc_preview()
 
     def _refresh_toc_preview(self) -> None:
