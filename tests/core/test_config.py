@@ -75,11 +75,10 @@ def test_library_defaults_come_from_config():
 
 
 def test_level_presets_match_config_levels():
-    """卷/章/节的默认值就是 Config.levels 里那三条。"""
+    """卷/章的默认值与 Config.levels 字段默认一致。"""
     for level, name, _label, pattern in LEVEL_PRESETS:
         assert option_default(_option(name)) == pattern
         assert next(r.pattern for r in DEFAULTS.levels if r.level == level) == pattern
-    assert option_default(_option("section")) == ""
 
 
 def test_default_chapter_regex_covers_common_headings():

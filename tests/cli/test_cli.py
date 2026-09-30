@@ -601,7 +601,6 @@ def test_convert_missing_input():
     [
         ["--chapter", "("],
         ["--volume", "["],
-        ["--section", "(?"],
         ["--level", "h2:("],
     ],
 )
@@ -642,7 +641,7 @@ def test_invalid_replace_regex_reports_clean_error(tmp_path):
 def test_all_levels_disabled_reports_clean_error(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(
-        convert, [str(src), "--volume", "", "--chapter", "", "--section", ""]
+        convert, [str(src), "--volume", "", "--chapter", ""]
     )
     assert result.exit_code == 2, result.output
     assert "没有启用的标题规则" in result.output

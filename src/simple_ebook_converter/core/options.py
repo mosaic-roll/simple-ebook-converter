@@ -3,12 +3,12 @@
 表里只写「前端要什么」——选项名、中文标签、说明、分组、旗标形态；其余一律从真源推出：
 
 - `name` 就是 `Config` 的字段名，取值类型与缺省值按字段注解取；名字不是 `Config`
-  字段的选项不进 `Config`，值在前端收集后合成（`--volume/--chapter/--section/--level`
+  字段的选项不进 `Config`，值在前端收集后合成（`--volume/--chapter/--level`
   合成 `levels`，`--replace-rules` 合成 `replacements`，`--no-volume`
   表示无卷模式）；
 - `negative` 的选项命令行写 `--no-<name>`，界面按正面说法显示，两个前端收上来的值
   都已经是 `Config` 的正面语义，`build_config()` 因此不必认识 `--no-xxx`；
-- 卷/章/节本质是三条预设的 `--level` 规格（class 名 = 选项名），`--no-volume` 等同
+- 卷/章是两条预设的 `--level` 规格（class 名 = 选项名），`--no-volume` 等同
   清空卷正则。
 """
 
@@ -116,7 +116,6 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 章节识别 ----
     Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别"),
     Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别"),
-    Option("section", "节标题正则", "h4 + class=section；默认留空（不启用）", "章节识别"),
     Option(
         "no_volume", "无卷模式", "卷行不当标题，等同清空卷标题正则；显式给 --volume 时以正则为准",
         "章节识别", value_type=bool,

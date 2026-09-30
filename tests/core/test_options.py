@@ -143,7 +143,8 @@ def test_presets_default_to_builtin_patterns(tmp_path):
     by_level = {r.level: r for r in cfg.levels}
     assert by_level[2].pattern == DEFAULT_VOLUME_RE
     assert by_level[3].pattern == DEFAULT_CHAPTER_RE
-    assert by_level[4].pattern == ""
+    # 不再有无级别的默认节预设；h4 只能通过 --level h4.xxx:正则 显式加
+    assert 4 not in by_level
 
 
 def test_absent_preset_uses_builtin(tmp_path):
@@ -153,8 +154,8 @@ def test_absent_preset_uses_builtin(tmp_path):
 
 
 def test_blank_preset_disables_level(tmp_path):
-    cfg = _config(tmp_path, volume="", chapter="", section="")
-    assert [r.active for r in cfg.levels] == [False, False, False]
+    cfg = _config(tmp_path, volume="", chapter="")
+    assert [r.active for r in cfg.levels] == [False, False]
 
 
 def test_extra_levels_from_one_line_per_spec(tmp_path):
@@ -164,7 +165,6 @@ def test_extra_levels_from_one_line_per_spec(tmp_path):
         (1, "part"),
         (2, "volume"),
         (3, "chapter"),
-        (4, "section"),
         (5, "scene"),
         (6, "note"),
     ]
@@ -375,9 +375,9 @@ def test_negative_options_point_at_boolean_fields():
             assert opt.kind is bool, opt.name
 
 
-def test_level_presets_are_levels_two_to_four():
-    assert [opt.level for opt in OPTIONS if opt.level] == [2, 3, 4]
-    assert [opt.name for opt in OPTIONS if opt.level] == ["volume", "chapter", "section"]
+def test_level_presets_are_levels_two_to_three():
+    assert [opt.level for opt in OPTIONS if opt.level] == [2, 3]
+    assert [opt.name for opt in OPTIONS if opt.level] == ["volume", "chapter"]
 
 
 def test_every_option_is_optional_except_input(tmp_path):

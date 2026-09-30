@@ -42,8 +42,8 @@ def test_build_levels_returns_only_the_specs():
 
 def test_build_levels_blank_pattern_disables_that_level():
     """空正则 = 不识别该层级（`--no-volume` 与 GUI 清空输入框都走这条路）。"""
-    levels = build_levels(["h2.volume:", "h3.chapter:^第.章", "h4.section:"])
-    assert [r.active for r in levels] == [False, True, False]
+    levels = build_levels(["h2.volume:", "h3.chapter:^第.章"])
+    assert [r.active for r in levels] == [False, True]
 
 
 def test_build_levels_sorts_by_level_keeping_written_order():
@@ -71,7 +71,7 @@ def test_build_levels_does_not_share_default_rules():
     [
         (["h2.volume:("], "卷标题"),
         (["h3.chapter:["], "章标题"),
-        (["h4.section:(?:"], "节标题"),
+        (["h5.note:(?:"], "额外层级 h5"),
         (["h5.note:^ok", "h2:("], "额外层级 h2"),
     ],
 )

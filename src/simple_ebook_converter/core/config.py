@@ -42,7 +42,6 @@ ALIGN_CHOICES = ("left", "center", "right", "justify")
 LEVEL_PRESETS = (
     (2, "volume", "卷标题", DEFAULT_VOLUME_RE),
     (3, "chapter", "章标题", DEFAULT_CHAPTER_RE),
-    (4, "section", "节标题", ""),
 )
 
 # 一条标题都没命中时整篇作为一章，标题取什么
