@@ -26,8 +26,8 @@ from ..widgets import make_field_btn, make_group
 #: 预置行标签 → DEFAULTS 的键；TODO: 接 core 后由 core.config.DEFAULTS 补全
 BUILTIN_ROWS = ("卷", "章", "字数上限", "无标题章节")
 
-#: 额外层级的默认 hN：第 1 行 h5、第 2 行 h6，之后新增的行都 h6
-EXTRA_LEVEL_DEFAULTS = ("h5", "h6")
+#: 额外层级的默认 hN：第 1~3 行分别预填 h4/h5/h6，之后新增的行都 h6
+EXTRA_LEVEL_DEFAULTS = ("h4", "h5", "h6")
 
 
 def _default_level(index: int) -> str:

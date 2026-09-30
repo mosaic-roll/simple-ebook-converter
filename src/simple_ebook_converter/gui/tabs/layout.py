@@ -50,9 +50,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     align_chapter = make_field_menu(
         al, 1, "章", list(ALIGN_LABELS), ctx, default="居中", col=2
     )
-    align_section = make_field_menu(
-        al, 2, "节", list(ALIGN_LABELS), ctx, default="左对齐", col=0
-    )
     align_body = make_field_menu(
         al, 2, "正文", list(ALIGN_LABELS), ctx, default="两端对齐", col=2
     )
@@ -169,7 +166,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "margin": margin,
         "align_volume": align_volume,
         "align_chapter": align_chapter,
-        "align_section": align_section,
         "align_body": align_body,
         "font_entry": font_entry,
         "css_source": source_var,
