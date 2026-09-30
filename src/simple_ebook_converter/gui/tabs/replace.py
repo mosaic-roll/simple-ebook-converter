@@ -61,18 +61,14 @@ def build(
     # 存引用而非值快照：app 层后续 append 的回调必须被 _fire 感知到（§4.1 根因）
     _triggers = ctx._on_rules_changed if on_rules_changed is None else [on_rules_changed]
     # 规则字段快照：用于在 _fire 里做「规则是否真的变了」的比较。
-    # 只有真正变了才通知 app 层，避免 <FocusOut> 空触发时白白重建表格。
+    # 基于 collect_rules 的输出：空 pattern 的卡片不计入，
+    # 增删空卡不会误触发刷新。
     _last_snapshot: tuple = ()
 
     def _snapshot(cards: list[dict[str, Any]]) -> tuple:
         return tuple(
-            (
-                c["pattern_entry"].get(),
-                c["replace_entry"].get(),
-                c["stage_menu"].get(),
-                bool(c["enabled_var"].get()),
-            )
-            for c in cards
+            (r.pattern, r.replace, r.stage, r.enabled)
+            for r in collect_rules(cards)
         )
 
     def _fire() -> None:
