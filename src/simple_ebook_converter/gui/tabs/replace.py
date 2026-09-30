@@ -260,8 +260,31 @@ def _make_card(
     replace_entry.grid(row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
 
     # 失焦时刷新预览：用户编辑完规则、移开焦点后应用。
-    pattern_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
-    replace_entry._entry.bind("<FocusOut>", lambda _: on_change())  # type: ignore[attr-defined]
+    # CTkEntry 的内部 FocusOut 会调 _activate_placeholder()，但因为我们先于内部绑定运行，
+    # 此时 _is_focused 仍为 True，会导致 placeholder 不恢复（只发生在字段为空时）。
+    # 所以这里：先跑规则判断，再在字段为空时强制恢复 placeholder（包括颜色和文本）。
+    def _on_pattern_focusout(_event=None) -> None:
+        on_change()
+        if pattern_entry._entry.get() == "":
+            pattern_entry._placeholder_text_active = True
+            pattern_entry._entry.config(
+                fg=pattern_entry._apply_appearance_mode(pattern_entry._placeholder_text_color),
+                disabledforeground=pattern_entry._apply_appearance_mode(pattern_entry._placeholder_text_color),
+            )
+            pattern_entry._entry.delete(0, tk.END)
+            pattern_entry._entry.insert(0, pattern_entry._placeholder_text)
+    def _on_replace_focusout(_event=None) -> None:
+        on_change()
+        if replace_entry._entry.get() == "":
+            replace_entry._placeholder_text_active = True
+            replace_entry._entry.config(
+                fg=replace_entry._apply_appearance_mode(replace_entry._placeholder_text_color),
+                disabledforeground=replace_entry._apply_appearance_mode(replace_entry._placeholder_text_color),
+            )
+            replace_entry._entry.delete(0, tk.END)
+            replace_entry._entry.insert(0, replace_entry._placeholder_text)
+    pattern_entry._entry.bind("<FocusOut>", _on_pattern_focusout)  # type: ignore[attr-defined]
+    replace_entry._entry.bind("<FocusOut>", _on_replace_focusout)  # type: ignore[attr-defined]
 
     ref.update(
         frame=card,
