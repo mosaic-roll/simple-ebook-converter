@@ -300,8 +300,10 @@ def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> 
         path = Path(cfg.cover)
         book.set_cover(f"images/{path.name}", path.read_bytes(), create_page=False)
         item = book.get_item_with_id("cover-img")
-        if item is not None:
-            item.media_type = cover_media_type(path)
+        if item is None:
+            # 静默跳过的话，media_type 会停在 ebooklib 猜错的值上，最后产出打不开的 epub
+            raise ValueError(f"未能取得封面图片项，封面类型无法修正：{cfg.cover}")
+        item.media_type = cover_media_type(path)
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
         page.is_linear = False
         page.content = image_cover_body(f"images/{path.name}", alt=title).encode(

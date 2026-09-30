@@ -3,7 +3,7 @@
 import pytest
 
 from simple_ebook_converter.core.parser import Node
-from simple_ebook_converter.core.toc import load_toc, to_json, tree_from_json
+from simple_ebook_converter.core.toc import load_toc, to_json, to_text, tree_from_json
 
 
 def _sample_tree() -> list[Node]:
@@ -38,6 +38,30 @@ def test_to_json_and_tree_from_json_round_trip():
     )
     assert volume.paragraphs == []  # direct body stops before the next heading
     assert body.paragraphs == ["正文甲"]  # 标题行本身不进正文
+
+
+def test_to_text_indents_by_relation_not_by_level():
+    """顶层不管自己是 h2 还是 h4 都不缩进，其后逐层加一级。"""
+    chapter = Node("第一章 一", 3, "chapter", paragraphs=["正文甲"])
+    assert to_text([Node("第一卷", 2, "volume", children=[chapter])]) == (
+        "第一卷\n  第一章 一"
+    )
+
+    # 顶层是 h4（--level 改过的目录）：不该因为 level-1=3 就缩进三级
+    section = Node("第一节", 4, "section", children=[chapter])
+    assert to_text([Node("总述", 4, "section", children=[section])]) == (
+        "总述\n  第一节\n    第一章 一"
+    )
+
+
+def test_to_text_and_to_json_agree_on_depth():
+    """`depth` 卡的是绝对 level，两种格式得挑出同一批节点——包括顶层。"""
+    tree = _sample_tree()
+    for depth in range(1, 7):
+        assert len(to_text(tree, depth).splitlines()) == len(to_json(tree, depth))
+
+    assert to_text(tree, 1) == ""  # 顶层 level 2 > depth 1，同样被卡掉
+    assert to_json(tree, 1) == []
 
 
 def test_tree_from_json_uses_titles_as_given():

@@ -19,11 +19,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, DEFAULTS, Config, LEVEL_PRESETS
+from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, Config, LEVEL_PRESETS
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
 from .replace import rules_from_file
-from .toc import FORMATS
 
 
 def _config_kinds() -> dict[str, type]:

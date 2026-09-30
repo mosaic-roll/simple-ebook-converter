@@ -1,21 +1,35 @@
 """目录的渲染与往返：缩进文本、扁平 JSON 列表，按格式选一种的 `render()`。
 
-JSON 是 GUI 预览与 `--toc-file` 共用的中间产物：按文档序一行一个条目，只存原始
-标题（`raw_title`）、层级（`level`）与完整行号范围（`lines`，含子孙）——层级由
-`level` 决定，嵌套不落盘。标题的清理替换推迟到组装阶段。`to_json` / `tree_from_json`
-互为逆操作，中间可以插一步人工编辑（改标题、删除线标记、合并章节）。
+JSON 是 `--toc-only --toc-format json` 导出与 `--toc-file` 回喂之间的中间产物：按文档序
+一行一个条目，只存原始标题（`raw_title`）、层级（`level`）与完整行号范围（`lines`，含
+子孙）——层级由 `level` 决定，嵌套不落盘。标题的清理替换推迟到组装阶段。`to_json` /
+`tree_from_json` 互为逆操作，中间可以插一步人工编辑（改标题、删除线标记、合并章节）。
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
 
-from .config import DEFAULTS
-from .parser import Node, TreeBuilder, assign_anchors, walk
+from .config import DEFAULTS, FORMATS
+from .parser import Node, TreeBuilder, assign_anchors
 
-#: `--toc-format` 的取值
-FORMATS = ("text", "json")
+
+def _visible(
+    nodes: list[Node], depth: int, indent: int = 0
+) -> Iterator[tuple[Node, int]]:
+    """按文档序遍历该进目录的节点，连同它相对顶层的缩进层数。
+
+    `depth` 按绝对 level 卡；缩进按相对层数给——顶层不管自己是 h2 还是 h4 都不缩进，
+    其后每深一层加一级。缩进只是给人看的，level 本身在 json 条目里，文本不必能还原
+    回目录树。
+    """
+    for node in nodes:
+        if node.level > depth:
+            continue
+        yield node, indent
+        yield from _visible(node.children, depth, indent + 1)
 
 
 def render(tree: list[Node], depth: int, fmt: str) -> str:
@@ -28,11 +42,12 @@ def render(tree: list[Node], depth: int, fmt: str) -> str:
 
 
 def to_json(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> list[dict]:
-    """转扁平 JSON 列表供 GUI 预览或 `--toc-format json`。文档序一行一个条目，含
-    `raw_title`（原始标题行）、`level`、`class_name`、`lines`（[起, 止]，1-based
-    闭区间，完整覆盖含子孙）；超过 `depth` 的层级不导出。
+    """转扁平 JSON 列表，供 `--toc-only --toc-format json` 导出与 `tree_from_json`
+    回喂。文档序一行一个条目，含 `raw_title`（原始标题行）、`level`、`class_name`、
+    `lines`（[起, 止]，1-based 闭区间，完整覆盖含子孙）；超过 `depth` 的层级不导出。
+    界面要的是 `Node` 树本身，不经过这里。
     """
-    return [_entry(node) for node in walk(tree) if node.level <= depth]
+    return [_entry(node) for node, _ in _visible(tree, depth)]
 
 
 def load_toc(path: Path) -> list:
@@ -85,16 +100,10 @@ def _rebuild(nodes: list[Node]) -> list[Node]:
 
 
 def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:
-    """转缩进文本，一行一个标题。"""
-    lines: list[str] = []
-
-    def emit(nodes: list[Node]) -> None:
-        for node in nodes:
-            lines.append("  " * max(0, node.level - 1) + node.title)
-            emit([c for c in node.children if c.level <= depth])
-
-    emit(tree)
-    return "\n".join(lines)
+    """转缩进文本，一行一个标题，缩进按相对层数（见 `_visible`）。"""
+    return "\n".join(
+        f"{'  ' * indent}{node.title}" for node, indent in _visible(tree, depth)
+    )
 
 
 def _entry(node: Node) -> dict:

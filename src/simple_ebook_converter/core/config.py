@@ -41,6 +41,10 @@ DEFAULT_EXCLUDE_RE = ""
 #: 标题对齐方式，写进 CSS 的 `text-align`
 ALIGN_CHOICES = ("left", "center", "right", "justify")
 
+#: 目录输出格式：`--toc-format` 的取值，也是 `validate()` 认的集合。
+#: 放在这里而不是 `toc`——`toc` 要 import 本模块，反向导入会成环。
+FORMATS = ("text", "json")
+
 #: 预设层级：级别 → (class 名, 中文名, 内置正则)。空正则 = 默认不启用。
 LEVEL_PRESETS = (
     (2, "volume", "卷标题", DEFAULT_VOLUME_RE),
@@ -121,7 +125,7 @@ class Config:
     #: 目录页是否进 spine（nav 文档无论如何都生成）
     toc_in_spine: bool = True
     toc_depth: int = 6
-    #: 目录输出格式：text | json（见 `toc.FORMATS`）
+    #: 目录输出格式：`FORMATS` 之一（text | json）
     toc_format: str = "text"
     #: 目录树 JSON 文件（`toc.to_json` 的产物，可经界面编辑）。给了就跳过正则解析，
     #: 按行号从输入取正文，标题用文件现值
@@ -153,6 +157,10 @@ class Config:
             raise ValueError(f"标题最大字数需为正整数，收到：{self.max_title_len}")
         if not 1 <= self.toc_depth <= 6:
             raise ValueError(f"目录深度需在 1~6 之间，收到：{self.toc_depth}")
+        if self.toc_format not in FORMATS:
+            raise ValueError(
+                f"目录格式只能是 {'/'.join(FORMATS)}，收到：{self.toc_format}"
+            )
         if self.indent < 0:
             raise ValueError(f"段落缩进字数不能为负，收到：{self.indent}")
         for name, label in (

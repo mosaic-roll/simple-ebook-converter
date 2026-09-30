@@ -317,7 +317,9 @@ def test_preview_without_html_rules_shows_unescaped_text():
 
 
 def test_preview_flags_an_html_rule_that_fired():
-    chapter = _preview([Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")])[2]
+    chapter = _preview([Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")])[
+        2
+    ]
     assert chapter.title == "第一章 初遇"
     assert chapter.title_html == '第<span class="num">一</span>章 初遇'
     assert chapter.html_hit is True

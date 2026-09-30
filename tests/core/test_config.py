@@ -122,6 +122,7 @@ def test_validate_rejects_out_of_range():
         ({"max_title_len": 0}, "标题最大字数"),
         ({"toc_depth": 0}, "目录深度"),
         ({"toc_depth": 7}, "目录深度"),
+        ({"toc_format": "md"}, "目录格式"),
         ({"indent": -1}, "段落缩进"),
         ({"chapter_align": "middle"}, "章对齐"),
         ({"volume_align": "MIDDLE"}, "卷对齐"),
