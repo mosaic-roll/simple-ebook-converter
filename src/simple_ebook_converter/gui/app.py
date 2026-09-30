@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from tkinter import messagebox
 
 import customtkinter as ctk
@@ -44,7 +45,14 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
-from .toc_panel import TEST_ENTRIES, entries_from_preview, populate_toc
+from .tabs.replace import export_rules_json, import_rules_json
+from .toc_panel import (
+    TEST_ENTRIES,
+    entries_from_preview,
+    export_toc_json,
+    import_toc_json,
+    populate_toc,
+)
 from .toc_panel import build as build_toc_panel
 from .utils import open_with_default_app
 
@@ -239,13 +247,74 @@ class App(ctk.CTk):
 
     def _rescan_toc(self) -> None: ...
 
-    def _import_toc(self) -> None: ...
+    def _import_toc(self) -> None:
+        """导入目录 JSON：弹出文件选择框，加载后替换 ctx.toc_entries 并刷新预览。"""
+        from tkinter import filedialog
 
-    def _export_toc(self) -> None: ...
+        path = filedialog.askopenfilename(
+            title="导入目录",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            entries = import_toc_json(Path(path))
+        except (ValueError, TypeError) as e:
+            messagebox.showerror("导入失败", str(e))
+            return
+        self.ctx.toc_entries = entries
+        self._refresh_toc_preview()
 
-    def _import_rules(self) -> None: ...
+    def _export_toc(self) -> None:
+        """导出目录 JSON：弹出保存框，将 ctx.toc_entries 写入文件。"""
+        from tkinter import filedialog
 
-    def _export_rules(self) -> None: ...
+        path = filedialog.asksaveasfilename(
+            title="导出目录",
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            export_toc_json(self.ctx.toc_entries, Path(path))
+        except OSError as e:
+            messagebox.showerror("导出失败", str(e))
+
+    def _import_rules(self) -> None:
+        """导入替换规则 JSON：弹出文件选择框，加载后填充到卡片。"""
+        from tkinter import filedialog
+
+        path = filedialog.askopenfilename(
+            title="导入替换规则",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            import_rules_json(
+                self.tab_widgets["replace"]["rule_cards"],
+                Path(path),
+                self.tab_widgets["replace"].get("add_card"),
+            )
+        except (ValueError, TypeError) as e:
+            messagebox.showerror("导入失败", str(e))
+
+    def _export_rules(self) -> None:
+        """导出替换规则 JSON：弹出保存框，将当前规则写入文件。"""
+        from tkinter import filedialog
+
+        path = filedialog.asksaveasfilename(
+            title="导出替换规则",
+            defaultextension=".json",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            export_rules_json(self.tab_widgets["replace"]["rule_cards"], Path(path))
+        except OSError as e:
+            messagebox.showerror("导出失败", str(e))
 
     def _on_generate(self) -> None: ...
 

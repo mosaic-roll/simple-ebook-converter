@@ -9,6 +9,7 @@ from __future__ import annotations
 import tkinter as tk
 import traceback
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import customtkinter as ctk
@@ -75,6 +76,27 @@ def build(
         _relayout(rule_cards)
         _fire()
 
+    # 供 import_rules_json() 复用：不依赖 build 闭包直接建卡片
+    def _add_card(
+        pattern: str = "",
+        replace: str = "",
+        stage: str = "原文",
+        enabled: bool = True,
+    ) -> dict[str, Any]:
+        card = _make_card(
+            holder, ctx, on_move=_move_rule, on_remove=_remove_rule, on_change=_fire
+        )
+        if pattern:
+            card["pattern_entry"].insert(0, pattern)
+        if replace:
+            card["replace_entry"].insert(0, replace)
+        card["stage_menu"].set(stage)
+        card["enabled_var"].set(enabled)
+        rule_cards.append(card)
+        _relayout(rule_cards)
+        _fire()
+        return card
+
     def _move_rule(card: dict[str, Any], delta: int) -> None:
         if card not in rule_cards:
             return
@@ -122,6 +144,7 @@ def build(
     return {
         "rule_cards": rule_cards,
         "add_rule": add_rule,
+        "add_card": _add_card,
     }
 
 
@@ -239,3 +262,40 @@ def _relayout(cards: list[dict[str, Any]]) -> None:
     """按列表顺序重排卡片行号（调序、删除后都要重来一遍）。"""
     for i, card in enumerate(cards):
         card["frame"].grid(row=i, column=0, sticky="ew", pady=CARD_PADY)
+
+
+def export_rules_json(cards: list[dict[str, Any]], path: Path) -> None:
+    """把当前规则卡片序列化为 JSON 文件（与 core.replace.rules_to_json 同格式）。"""
+    from ...core.replace import rules_to_json
+
+    rules = collect_rules(cards)
+    Path(path).write_text(rules_to_json(rules), encoding="utf-8")
+
+
+def import_rules_json(cards: list[dict[str, Any]], path: Path, add_card=None) -> None:
+    """从 JSON 文件加载替换规则并填充到卡片。
+
+    清空现有卡片，按 JSON 顺序创建新卡片；读不了或格式非法抛 `ValueError`。
+    `add_card` 由 app 层传入（build() 中定义的 _add_card 闭包），为空时仅清空。
+    """
+    from ...core.replace import rules_from_json
+
+    text = path.read_text(encoding="utf-8")
+    rules = rules_from_json(text) if text.strip() else []
+    # 清空现有卡片
+    for card in cards:
+        card["frame"].destroy()
+    cards.clear()
+    # 按规则重建卡片；没有规则时保留一张空卡方便用户立即开始编辑
+    if not rules:
+        if add_card:
+            add_card()
+    else:
+        for r in rules:
+            if add_card:
+                add_card(
+                    pattern=r.pattern,
+                    replace=r.replace,
+                    stage=r.stage_label,
+                    enabled=r.enabled,
+                )

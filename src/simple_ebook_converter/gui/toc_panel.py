@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from tkinter import ttk
 from typing import Any
 
@@ -246,3 +248,46 @@ TEST_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第二卷 风暴", "level": 2, "open": True},
     {"raw_title": "第三章 重逢", "level": 3},
 )
+
+
+def export_toc_json(toc_entries: list[dict], path: Path) -> None:
+    """把当前目录条目列表序列化为 JSON 文件（与 core.toc.to_json 同格式）。"""
+    entries = [
+        {"raw_title": e["raw_title"], "level": e["level"]}
+        for e in toc_entries
+    ]
+    Path(path).write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def import_toc_json(path: Path) -> list[dict]:
+    """从 JSON 文件加载目录条目，格式与 `to_json` 导出一致。
+
+    不重建 line 范围（纯展示用），仅取 raw_title / level / deleted 三字段。
+    读不了或格式非法抛 `ValueError`。
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as e:
+        raise ValueError(f"无法读取目录文件：{e}") from e
+    except json.JSONDecodeError as e:
+        raise ValueError(f"目录文件不是合法 JSON：{e}") from e
+    if not isinstance(data, list):
+        raise TypeError("目录文件必须是 JSON 列表")
+    entries: list[dict] = []
+    for i, item in enumerate(data, start=1):
+        if not isinstance(item, dict):
+            raise TypeError(f"第 {i} 个条目必须是 JSON 对象，收到：{item!r}")
+        title = item.get("raw_title")
+        level = item.get("level")
+        if not isinstance(title, str) or not title.strip():
+            raise TypeError(f"第 {i} 个条目标题必须是字符串，收到：{title!r}")
+        if not isinstance(level, int) or isinstance(level, bool):
+            raise TypeError(f"第 {i} 个条目 level 必须是整数，收到：{level!r}")
+        entries.append(
+            {
+                "raw_title": title,
+                "level": level,
+                "deleted": bool(item.get("deleted", False)),
+            }
+        )
+    return entries
