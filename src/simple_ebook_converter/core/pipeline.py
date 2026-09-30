@@ -118,10 +118,14 @@ class TitleResult:
 def _transform_title(node: Node, raw: Replacer, html: Replacer) -> TitleResult:
     """一个标题过完整条链：raw 替换 → 转义 → html 替换。
 
+    raw 规则的语义是「匹配原文」，所以读 `node.raw_title` 而不是 `node.title`：
+    即便传入的树已经 `process()` 过（`title` 是替换后的值），也只会对原文作用一次，
+    不会把 raw 规则重复叠加。
+
     `process()` 与 `preview_titles()` 共用这一条。两个替换器由调用方先经
     `replacers_by_stage()` 分好（循环 N 条标题只分流一次），故不对外。
     """
-    title = raw.text(node.title)
+    title = raw.text(node.raw_title)
     title_html, hit = html.apply(escape(title))
     return TitleResult(node.level, node.raw_title, title, title_html, hit)
 

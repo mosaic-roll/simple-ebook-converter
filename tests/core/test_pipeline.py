@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
-from simple_ebook_converter.core.parser import NoEnabledRulesError, walk
+from simple_ebook_converter.core.parser import NoEnabledRulesError, Node, walk
 from simple_ebook_converter.core.pipeline import (
     preview_titles,
     process,
@@ -334,6 +334,13 @@ def test_preview_flags_an_html_rule_that_changed_nothing():
 def test_preview_flags_only_the_titles_a_rule_reached():
     results = _preview([Rule("离别", "别离", "html")])
     assert [r.html_hit for r in results] == [False, False, False, True]
+
+
+def test_preview_reads_raw_title_not_current_title():
+    """raw 规则匹配原文：即便传入的树 `title` 已被替换过，也只对 `raw_title` 作用一次。"""
+    node = Node("第X一章", 3, "chapter", raw_title="第一章")
+    result = preview_titles([node], [Rule("第", "第X")])[0]
+    assert result.title == "第X一章"  # 若读 title 会二次叠加成「第XX一章」
 
 
 def test_preview_agrees_with_what_process_writes(tmp_path):

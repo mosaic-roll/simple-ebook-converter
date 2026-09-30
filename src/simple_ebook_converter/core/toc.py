@@ -85,8 +85,11 @@ def tree_from_json(data: list, lines: list[str]) -> list[Node]:
         )
     tree = _rebuild(nodes)
     # level 0 在前言/兜底里固定用 anchor="preface"；多于一个会生成重名 xhtml，EPUB 损坏。
-    if sum(1 for n in tree if n.level == 0) > 1:
-        raise ValueError("目录树里只能有一个 level 0 条目（前言）")
+    level0 = [n for n in tree if n.level == 0]
+    if len(level0) > 1:
+        raise ValueError(
+            f"目录树里只能有一个 level 0 条目（前言），收到 {len(level0)} 个"
+        )
     assign_anchors(tree)
     return tree
 
