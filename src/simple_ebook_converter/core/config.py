@@ -35,6 +35,9 @@ _CHAPTER_FRAGMENTS = (
 )
 DEFAULT_CHAPTER_RE = "|".join(_CHAPTER_FRAGMENTS)
 
+#: 默认排除规则，不除外任何行（留空表示不开启）
+DEFAULT_EXCLUDE_RE = ""
+
 #: 标题对齐方式，写进 CSS 的 `text-align`
 ALIGN_CHOICES = ("left", "center", "right", "justify")
 
@@ -92,8 +95,8 @@ class Config:
     levels: list[LevelRule] = field(default_factory=default_levels)
     max_title_len: int = 35
     preface_title: str = "前言"
-    #: 排除规则；行命中该正则时不作为标题。空串表示不排除任何行。
-    exclude: str = ""
+    #: 排除规则；行命中该正则时不作为标题。留空表示不排除任何行。
+    exclude: str = DEFAULT_EXCLUDE_RE
 
     # 文本处理
     clean: bool = True
