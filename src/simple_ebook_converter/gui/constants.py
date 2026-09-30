@@ -106,7 +106,6 @@ ENCODING_LABELS: dict[str, str] = {
     "繁体中文 Big5": "big5",
     "日文 CP932（微软扩展）": "cp932",
     "日文 Shift_JIS（标准）": "shift_jis",
-    "日文 EUC-JP": "euc_jp",
 }
 LANGUAGES = ["zh", "en", "jp"]
 TOC_DEPTHS = [str(i) for i in range(1, 7)]
