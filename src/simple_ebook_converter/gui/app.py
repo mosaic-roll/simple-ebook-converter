@@ -19,7 +19,6 @@ import customtkinter as ctk
 
 from ..core.encoding import EncodingError, read_lines
 from ..core.pipeline import preview_titles, scan_toc
-from ..core.replace import rules_from_rows
 from . import settings_dialog, theme
 from .constants import (
     BAR_HEIGHT_BOTTOM,
@@ -45,8 +44,8 @@ from .constants import (
 from .context import GuiContext
 from .fonts import FontManager
 from .tabs import basic, layout, replace, rules
+from .toc_panel import _TEST_ENTRIES, entries_from_preview, populate_toc
 from .toc_panel import build as build_toc_panel
-from .toc_panel import entries_from_preview, populate_toc
 from .utils import open_with_default_app
 
 
@@ -173,19 +172,17 @@ class App(ctk.CTk):
         self.toc_widgets = build_toc_panel(self.main, self.ctx)
 
         # 初始化目录条目：用测试数据填充，等真实扫描后再替换
-        from ..gui.toc_panel import _TEST_ENTRIES
-
         self.ctx.toc_entries = [
             {"raw_title": e["raw_title"], "level": e["level"]}
             for e in _TEST_ENTRIES
         ]
         self.toc_widgets["table"].delete(*self.toc_widgets["table"].get_children())
-        from .toc_panel import populate_toc
-
         populate_toc(self.toc_widgets["table"], _TEST_ENTRIES)
 
         # 替换规则变动 → 刷新目录预览（ctx._on_rules_changed 由 replace tab 触发）
         self.ctx._on_rules_changed.append(self._refresh_toc_preview)
+        # §6.4：注册后立即刷一次，否则首屏「替换结果」列始终为空
+        self._refresh_toc_preview()
 
     # ---------------------------------------------------------------- 底栏
 
@@ -283,19 +280,13 @@ class App(ctk.CTk):
         self._refresh_toc_preview()
 
     def _refresh_toc_preview(self) -> None:
-        """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。"""
-        cards = self.tab_widgets["replace"]["rule_cards"]
-        rules_list = rules_from_rows(
-            [
-                (
-                    card["pattern_entry"].get(),
-                    card["replace_entry"].get(),
-                    card["stage_menu"].get(),
-                )
-                for card in cards
-                if card["pattern_entry"].get()
-            ]
-        )
+        """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。
+
+        收集逻辑收在 `tabs.replace.collect_rules()` 里（§5.3），此处只负责刷新。
+        """
+        from .tabs.replace import collect_rules
+
+        rules_list = collect_rules(self.tab_widgets["replace"]["rule_cards"])
         try:
             results = preview_titles(
                 _entries_to_nodes(self.ctx.toc_entries), rules_list

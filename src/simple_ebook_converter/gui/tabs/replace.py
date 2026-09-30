@@ -7,11 +7,13 @@
 from __future__ import annotations
 
 import tkinter as tk
+import traceback
 from collections.abc import Callable
 from typing import Any
 
 import customtkinter as ctk
 
+from ...core.replace import Rule, check_stage
 from ..constants import (
     BTN_GAP,
     BTN_W_M,
@@ -55,17 +57,15 @@ def build(
     holder.grid_columnconfigure(0, weight=1)
 
     rule_cards: list[dict[str, Any]] = []
-    # 持有对 ctx 的闭包引用；ctx._on_rules_changed 由 app 层注册，这里是触发方。
-    _triggers = (
-        list(ctx._on_rules_changed) if on_rules_changed is None else [on_rules_changed]
-    )
+    # 存引用而非值快照：app 层后续 append 的回调必须被 _fire 感知到（§4.1 根因）
+    _triggers = ctx._on_rules_changed if on_rules_changed is None else [on_rules_changed]
 
     def _fire() -> None:
         for cb in _triggers:
             try:
                 cb()
-            except Exception:  # noqa: BLE001, S110
-                pass  # app 侧的刷新逻辑出错不应阻断卡片操作
+            except Exception as e:  # noqa: BLE001
+                traceback.print_exc(e)
 
     def add_rule() -> None:
         card = _make_card(
@@ -125,21 +125,27 @@ def build(
     }
 
 
-def collect_rules(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """卡片列表 → `core.replace.rules_from_json()` 能吃的规则字典列表。
+def collect_rules(cards: list[dict[str, Any]]) -> list[Rule]:
+    """卡片列表 → core 的 `Rule` 列表。
 
-    TODO: 接 core 后核对字段名（pattern / replace / stage / enabled），
-    阶段标签「原文/HTML」要经 `core.replace.STAGE_BY_LABEL` 换成 raw/html。
+    保留 `enabled` 状态：core 的 `replacers_by_stage()` 会自动跳过禁用的规则，
+    与 CLI 行为一致（禁用规则仍在列表里但不下发）。阶段标签「原文/HTML」由
+    `check_stage()` 自动转成 raw/html，未知值抛 ValueError。
     """
-    return [
-        {
-            "pattern": card["pattern_entry"].get(),
-            "replace": card["replace_entry"].get(),
-            "stage": card["stage_menu"].get(),
-            "enabled": bool(card["enabled_var"].get()),
-        }
-        for card in cards
-    ]
+    rules: list[Rule] = []
+    for card in cards:
+        pattern = card["pattern_entry"].get()
+        if not pattern:
+            continue
+        rules.append(
+            Rule(
+                pattern=pattern,
+                replace=card["replace_entry"].get(),
+                stage=check_stage(card["stage_menu"].get()),
+                enabled=bool(card["enabled_var"].get()),
+            )
+        )
+    return rules
 
 
 def _make_card(
