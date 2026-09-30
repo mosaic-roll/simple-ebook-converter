@@ -1,14 +1,11 @@
-"""右侧目录面板：目录树预览 + 编辑（改标题、删除线、深度、导入导出）。
+"""右侧目录面板：目录树预览 + 编辑（改标题、删除线、深度）。
 
-目录树 JSON 是**扁平列表**（文档序），层级由 `level` 决定，没有 children 嵌套；
-回喂时按 level 栈式挂树，与 `lines` 无关。
+目录树条目是**扁平列表**（文档序），层级由 `level` 决定，没有 children 嵌套。
 """
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterable, Mapping
-from pathlib import Path
 from tkinter import ttk
 from typing import Any
 
@@ -68,23 +65,6 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         font=font,
         command=ctx.cb("rescan_toc"),
     ).grid(row=0, column=0, sticky="w")
-
-    right_top = ctk.CTkFrame(top, fg_color="transparent")
-    right_top.grid(row=0, column=1, sticky="e")
-    ctk.CTkButton(
-        right_top,
-        text="导入",
-        width=BTN_W_M,
-        font=font,
-        command=ctx.cb("import_toc"),
-    ).pack(side="left", padx=(0, BTN_GAP))
-    ctk.CTkButton(
-        right_top,
-        text="导出",
-        width=BTN_W_M,
-        font=font,
-        command=ctx.cb("export_toc"),
-    ).pack(side="left")
 
     table = _make_table(panel)
     populate_toc(table, TEST_ENTRIES)
@@ -248,87 +228,3 @@ TEST_ENTRIES: tuple[dict[str, Any], ...] = (
     {"raw_title": "第二卷 风暴", "level": 2, "open": True},
     {"raw_title": "第三章 重逢", "level": 3},
 )
-
-
-def export_toc_json(entries: list[dict], lines: list[str], path: Path) -> None:
-    """导出目录 JSON：用 core.toc.to_json 对 entries+lines 重建 Node 树后序列化。
-
-    导出格式与 core.toc.to_json 完全一致（含 raw_title / level / class_name / lines）。
-    """
-    from ..core.parser import Node
-    from ..core.toc import to_json
-
-    nodes = [
-        Node(
-            title=str(e.get("raw_title", "")),
-            raw_title=str(e.get("raw_title", "")),
-            level=int(e.get("level", 0)),
-            class_name=str(e.get("class_name", "")),
-            lines=(int(e.get("lines", [0, 0])[0]), int(e.get("lines", [0, 0])[1])),
-            deleted=bool(e.get("deleted", False)),
-        )
-        for e in entries
-    ]
-    data = to_json(nodes, depth=max(int(e.get("level", 0)) for e in entries) if entries else 6)
-    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def import_toc_json(path: Path, lines: list[str]) -> tuple[list[dict], list[str]]:
-    """导入目录 JSON：用 core.toc.tree_from_json 重建 Node 树，返回 (entries, lines)。
-
-    若有原始行（lines 非空），通过 tree_from_json 重建完整 Node 树并返回新条目；
-    若无原始行（测试模式），直接解析 JSON 条目，lines 保持原样。
-    返回的 entries 含 raw_title / level / class_name / lines / deleted 全字段。
-    """
-    from ..core.toc import load_toc
-
-    data = load_toc(path)
-    if lines:
-        from ..core.parser import walk
-        from ..core.toc import tree_from_json
-
-        tree = tree_from_json(data, lines)
-        entries = [
-            {
-                "raw_title": n.raw_title,
-                "level": n.level,
-                "class_name": n.class_name,
-                "lines": list(n.lines),
-                "deleted": n.deleted,
-            }
-            for n in walk(tree)
-        ]
-    else:
-        # 无原始行（测试模式）：直接解析，校验必要字段
-        entries = _parse_toc_entries(data)
-    return entries, lines
-
-
-def _parse_toc_entries(data: list) -> list[dict]:
-    """无原始行时的 JSON 条目解析（测试模式用）。
-
-    校验必要字段，返回扁平条目列表。
-    """
-    entries: list[dict] = []
-    for i, item in enumerate(data, start=1):
-        if not isinstance(item, dict):
-            raise TypeError(f"第 {i} 个条目必须是 JSON 对象，收到：{item!r}")
-        title = item.get("raw_title")
-        level = item.get("level")
-        if not isinstance(title, str) or not title.strip():
-            raise TypeError(f"第 {i} 个条目标题必须是字符串，收到：{title!r}")
-        if not isinstance(level, int) or isinstance(level, bool):
-            raise TypeError(f"第 {i} 个条目 level 必须是整数，收到：{level!r}")
-        span = item.get("lines", [0, 0])
-        if not isinstance(span, list) or len(span) != 2:
-            raise TypeError(f"第 {i} 个条目 lines 必须是 [起, 止]，收到：{span!r}")
-        entries.append(
-            {
-                "raw_title": title,
-                "level": level,
-                "class_name": item.get("class_name", ""),
-                "lines": [int(span[0]), int(span[1])],
-                "deleted": bool(item.get("deleted", False)),
-            }
-        )
-    return entries

@@ -49,8 +49,6 @@ from .tabs.replace import export_rules_json, import_rules_json
 from .toc_panel import (
     TEST_ENTRIES,
     entries_from_preview,
-    export_toc_json,
-    import_toc_json,
     populate_toc,
 )
 from .toc_panel import build as build_toc_panel
@@ -107,8 +105,6 @@ class App(ctk.CTk):
             load_builtin_css=self._load_builtin_css,
             open_cover=self._open_cover,
             rescan_toc=self._on_scan,
-            import_toc=self._import_toc,
-            export_toc=self._export_toc,
             import_rules=self._import_rules,
             export_rules=self._export_rules,
             on_generate=self._on_generate,
@@ -247,41 +243,6 @@ class App(ctk.CTk):
 
     def _rescan_toc(self) -> None: ...
 
-    def _import_toc(self) -> None:
-        """导入目录 JSON：弹出文件选择框，用 tree_from_json 重建 Node 树并刷新。"""
-        from tkinter import filedialog
-
-        path = filedialog.askopenfilename(
-            title="导入目录",
-            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
-        )
-        if not path:
-            return
-        try:
-            entries, lines = import_toc_json(Path(path), self.ctx.toc_lines)
-        except (ValueError, TypeError) as e:
-            messagebox.showerror("导入失败", str(e))
-            return
-        self.ctx.toc_entries = entries
-        self.ctx.toc_lines = lines
-        self._refresh_toc_preview()
-
-    def _export_toc(self) -> None:
-        """导出目录 JSON：弹出保存框，用 core.toc.to_json 序列化后写入文件。"""
-        from tkinter import filedialog
-
-        path = filedialog.asksaveasfilename(
-            title="导出目录",
-            defaultextension=".json",
-            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
-        )
-        if not path:
-            return
-        try:
-            export_toc_json(self.ctx.toc_entries, self.ctx.toc_lines, Path(path))
-        except OSError as e:
-            messagebox.showerror("导出失败", str(e))
-
     def _import_rules(self) -> None:
         """导入替换规则 JSON：弹出文件选择框，加载后填充到卡片。"""
         from tkinter import filedialog
@@ -349,7 +310,6 @@ class App(ctk.CTk):
             {"raw_title": n.raw_title, "level": n.level}
             for n in core_walk(tree)
         ]
-        self.ctx.toc_lines = lines
         self._refresh_toc_preview()
 
     def _refresh_toc_preview(self) -> None:

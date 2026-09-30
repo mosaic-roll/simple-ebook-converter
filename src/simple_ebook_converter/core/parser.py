@@ -17,11 +17,10 @@ from .config import DEFAULTS, LevelRule
 class Node:
     """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。
 
-    `lines` 是节点在输入里的完整覆盖范围：1-based 闭区间 [标题行, 本章最后一行]，
-    含全部子孙节点的行（子节点的范围落在父节点范围内）；直属正文不含子节点，
-    组装时按「标题行之后、第一个子标题之前」切出。前言（level 0）的标题不在
-    原文中，范围即正文。供目录树往返（`toc.to_json` / `toc.tree_from_json`）
-    与预览定位用。
+    `line` 是节点在输入里的**标题行**行号（1-based）。正文范围不落盘：由「本行
+    之后到下一个条目的 `line` 之前」派生（见 `toc.tree_from_json`）。前言
+    （level 0）没有标题行，`line` 记的是正文首行。供目录树往返
+    （`toc.to_json` / `toc.tree_from_json`）与预览定位用。
     """
 
     title: str
@@ -34,7 +33,7 @@ class Node:
     #: 书页标题的 HTML 片段（转义 + html 阶段替换后的结果），由 `pipeline.process()` 填；
     #: 目录/元数据仍用纯文本的 `title`。
     title_html: str = ""
-    lines: tuple[int, int] = (0, 0)
+    line: int = 0
     #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
     #: dissolves such nodes into their neighbors. Never set by parse().
     deleted: bool = False
@@ -90,7 +89,7 @@ def parse(
 
     正文段落跟随最近的标题；首个标题之前的段落归到 `preface_title`；一条标题都没
     命中时整篇作为一章，标题用 `fallback_title`。不启用某层级就是把它的正则留空。
-    每个节点同时记下它在输入里的行范围（`Node.lines`），供目录树往返与预览定位。
+    每个节点同时记下它的标题行号（`Node.line`），供目录树往返与预览定位。
     """
     # 排序键只有级别，而排序是稳定的 → 同级保持 `levels` 的顺序，即上面的优先级
     rules = sorted((r for r in levels if r.active), key=lambda r: r.level)
@@ -117,9 +116,7 @@ def parse(
                     break
         if rule is None:
             if builder.last is not None:
-                node = builder.last
-                node.paragraphs.append(line)
-                node.lines = (node.lines[0], lineno)
+                builder.last.paragraphs.append(line)
             else:
                 preface.append((lineno, line))
             continue
@@ -129,27 +126,15 @@ def parse(
                 rule.level,
                 rule.class_name,
                 raw_title=title,
-                lines=(lineno, lineno),
+                line=lineno,
             )
         )
         stats.level_counts[rule.level] = stats.level_counts.get(rule.level, 0) + 1
         stats.max_level = max(stats.max_level, rule.level)
 
     _wrap_preface(builder.tree, preface, preface_title, fallback_title, stats)
-    _full_spans(builder.tree)
     assign_anchors(builder.tree)
     return builder.tree, stats
-
-
-def _full_spans(nodes: list[Node]) -> None:
-    """Widen each node's span to cover all its descendants, so `Node.lines` is the
-    full extent of the section it stands for (children live inside their parent).
-    """
-    for node in nodes:
-        _full_spans(node.children)
-        if node.children:
-            end = max(node.lines[1], *(c.lines[1] for c in node.children))
-            node.lines = (node.lines[0], end)
 
 
 def _match(
@@ -172,7 +157,7 @@ def _wrap_preface(
     if not preface:
         return
     paragraphs = [line for _, line in preface]
-    span = (preface[0][0], preface[-1][0])  # preface covers lines 1..first title
+    first_line = preface[0][0]  # 前言/兜底都没有标题行，正文从首行开始
     if tree:
         stats.has_preface = True
         tree.insert(
@@ -183,18 +168,20 @@ def _wrap_preface(
                 "preface",
                 paragraphs=paragraphs,
                 raw_title=preface_title,
-                lines=span,
+                line=first_line,
             ),
         )
     else:
+        # 整篇无标题时兜底成一章：没有真实标题行，给 level 0（合成标题语义），
+        # `line` 记正文首行；这样 `to_json → tree_from_json` 往返不会丢首行。
         tree.append(
             Node(
                 fallback_title,
-                2,
+                0,
                 "chapter",
                 paragraphs=paragraphs,
                 raw_title=fallback_title,
-                lines=span,
+                line=first_line,
             )
         )
 

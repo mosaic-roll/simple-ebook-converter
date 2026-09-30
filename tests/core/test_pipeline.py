@@ -360,9 +360,9 @@ def test_toc_json_round_trips(cfg):
     tree, _ = scan_toc(lines, resolve(cfg))
     data = to_json(tree)
     assert data[0]["raw_title"] == "第一卷 风起"
-    # Full-span semantics: a parent covers all its children's lines.
-    assert data[0]["lines"] == [1, 5]
-    assert data[1]["lines"] == [2, 3]
+    # 单行号：只存标题行号，正文范围由相邻条目派生。
+    assert data[0]["line"] == 1
+    assert data[1]["line"] == 2
     restored = tree_from_json(data, lines)
     assert [n.raw_title for n in walk(restored)] == [n.raw_title for n in walk(tree)]
     assert [n.paragraphs for n in walk(restored)] == [n.paragraphs for n in walk(tree)]
