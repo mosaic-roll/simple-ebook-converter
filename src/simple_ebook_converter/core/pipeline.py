@@ -4,7 +4,7 @@
 `Book`；产出方式由 `cfg` 上的 `toc_only` / `dump_css` 决定，所以这里没有「产出类型」
 参数，也没有需要前端记住的调用顺序。
 
-变换分两个阶段：`scan_toc()` 从原始行扫出目录树（原始标题 + 行号范围），`process()`
+变换分两个阶段：`scan_toc()` 从原始行扫出目录树（原始标题 + 标题行号），`process()`
 再对树做清理与替换。目录树文件（`cfg.toc_file`）就是两阶段之间的契约——正常流程在
 内存里直接走完，`--toc-file` 则让第一阶段的结果可被人工编辑后从文件读回。
 """
@@ -54,7 +54,7 @@ def resolve(cfg: Config) -> Config:
 
 
 def scan_toc(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
-    """阶段一：从原始行扫出目录树（原始标题 + 行号范围），不做清理与替换。
+    """阶段一：从原始行扫出目录树（原始标题 + 标题行号），不做清理与替换。
 
     `cfg.toc_file` 给了就跳过正则解析，按目录树文件构树（可经界面编辑），
     卷/章/节正则与 `max_title_len` 在这一形态下都不参与。

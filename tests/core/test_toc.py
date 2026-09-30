@@ -204,6 +204,18 @@ def test_tree_from_json_rejects_bad_entries():
         tree_from_json(["不是字典"], lines)
 
 
+def test_tree_from_json_rejects_multiple_level_zero():
+    """多个 level 0（前言）会撞 anchor='preface'、生成重名 xhtml，直接拒绝。"""
+    lines = ["前言一", "前言二", "第一章", "正文"]
+    data = [
+        {"raw_title": "前言一", "level": 0, "line": 1},
+        {"raw_title": "前言二", "level": 0, "line": 2},
+        {"raw_title": "第一章", "level": 2, "line": 3},
+    ]
+    with pytest.raises(ValueError, match="只能有一个 level 0"):
+        tree_from_json(data, lines)
+
+
 def test_tree_from_json_keeps_an_empty_class_name():
     """classless 层级（`--level h1:…`）的 class 是空串，回喂后原样保留，不能补成 levelN。"""
     data = [{"raw_title": "Part 1", "level": 1, "class_name": "", "line": 1}]

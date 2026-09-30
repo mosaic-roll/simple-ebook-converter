@@ -15,7 +15,8 @@ from .config import DEFAULTS, LevelRule
 
 @dataclass
 class Node:
-    """一个标题节点。`title` 是替换后的标题，`raw_title` 始终保留原文。
+    """一个标题节点。`title` 是替换后的标题（`process()` 填；`parse()` 返回时等于原文），
+    `raw_title` 始终保留原文。
 
     `line` 是节点在输入里的**标题行**行号（1-based）。正文范围不落盘：由「本行
     之后到下一个条目的 `line` 之前」派生（见 `toc.tree_from_json`）。前言
@@ -65,6 +66,8 @@ class TreeBuilder:
 class ParseStats:
     level_counts: dict[int, int] = field(default_factory=dict)
     max_level: int = 0
+    #: 有 level 0 节点。注意：整篇无标题的兜底单章也是 level 0——扫描路径下这里仍为
+    #: False（`_wrap_preface` 的兜底分支不设它），回喂路径 `_stats_from_tree` 下为 True。
     has_preface: bool = False
     total_lines: int = 0
 
