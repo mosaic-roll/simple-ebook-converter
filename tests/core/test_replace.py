@@ -120,7 +120,9 @@ def test_rules_from_json_rejects_non_string_stage():
 
 
 def test_rules_from_rows_skips_blank_pattern():
-    assert rules_from_rows([("", "x", "原文"), ("a", "b", "HTML")]) == [Rule("a", "b", "html")]
+    assert rules_from_rows([("", "x", "原文"), ("a", "b", "HTML")]) == [
+        Rule("a", "b", "html")
+    ]
 
 
 def test_rules_from_rows_accepts_short_rows():

@@ -88,7 +88,10 @@ def _click_option(opt: Option) -> click.Option:
     if opt.kind is bool:
         attrs |= {"is_flag": True, "flag_value": not default}
     else:
-        attrs |= {"type": _click_type(opt), "show_default": default not in (None, "", ())}
+        attrs |= {
+            "type": _click_type(opt),
+            "show_default": default not in (None, "", ()),
+        }
     if opt.multiple:
         attrs |= {"multiple": True}
     return click.Option(list(opt.flags), **attrs)
@@ -97,7 +100,9 @@ def _click_option(opt: Option) -> click.Option:
 class _GroupedHelp(click.Command):
     """`--help` 按选项表里的分组小节打印，而不是 click 默认的一长串。"""
 
-    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+    def format_options(
+        self, ctx: click.Context, formatter: click.HelpFormatter
+    ) -> None:
         params = {param.name: param for param in self.params}
         listed: set[str] = set()
         for title, options in option_groups():
@@ -144,7 +149,9 @@ def _produce(cfg: Config) -> None:
             click.echo(f"目录已写入：{write_toc(book)}")
         return
     if str(cfg.out or "") == STDOUT:
-        raise click.UsageError("EPUB 是二进制文件，不能输出到标准输出，请用 --out 指定文件路径")
+        raise click.UsageError(
+            "EPUB 是二进制文件，不能输出到标准输出，请用 --out 指定文件路径"
+        )
     click.echo(f"已生成：{write_epub(book)}")
     click.echo(_summary(book))
 

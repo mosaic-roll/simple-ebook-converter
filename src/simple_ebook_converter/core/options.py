@@ -81,7 +81,9 @@ class Option:
     @property
     def long_flag(self) -> str:
         """长旗标的词干（不含 `--`）：显式 `flag` 优先，否则按 `name` 推。"""
-        return self.flag or ("no-" if self.negative else "") + self.name.replace("_", "-")
+        return self.flag or ("no-" if self.negative else "") + self.name.replace(
+            "_", "-"
+        )
 
     @property
     def flags(self) -> tuple[str, ...]:
@@ -93,53 +95,106 @@ OPTIONS: tuple[Option, ...] = (
     # ---- 输入 ----
     Option("input", "输入文件", "输入 txt（也可直接作为位置参数）", "输入", short="i"),
     Option(
-        "encoding", "编码",
+        "encoding",
+        "编码",
         f"输入编码，auto 为自动检测；也可填 Python codec 名"
         f"（常用：{'/'.join(ENCODING_CHOICES[1:])}）",
-        "输入", short="e",
+        "输入",
+        short="e",
     ),
     # ---- 输出 ----
-    Option("out", "输出文件", "输出文件，缺 .epub 后缀自动补，默认取输入名", "输出", short="o", output=True),
-    Option("overwrite", "覆盖已有文件", "输出文件已存在时是否覆盖（默认覆盖）", "输出", negative=True),
     Option(
-        "dump_css", "导出 CSS",
+        "out",
+        "输出文件",
+        "输出文件，缺 .epub 后缀自动补，默认取输入名",
+        "输出",
+        short="o",
+        output=True,
+    ),
+    Option(
+        "overwrite",
+        "覆盖已有文件",
+        "输出文件已存在时是否覆盖（默认覆盖）",
+        "输出",
+        negative=True,
+    ),
+    Option(
+        "dump_css",
+        "导出 CSS",
         "把内置 CSS 模板写到这个文件（不必读输入，不受 --css-file/--css-append 影响）",
-        "输出", output=True,
+        "输出",
+        output=True,
     ),
     # ---- 书籍信息 ----
     Option("title", "书名", "留空则从文件名「《书名》作者：作者」提取", "书籍信息"),
     Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
     Option("date", "出版日期", "如 2024-05-13，留空则不写入", "书籍信息"),
     Option("language", "语言", "语言代码", "书籍信息"),
-    Option("cover", "封面图", "留空则先找输入同目录的 cover.*，再退回文字封面页", "书籍信息"),
-    Option("text_cover", "文字封面页", "没有封面图时是否生成只含书名/作者的封面页（默认生成）", "书籍信息", negative=True),
-    # ---- 章节识别 ----
-    Option("volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别"),
-    Option("chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别"),
     Option(
-        "no_volume", "无卷模式", "卷行不当标题，等同清空卷标题正则；显式给 --volume 时以正则为准",
-        "章节识别", value_type=bool,
+        "cover",
+        "封面图",
+        "留空则先找输入同目录的 cover.*，再退回文字封面页",
+        "书籍信息",
     ),
     Option(
-        "level", "额外层级",
+        "text_cover",
+        "文字封面页",
+        "没有封面图时是否生成只含书名/作者的封面页（默认生成）",
+        "书籍信息",
+        negative=True,
+    ),
+    # ---- 章节识别 ----
+    Option(
+        "volume", "卷标题正则", "h2 + class=volume；留空表示不识别卷标题", "章节识别"
+    ),
+    Option(
+        "chapter", "章标题正则", "h3 + class=chapter；留空表示不识别章标题", "章节识别"
+    ),
+    Option(
+        "no_volume",
+        "无卷模式",
+        "卷行不当标题，等同清空卷标题正则；显式给 --volume 时以正则为准",
+        "章节识别",
+        value_type=bool,
+    ),
+    Option(
+        "level",
+        "额外层级",
         "额外层级规则，可重复；格式 hN[.class]:正则（如 h1.part:^Part），与 CSS 选择器一致；"
         "同一级可给多条，先写的优先（内置卷/章/节还在它们前面）",
-        "章节识别", multiple=True,
+        "章节识别",
+        multiple=True,
     ),
-    Option("max_title_len", "标题最长字数", "超过这个字数的行直接当正文，不参与匹配", "章节识别"),
     Option(
-        "exclude", "排除规则",
+        "max_title_len",
+        "标题最长字数",
+        "超过这个字数的行直接当正文，不参与匹配",
+        "章节识别",
+    ),
+    Option(
+        "exclude",
+        "排除规则",
         "排除规则；行命中该正则时不作为标题",
         "章节识别",
     ),
-    Option("preface_title", "前言标题", "首个标题之前那些无标题段落归到这一节", "章节识别"),
-    # ---- 清理与替换 ----
-    Option("clean", "清理文本", "去掉段首段尾空格并删除空行（默认清理）", "清理与替换", negative=True),
     Option(
-        "replace_rules", "替换规则文件",
+        "preface_title", "前言标题", "首个标题之前那些无标题段落归到这一节", "章节识别"
+    ),
+    # ---- 清理与替换 ----
+    Option(
+        "clean",
+        "清理文本",
+        "去掉段首段尾空格并删除空行（默认清理）",
+        "清理与替换",
+        negative=True,
+    ),
+    Option(
+        "replace_rules",
+        "替换规则文件",
         "从 JSON 文件读取替换规则（一个有序列表）；"
         "每条含 pattern / replace / stage（raw|html）/ enabled",
-        "清理与替换", value_type=Path,
+        "清理与替换",
+        value_type=Path,
     ),
     # ---- 排版 ----
     Option("indent", "段落缩进", "段落缩进字数，0 为不缩进", "排版"),
@@ -150,30 +205,42 @@ OPTIONS: tuple[Option, ...] = (
     Option("body_align", "正文对齐", "正文默认对齐方式", "排版", choices=ALIGN_CHOICES),
     Option("font", "正文字体", "嵌入到书里的正文字体（ttf/otf/woff/woff2）", "排版"),
     Option(
-        "css_file", "外部 CSS 文件",
+        "css_file",
+        "外部 CSS 文件",
         "替代内置样式：给了它就用这一份（先用 --dump-css 导一份内置模板作起点）",
         "排版",
     ),
     Option(
-        "css_append", "附加 CSS 文件",
+        "css_append",
+        "附加 CSS 文件",
         "追加在内置样式之后，用于少量覆盖（与 --css-file 互斥）",
         "排版",
     ),
     # ---- 目录 ----
     Option(
-        "toc_in_spine", "书页含目录",
+        "toc_in_spine",
+        "书页含目录",
         "目录页是否进正文流（阅读器导航目录不受影响，始终生成）",
-        "目录", negative=True, flag="no-toc",
+        "目录",
+        negative=True,
+        flag="no-toc",
     ),
     Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
     Option(
-        "toc_file", "目录树文件",
+        "toc_file",
+        "目录树文件",
         "从 JSON 目录树生成：跳过正则解析，按行号从输入取正文；"
         "标题用文件里的值，仍会做清理与替换（--toc-only --toc-format json 导出的目录可编辑后再传入）",
         "目录",
     ),
     Option("toc_only", "只输出目录", "只输出目录，不生成 EPUB", "目录"),
-    Option("toc_format", "目录格式", "只输出目录时的格式：text | json", "目录", choices=FORMATS),
+    Option(
+        "toc_format",
+        "目录格式",
+        "只输出目录时的格式：text | json",
+        "目录",
+        choices=FORMATS,
+    ),
 )
 
 
@@ -216,7 +283,11 @@ def build_config(values: Mapping[str, Any]) -> Config:
         replacements=rules_from_file(
             _path(_option("replace_rules"), values.get("replace_rules"))
         ),
-        **{opt.name: _convert(opt, values.get(opt.name)) for opt in OPTIONS if opt.in_config},
+        **{
+            opt.name: _convert(opt, values.get(opt.name))
+            for opt in OPTIONS
+            if opt.in_config
+        },
     )
 
 

@@ -73,7 +73,9 @@ def test_find_cover_finds_the_only_one(tmp_path):
     assert find_cover(tmp_path / "novel.txt") == cover
 
 
-@pytest.mark.parametrize("name", ["cover.jpg", "cover.JPEG", "Cover.webp", "COVER.avif"])
+@pytest.mark.parametrize(
+    "name", ["cover.jpg", "cover.JPEG", "Cover.webp", "COVER.avif"]
+)
 def test_find_cover_accepts_every_supported_format(tmp_path, name):
     cover = _touch(tmp_path / name)
     assert find_cover(tmp_path / "novel.txt") == cover

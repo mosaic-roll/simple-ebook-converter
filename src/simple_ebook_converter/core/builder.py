@@ -148,7 +148,10 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
 
     book.add_item(
         epub.EpubItem(
-            uid="style", file_name="style.css", media_type="text/css", content=css.encode("utf-8")
+            uid="style",
+            file_name="style.css",
+            media_type="text/css",
+            content=css.encode("utf-8"),
         )
     )
     if cfg.font:
@@ -251,7 +254,10 @@ def _heading(node: Node, *, with_id: bool) -> str:
 
 
 def _toc_entries(
-    nodes: list[Node], page_map: dict[str, epub.EpubHtml], owner: dict[str, str], depth: int
+    nodes: list[Node],
+    page_map: dict[str, epub.EpubHtml],
+    owner: dict[str, str],
+    depth: int,
 ) -> list:
     """章节树转 ebooklib 的 toc 结构；超过 `depth` 的层级不写进目录。
 
@@ -263,13 +269,17 @@ def _toc_entries(
             continue
         entry = _toc_entry(node, page_map, owner)
         children = (
-            _toc_entries(node.children, page_map, owner, depth) if node.level < depth else []
+            _toc_entries(node.children, page_map, owner, depth)
+            if node.level < depth
+            else []
         )
         out.append((entry, children) if children else entry)
     return out
 
 
-def _toc_entry(node: Node, page_map: dict[str, epub.EpubHtml], owner: dict[str, str]) -> object:
+def _toc_entry(
+    node: Node, page_map: dict[str, epub.EpubHtml], owner: dict[str, str]
+) -> object:
     root_anchor = owner[node.anchor]
     page = page_map[root_anchor]
     if node.anchor == root_anchor:
@@ -294,7 +304,9 @@ def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> 
             item.media_type = cover_media_type(path)
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
         page.is_linear = False
-        page.content = image_cover_body(f"images/{path.name}", alt=title).encode("utf-8")
+        page.content = image_cover_body(f"images/{path.name}", alt=title).encode(
+            "utf-8"
+        )
     elif cfg.text_cover:
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
         page.content = text_cover_body(title, cfg.author).encode("utf-8")

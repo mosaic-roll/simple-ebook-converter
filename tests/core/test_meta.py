@@ -2,7 +2,10 @@ from simple_ebook_converter.core.meta import guess_metadata, resolve_metadata
 
 
 def test_guess_full():
-    assert guess_metadata("《希灵帝国》（校对版全本）作者：远瞳") == ("希灵帝国", "远瞳")
+    assert guess_metadata("《希灵帝国》（校对版全本）作者：远瞳") == (
+        "希灵帝国",
+        "远瞳",
+    )
 
 
 def test_guess_no_extra():
@@ -31,16 +34,28 @@ def test_resolve_accepts_full_path(tmp_path):
 
 
 def test_resolve_explicit_wins_over_guess():
-    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", "手写", "张三") == ("手写", "张三")
+    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", "手写", "张三") == (
+        "手写",
+        "张三",
+    )
 
 
 def test_resolve_partial_explicit_falls_back_per_field():
-    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", title="手写") == ("手写", "远瞳")
-    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", author="张三") == ("希灵帝国", "张三")
+    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", title="手写") == (
+        "手写",
+        "远瞳",
+    )
+    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", author="张三") == (
+        "希灵帝国",
+        "张三",
+    )
 
 
 def test_resolve_blank_explicit_is_treated_as_absent():
-    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", "", "  ") == ("希灵帝国", "远瞳")
+    assert resolve_metadata("《希灵帝国》作者：远瞳.txt", "", "  ") == (
+        "希灵帝国",
+        "远瞳",
+    )
 
 
 def test_resolve_falls_back_to_stem_never_none():

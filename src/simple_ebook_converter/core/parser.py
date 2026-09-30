@@ -106,7 +106,9 @@ def parse(
     for lineno, line in enumerate(lines, start=1):
         title = line.strip()
         # 超长行不可能是标题，直接归正文，连正则都不试
-        rule = _match(title, compiled) if title and len(title) <= max_title_len else None
+        rule = (
+            _match(title, compiled) if title and len(title) <= max_title_len else None
+        )
         # 标题命中后再过一遍排除规则，任一条命中就当正文
         if rule is not None:
             for pat in compiled_exclude:

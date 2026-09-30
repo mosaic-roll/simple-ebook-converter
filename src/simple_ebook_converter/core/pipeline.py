@@ -176,7 +176,9 @@ def _epub_path(cfg: Config) -> Path:
     if cfg.out is None:
         return Path(cfg.input).with_suffix(".epub")
     path = _target(cfg.out)
-    return path if path.suffix.lower() == ".epub" else path.with_name(path.name + ".epub")
+    return (
+        path if path.suffix.lower() == ".epub" else path.with_name(path.name + ".epub")
+    )
 
 
 def _target(out: str | Path) -> Path:

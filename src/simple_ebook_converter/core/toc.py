@@ -56,7 +56,10 @@ def tree_from_json(data: list, lines: list[str]) -> list[Node]:
     `deleted` 条目不生成标题：直属正文并入文档序上一个未删除条目（最前方没有
     归宿的丢弃），其未删除的子条目自动挂到更上层的未删除祖先。
     """
-    nodes = [_node_from_entry(e, lines, f"第 {i} 个条目") for i, e in enumerate(data, start=1)]
+    nodes = [
+        _node_from_entry(e, lines, f"第 {i} 个条目")
+        for i, e in enumerate(data, start=1)
+    ]
     for node, nxt in zip(nodes, [*nodes[1:], None]):
         # Direct body runs to the next heading (whatever its level), bounded by own span.
         body_end = min(node.lines[1], nxt.lines[0] - 1) if nxt else node.lines[1]

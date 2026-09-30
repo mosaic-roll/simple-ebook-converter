@@ -57,6 +57,8 @@ def find_cover(input_path: Path) -> Path | None:
     hits = [
         path
         for path in entries
-        if path.is_file() and path.stem.lower() == "cover" and path.suffix.lower() in COVER_TYPES
+        if path.is_file()
+        and path.stem.lower() == "cover"
+        and path.suffix.lower() in COVER_TYPES
     ]
     return hits[0] if len(hits) == 1 else None

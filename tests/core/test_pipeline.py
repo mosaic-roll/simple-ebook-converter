@@ -164,7 +164,9 @@ def test_process_reports_disabled_levels(tmp_path):
 
 def test_process_falls_back_to_book_title(tmp_path):
     """没有标题命中时，整篇归到一章，标题取书名。"""
-    tree, stats = process(["没有标题的一行", "另一行"], Config(input=tmp_path / "我的小说.txt"))
+    tree, stats = process(
+        ["没有标题的一行", "另一行"], Config(input=tmp_path / "我的小说.txt")
+    )
     assert stats.has_preface is False
     assert len(tree) == 1
     assert tree[0].title == "我的小说"
@@ -306,7 +308,8 @@ def test_scan_toc_from_toc_file(cfg, tmp_path):
     toc_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     tree, stats = process(
-        lines, replace(resolve(cfg), toc_file=toc_path, replacements=[Rule("初遇", "重逢")])
+        lines,
+        replace(resolve(cfg), toc_file=toc_path, replacements=[Rule("初遇", "重逢")]),
     )
     assert tree[0].title == "第一卷 改名"
     assert tree[0].children[0].title == "第一章 重逢"
@@ -352,7 +355,9 @@ def test_write_epub_falls_back_to_input_name(cfg):
 
 
 def test_write_epub_adds_missing_suffix(cfg, tmp_path):
-    assert write_epub(read_book(replace(cfg, out=tmp_path / "b"))) == tmp_path / "b.epub"
+    assert (
+        write_epub(read_book(replace(cfg, out=tmp_path / "b"))) == tmp_path / "b.epub"
+    )
 
 
 def test_write_epub_keeps_uppercase_suffix(cfg, tmp_path):
@@ -361,7 +366,9 @@ def test_write_epub_keeps_uppercase_suffix(cfg, tmp_path):
 
 
 def test_write_epub_creates_output_dir(cfg, tmp_path):
-    assert write_epub(read_book(replace(cfg, out=tmp_path / "deep" / "a.epub"))).is_file()
+    assert write_epub(
+        read_book(replace(cfg, out=tmp_path / "deep" / "a.epub"))
+    ).is_file()
 
 
 def test_write_epub_respects_overwrite_flag(cfg, tmp_path):
@@ -380,7 +387,9 @@ def test_write_epub_can_overwrite(cfg, tmp_path):
 
 def test_write_epub_reports_failure_with_context(cfg, tmp_path):
     """组装阶段出错要补上「无法生成 EPUB」这个上下文。"""
-    book = read_book(replace(cfg, out=tmp_path / "a.epub", css_file=tmp_path / "nope.css"))
+    book = read_book(
+        replace(cfg, out=tmp_path / "a.epub", css_file=tmp_path / "nope.css")
+    )
     with pytest.raises(ValueError, match="无法生成 EPUB"):
         write_epub(book)
 
@@ -406,7 +415,9 @@ def test_write_css_writes_only_css(cfg, tmp_path):
 
 def test_write_css_needs_no_input(tmp_path):
     """只排版不读内容：没有输入文件也能导出 CSS。"""
-    assert "body" in write_css(Config(dump_css=tmp_path / "b.css")).read_text(encoding="utf-8")
+    assert "body" in write_css(Config(dump_css=tmp_path / "b.css")).read_text(
+        encoding="utf-8"
+    )
 
 
 def test_write_css_needs_a_path():

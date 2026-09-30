@@ -12,7 +12,12 @@ from simple_ebook_converter.core.config import (
     Config,
     default_levels,
 )
-from simple_ebook_converter.core.options import OPTIONS, Option, option_default, option_groups
+from simple_ebook_converter.core.options import (
+    OPTIONS,
+    Option,
+    option_default,
+    option_groups,
+)
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.toc import to_json, to_text
 
@@ -130,7 +135,9 @@ def test_validate_rejects_out_of_range():
 
 
 def test_validate_accepts_edge_values():
-    Config(max_title_len=1, toc_depth=1, indent=0, date="2024-05-13 08:30:00").validate()
+    Config(
+        max_title_len=1, toc_depth=1, indent=0, date="2024-05-13 08:30:00"
+    ).validate()
     Config(toc_depth=6, date="2024-05-13").validate()
 
 

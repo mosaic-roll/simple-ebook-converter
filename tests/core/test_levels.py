@@ -3,7 +3,11 @@ import re
 import pytest
 
 from simple_ebook_converter.core.config import default_levels
-from simple_ebook_converter.core.levels import build_levels, check_pattern, parse_level_spec
+from simple_ebook_converter.core.levels import (
+    build_levels,
+    check_pattern,
+    parse_level_spec,
+)
 from simple_ebook_converter.core.replace import Rule, rules_from_json
 
 
@@ -14,7 +18,9 @@ def test_parse_level_spec():
     assert parse_level_spec("h2:^甲:带:冒号") == (2, "^甲:带:冒号", "")
 
 
-@pytest.mark.parametrize("spec", ["^没有级别号", "h7:^x", "h0:^x", "x2:^x", "h2", "h2.类名:^x"])
+@pytest.mark.parametrize(
+    "spec", ["^没有级别号", "h7:^x", "h0:^x", "x2:^x", "h2", "h2.类名:^x"]
+)
 def test_parse_level_spec_rejects_bad_input(spec):
     with pytest.raises(ValueError):
         parse_level_spec(spec)

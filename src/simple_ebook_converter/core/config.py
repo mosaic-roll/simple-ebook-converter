@@ -66,7 +66,9 @@ class LevelRule:
 
 def default_levels() -> list[LevelRule]:
     """内置的卷/章/节三条层级。调用方拿到的是新列表，可随意改。"""
-    return [LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS]
+    return [
+        LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS
+    ]
 
 
 @dataclass
@@ -153,10 +155,16 @@ class Config:
             raise ValueError(f"目录深度需在 1~6 之间，收到：{self.toc_depth}")
         if self.indent < 0:
             raise ValueError(f"段落缩进字数不能为负，收到：{self.indent}")
-        for name, label in (("chapter_align", "章对齐"), ("volume_align", "卷对齐"), ("body_align", "正文对齐")):
+        for name, label in (
+            ("chapter_align", "章对齐"),
+            ("volume_align", "卷对齐"),
+            ("body_align", "正文对齐"),
+        ):
             value = getattr(self, name)
             if value not in ALIGN_CHOICES:
-                raise ValueError(f"{label}只能是 {'/'.join(ALIGN_CHOICES)}，收到：{value}")
+                raise ValueError(
+                    f"{label}只能是 {'/'.join(ALIGN_CHOICES)}，收到：{value}"
+                )
         if self.date:
             try:
                 datetime.fromisoformat(self.date)

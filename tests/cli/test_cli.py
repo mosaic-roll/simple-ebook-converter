@@ -16,7 +16,9 @@ from simple_ebook_converter.core.parser import NoEnabledRulesError
 
 def _write_sample(tmp_path, name="novel.txt", text=None):
     p = tmp_path / name
-    p.write_text(text or "第一卷 起源\n第一章 开端\n第一段正文\n第二段正文\n", encoding="utf-8")
+    p.write_text(
+        text or "第一卷 起源\n第一章 开端\n第一段正文\n第二段正文\n", encoding="utf-8"
+    )
     return p
 
 
@@ -109,10 +111,12 @@ def _nav_and_page(tmp_path: Path) -> tuple[str, str]:
     """读出生成结果里的目录页与正文页文本。"""
     out = tmp_path / "novel.epub"
     with zipfile.ZipFile(out) as z:
-        nav = z.read(next(n for n in z.namelist() if n.endswith("nav.xhtml"))).decode("utf-8")
-        page = z.read(next(n for n in z.namelist() if n.endswith("text/p0001.xhtml"))).decode(
+        nav = z.read(next(n for n in z.namelist() if n.endswith("nav.xhtml"))).decode(
             "utf-8"
         )
+        page = z.read(
+            next(n for n in z.namelist() if n.endswith("text/p0001.xhtml"))
+        ).decode("utf-8")
     return nav, page
 
 
@@ -181,7 +185,9 @@ def test_cover_is_discovered_next_to_input(tmp_path):
     result = CliRunner().invoke(convert, [str(src)])
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(tmp_path / "novel.epub") as z:
-        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode(
+            "utf-8"
+        )
     assert "cover.png" in opf
 
 
@@ -193,7 +199,9 @@ def test_ambiguous_covers_are_ignored(tmp_path):
     result = CliRunner().invoke(convert, [str(src)])
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(tmp_path / "novel.epub") as z:
-        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode(
+            "utf-8"
+        )
     assert "cover.png" not in opf
     assert "cover.jpg" not in opf
 
@@ -206,7 +214,9 @@ def test_explicit_cover_wins_over_discovery(tmp_path):
     result = CliRunner().invoke(convert, [str(src), "--cover", str(mine)])
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(tmp_path / "novel.epub") as z:
-        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode("utf-8")
+        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode(
+            "utf-8"
+        )
     assert "mine.jpg" in opf
     assert "cover.png" not in opf
 
@@ -221,7 +231,9 @@ def _cover_page(tmp_path, name="novel.epub"):
 def test_text_cover_page_generated_by_default(tmp_path):
     """没有封面图时默认生成文字封面页，内容是书名和作者。"""
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--title", "书名", "--author", "作者"])
+    result = CliRunner().invoke(
+        convert, [str(src), "--title", "书名", "--author", "作者"]
+    )
     assert result.exit_code == 0, result.output
     page = _cover_page(tmp_path)
     assert 'epub:type="cover"' in page
@@ -231,7 +243,9 @@ def test_text_cover_page_generated_by_default(tmp_path):
 
 def test_no_text_cover_skips_page(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--title", "书名", "--no-text-cover"])
+    result = CliRunner().invoke(
+        convert, [str(src), "--title", "书名", "--no-text-cover"]
+    )
     assert result.exit_code == 0, result.output
     assert _cover_page(tmp_path) == ""
     with zipfile.ZipFile(tmp_path / "novel.epub") as z:
@@ -309,7 +323,9 @@ def test_asset_check_is_mode_independent(tmp_path):
     bad = tmp_path / "font.ttc"
     bad.write_bytes(b"\x00\x00\x00\x00tc")
     for extra in ([], ["--dump-css", str(_write_sample(tmp_path, name="x.css"))]):
-        result = CliRunner().invoke(convert, [str(src), "--toc-only", *extra, "--font", str(bad)])
+        result = CliRunner().invoke(
+            convert, [str(src), "--toc-only", *extra, "--font", str(bad)]
+        )
         assert result.exit_code != 0
         assert "font.ttc" in result.output
 
@@ -324,7 +340,9 @@ def test_toc_text(tmp_path):
 
 def test_toc_json(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
+    result = CliRunner().invoke(
+        convert, [str(src), "--toc-only", "--toc-format", "json"]
+    )
     assert result.exit_code == 0
     data = json.loads(result.output)
     # Flat list in document order: volume first, then its chapter.
@@ -377,7 +395,9 @@ def test_toc_file_round_trip(tmp_path):
     toc_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     out = tmp_path / "book.epub"
-    result = runner.invoke(convert, [str(src), "--toc-file", str(toc_path), "-o", str(out)])
+    result = runner.invoke(
+        convert, [str(src), "--toc-file", str(toc_path), "-o", str(out)]
+    )
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(out) as zf:
         content = "".join(
@@ -450,13 +470,31 @@ def test_toc_json_depth_pruning(tmp_path):
     p.write_text("第一卷\n第一章\n§1\n正文\n", encoding="utf-8")
     deep = CliRunner().invoke(
         convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "6"],
+        [
+            str(p),
+            "--toc-only",
+            "--toc-format",
+            "json",
+            "--level",
+            "h4:^§",
+            "--toc-depth",
+            "6",
+        ],
     )
     assert deep.exit_code == 0, deep.output
     assert "§1" in deep.output
     shallow = CliRunner().invoke(
         convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "3"],
+        [
+            str(p),
+            "--toc-only",
+            "--toc-format",
+            "json",
+            "--level",
+            "h4:^§",
+            "--toc-depth",
+            "3",
+        ],
     )
     assert shallow.exit_code == 0, shallow.output
     assert "第一章" in shallow.output
@@ -494,7 +532,9 @@ def test_convert_metadata_from_filename(tmp_path):
 
 def test_convert_explicit_metadata_overrides_filename(tmp_path):
     src = _write_sample(tmp_path, name="《A》作者：B.txt")
-    result = CliRunner().invoke(convert, [str(src), "--title", "手动标题", "--author", "手动作者"])
+    result = CliRunner().invoke(
+        convert, [str(src), "--title", "手动标题", "--author", "手动作者"]
+    )
     assert result.exit_code == 0, result.output
     out = tmp_path / "《A》作者：B.epub"
     with zipfile.ZipFile(out) as z:
@@ -527,7 +567,9 @@ def test_css_file_replaces_builtin_in_epub(tmp_path):
     extra = tmp_path / "extra.css"
     extra.write_text("body { color: red; }", encoding="utf-8")
     out = tmp_path / "novel.epub"
-    result = CliRunner().invoke(convert, [str(src), "--css-file", str(extra), "-o", str(out)])
+    result = CliRunner().invoke(
+        convert, [str(src), "--css-file", str(extra), "-o", str(out)]
+    )
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(out) as z:
         assert z.read("EPUB/style.css").decode("utf-8") == "body { color: red; }"
@@ -552,7 +594,9 @@ def test_css_append_keeps_builtin_and_goes_last(tmp_path):
     extra = tmp_path / "extra.css"
     extra.write_text("body { color: red; }", encoding="utf-8")
     out = tmp_path / "novel.epub"
-    result = CliRunner().invoke(convert, [str(src), "--css-append", str(extra), "-o", str(out)])
+    result = CliRunner().invoke(
+        convert, [str(src), "--css-append", str(extra), "-o", str(out)]
+    )
     assert result.exit_code == 0, result.output
     with zipfile.ZipFile(out) as z:
         css = z.read("EPUB/style.css").decode("utf-8")
@@ -640,9 +684,7 @@ def test_invalid_replace_regex_reports_clean_error(tmp_path):
 
 def test_all_levels_disabled_reports_clean_error(tmp_path):
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(
-        convert, [str(src), "--volume", "", "--chapter", ""]
-    )
+    result = CliRunner().invoke(convert, [str(src), "--volume", "", "--chapter", ""])
     assert result.exit_code == 2, result.output
     assert "没有启用的标题规则" in result.output
     assert not isinstance(result.exception, NoEnabledRulesError)
@@ -725,7 +767,6 @@ def test_help_documents_each_option():
     for opt in OPTIONS:
         _flags, help_text = records[opt.flags[-1]]
         assert opt.help in help_text, opt.name
-
 
 
 @pytest.mark.parametrize(

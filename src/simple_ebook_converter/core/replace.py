@@ -52,9 +52,10 @@ def check_stage(stage: str, where: str = "") -> str:
     if resolved not in STAGES:
         prefix = f"{where}的 " if where else ""
         choices = "/".join(STAGE_LABELS.values())
-        raise ValueError(f"{prefix}阶段只能是 {choices}（{'/'.join(STAGES)}），收到：{stage!r}")
+        raise ValueError(
+            f"{prefix}阶段只能是 {choices}（{'/'.join(STAGES)}），收到：{stage!r}"
+        )
     return resolved
-
 
 
 def rules_from_json(text: str) -> list[Rule]:
@@ -102,7 +103,13 @@ def rules_from_rows(rows: Iterable[Sequence[str] | Rule]) -> list[Rule]:
         pattern, replace, stage = (list(row) + ["", ""])[:3]
         if not pattern:
             continue
-        rules.append(Rule(pattern, replace, check_stage(stage or DEFAULT_STAGE, f"规则「{pattern}」")))
+        rules.append(
+            Rule(
+                pattern,
+                replace,
+                check_stage(stage or DEFAULT_STAGE, f"规则「{pattern}」"),
+            )
+        )
     return rules
 
 
@@ -124,7 +131,15 @@ def rules_from_file(path: str | Path | None) -> list[Rule]:
 def rules_to_json(rules: Iterable[Rule]) -> str:
     """序列化成 JSON 文本（`stage` / `enabled` 总是显式写出）。"""
     return json.dumps(
-        [{"pattern": r.pattern, "replace": r.replace, "stage": r.stage, "enabled": r.enabled} for r in rules],
+        [
+            {
+                "pattern": r.pattern,
+                "replace": r.replace,
+                "stage": r.stage,
+                "enabled": r.enabled,
+            }
+            for r in rules
+        ],
         ensure_ascii=False,
         indent=2,
     )
@@ -158,4 +173,3 @@ def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
         Replacer.of(r for r in rules if r.stage == "raw"),
         Replacer.of(r for r in rules if r.stage == "html"),
     )
-

@@ -175,7 +175,9 @@ class App(ctk.CTk):
         self.status_label = ctk.CTkLabel(
             bar, text="就绪", font=self.fonts.base, anchor="e"
         )
-        self.status_label.grid(row=0, column=1, padx=BAR_PADX, pady=BAR_PADY, sticky="e")
+        self.status_label.grid(
+            row=0, column=1, padx=BAR_PADX, pady=BAR_PADY, sticky="e"
+        )
 
     def _set_status(self, text: str, kind: str = "info") -> None:
         """更新底栏状态文字。`kind`：info / ok / error，配色见 `constants.STATUS_COLORS`。"""

@@ -99,7 +99,11 @@ def test_numbers_accept_strings(tmp_path):
 
 def test_numbers_fall_back_when_blank(tmp_path):
     cfg = _config(tmp_path, max_title_len="", toc_depth=None, indent="")
-    assert (cfg.max_title_len, cfg.toc_depth, cfg.indent) == (DEFAULTS.max_title_len, 6, 2)
+    assert (cfg.max_title_len, cfg.toc_depth, cfg.indent) == (
+        DEFAULTS.max_title_len,
+        6,
+        2,
+    )
 
 
 def test_bad_number_names_the_option(tmp_path):
@@ -112,7 +116,9 @@ def test_bad_number_names_the_option(tmp_path):
 
 def test_switches_take_positive_values(tmp_path):
     """前端收上来的已经是 `Config` 的正面语义，`build_config()` 不做取反。"""
-    cfg = _config(tmp_path, overwrite=False, toc_in_spine=False, clean=False, text_cover=False)
+    cfg = _config(
+        tmp_path, overwrite=False, toc_in_spine=False, clean=False, text_cover=False
+    )
     assert cfg.overwrite is False
     assert cfg.toc_in_spine is False
     assert cfg.clean is False
@@ -131,7 +137,9 @@ def test_switches_default_to_on(tmp_path):
 
 def test_output_switches_land_on_config(tmp_path):
     """产出方式也是 `Config` 字段：前端收完值就直接交回 core。"""
-    cfg = _config(tmp_path, toc_only=True, toc_format="json", dump_css=str(tmp_path / "a.css"))
+    cfg = _config(
+        tmp_path, toc_only=True, toc_format="json", dump_css=str(tmp_path / "a.css")
+    )
     assert cfg.toc_only is True
     assert cfg.toc_format == "json"
     assert cfg.dump_css == tmp_path / "a.css"
@@ -248,7 +256,11 @@ def test_missing_asset_is_rejected(tmp_path):
 
 def test_output_paths_need_not_exist(tmp_path):
     """输出路径不要求已存在：本来就是要写出来的。"""
-    cfg = _config(tmp_path, out=str(tmp_path / "deep" / "a.epub"), dump_css=str(tmp_path / "b.css"))
+    cfg = _config(
+        tmp_path,
+        out=str(tmp_path / "deep" / "a.epub"),
+        dump_css=str(tmp_path / "b.css"),
+    )
     assert cfg.out == tmp_path / "deep" / "a.epub"
     assert cfg.dump_css == tmp_path / "b.css"
 
@@ -262,9 +274,13 @@ def test_no_replacement_by_default(tmp_path):
 
 def test_replacements_from_file(tmp_path):
     path = tmp_path / "rules.json"
-    path.write_text('[{"pattern": "甲", "replace": "乙", "stage": "html"}]', encoding="utf-8")
+    path.write_text(
+        '[{"pattern": "甲", "replace": "乙", "stage": "html"}]', encoding="utf-8"
+    )
     cfg = _config(tmp_path, replace_rules=str(path))
-    assert [(r.pattern, r.replace, r.stage) for r in cfg.replacements] == [("甲", "乙", "html")]
+    assert [(r.pattern, r.replace, r.stage) for r in cfg.replacements] == [
+        ("甲", "乙", "html")
+    ]
 
 
 def test_core_ignores_gui_table_rows(tmp_path):
@@ -295,7 +311,9 @@ def test_option_names_are_unique():
 def test_long_flag_comes_from_name_or_explicit_override():
     """长旗标默认按名字推：正面 `--xxx`，反面 `--no-xxx`；个别显式 `flag` 覆盖。"""
     for opt in OPTIONS:
-        expected = opt.flag or ("no-" if opt.negative else "") + opt.name.replace("_", "-")
+        expected = opt.flag or ("no-" if opt.negative else "") + opt.name.replace(
+            "_", "-"
+        )
         assert opt.flags[-1] == f"--{expected}", opt.name
 
 

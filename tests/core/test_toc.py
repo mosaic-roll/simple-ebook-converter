@@ -7,8 +7,17 @@ from simple_ebook_converter.core.toc import load_toc, to_json, tree_from_json
 
 
 def _sample_tree() -> list[Node]:
-    body = Node("第一章 一", 3, "chapter", paragraphs=["正文甲"], raw_title="第一章 一", lines=(2, 3))
-    volume = Node("第一卷", 2, "volume", children=[body], raw_title="第一卷", lines=(1, 3))
+    body = Node(
+        "第一章 一",
+        3,
+        "chapter",
+        paragraphs=["正文甲"],
+        raw_title="第一章 一",
+        lines=(2, 3),
+    )
+    volume = Node(
+        "第一卷", 2, "volume", children=[body], raw_title="第一卷", lines=(1, 3)
+    )
     return [volume]
 
 
@@ -22,7 +31,11 @@ def test_to_json_and_tree_from_json_round_trip():
 
     restored = tree_from_json(data, lines)
     volume, body = restored[0], restored[0].children[0]
-    assert (volume.raw_title, volume.level, volume.class_name) == ("第一卷", 2, "volume")
+    assert (volume.raw_title, volume.level, volume.class_name) == (
+        "第一卷",
+        2,
+        "volume",
+    )
     assert volume.paragraphs == []  # direct body stops before the next heading
     assert body.paragraphs == ["正文甲"]  # 标题行本身不进正文
 
@@ -40,8 +53,18 @@ def test_tree_from_json_levels_are_stacked():
     lines = ["第一卷", "第一章 一", "正文甲", "第二章 二", "正文二"]
     data = [
         {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 5]},
-        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [2, 3]},
-        {"raw_title": "第二章 二", "level": 3, "class_name": "chapter", "lines": [4, 5]},
+        {
+            "raw_title": "第一章 一",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [2, 3],
+        },
+        {
+            "raw_title": "第二章 二",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [4, 5],
+        },
     ]
     restored = tree_from_json(data, lines)
     assert [c.raw_title for c in restored[0].children] == ["第一章 一", "第二章 二"]
@@ -54,7 +77,12 @@ def test_tree_from_json_allows_gaps():
     data = [
         # Narrowed below the next heading: line 2 becomes a gap.
         {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 1]},
-        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [3, 4]},
+        {
+            "raw_title": "第一章 一",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [3, 4],
+        },
     ]
     restored = tree_from_json(data, lines)
     assert restored[0].paragraphs == []
@@ -87,7 +115,12 @@ def test_tree_from_json_dissolves_deleted_into_previous():
     ]
     data = [
         {"raw_title": "第一卷", "level": 2, "class_name": "volume", "lines": [1, 7]},
-        {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "lines": [2, 3]},
+        {
+            "raw_title": "第一章 一",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [2, 3],
+        },
         {
             "raw_title": "第100章 误匹配",
             "level": 3,
@@ -95,7 +128,12 @@ def test_tree_from_json_dissolves_deleted_into_previous():
             "lines": [4, 5],
             "deleted": True,
         },
-        {"raw_title": "第二章 二", "level": 3, "class_name": "chapter", "lines": [6, 7]},
+        {
+            "raw_title": "第二章 二",
+            "level": 3,
+            "class_name": "chapter",
+            "lines": [6, 7],
+        },
     ]
     restored = tree_from_json(data, lines)
     volume = restored[0]

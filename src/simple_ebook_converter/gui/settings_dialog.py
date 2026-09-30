@@ -111,9 +111,9 @@ def add_row(
     parent: ctk.CTkFrame, r: int, label: str, widget: ctk.CTkBaseClass, ctx: GuiContext
 ) -> None:
     """一行：标签列固定宽，控件列吸收剩余宽度。"""
-    ctk.CTkLabel(
-        parent, text=label, anchor="w", font=ctx.fonts.base
-    ).grid(row=r, column=0, sticky="w", padx=LABEL_PADX, pady=(0, ROW_PADY))
+    ctk.CTkLabel(parent, text=label, anchor="w", font=ctx.fonts.base).grid(
+        row=r, column=0, sticky="w", padx=LABEL_PADX, pady=(0, ROW_PADY)
+    )
     widget.grid(row=r, column=1, sticky="ew", pady=(0, ROW_PADY))
 
 

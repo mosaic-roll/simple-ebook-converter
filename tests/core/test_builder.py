@@ -18,7 +18,11 @@ from simple_ebook_converter.core.parser import parse
 
 
 def _default_tree():
-    return parse(["第一章 一", "正文一", "第二章 二", "正文二"], Config().levels, fallback_title="测试书")[0]
+    return parse(
+        ["第一章 一", "正文一", "第二章 二", "正文二"],
+        Config().levels,
+        fallback_title="测试书",
+    )[0]
 
 
 def _section_tree():
@@ -108,7 +112,9 @@ def test_css_content_applies_settings(tmp_path):
 
 
 def test_build_epub_structure(tmp_path):
-    cfg = Config(input=tmp_path / "novel.txt", title="测试书", author="作者", language="zh")
+    cfg = Config(
+        input=tmp_path / "novel.txt", title="测试书", author="作者", language="zh"
+    )
     tree, _ = parse(
         ["前言内容", "第1章 一", "第一段文字", "第2章 二", "第二段文字"],
         cfg.levels,
@@ -129,7 +135,12 @@ def test_build_epub_structure(tmp_path):
 
 def test_preface_built(tmp_path):
     cfg = Config(input=tmp_path / "novel.txt")
-    tree, _ = parse(["开篇语", "第1章 一", "正文"], cfg.levels, preface_title="前言", fallback_title="x")
+    tree, _ = parse(
+        ["开篇语", "第1章 一", "正文"],
+        cfg.levels,
+        preface_title="前言",
+        fallback_title="x",
+    )
     out = tmp_path / "out.epub"
     build_epub(cfg, tree, build_css(cfg), out)
     with zipfile.ZipFile(out) as z:
@@ -146,7 +157,9 @@ def test_cover_packaged(tmp_path):
     build_epub(cfg, tree, build_css(cfg), out)
     with zipfile.ZipFile(out) as z:
         names = z.namelist()
-    assert any("cover-image" in n for n in names) or any(n.endswith("c.png") for n in names)
+    assert any("cover-image" in n for n in names) or any(
+        n.endswith("c.png") for n in names
+    )
     assert any("cover.xhtml" in n for n in names)
 
 
@@ -184,7 +197,7 @@ def test_author_and_date_written(tmp_path):
     out = _build(tmp_path, cfg=cfg)
     entries = _entries(out)
     opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
-    assert "<dc:creator id=\"creator\">张三</dc:creator>" in opf
+    assert '<dc:creator id="creator">张三</dc:creator>' in opf
     assert "<dc:date>2024-05-13</dc:date>" in opf
 
 
@@ -207,7 +220,7 @@ def test_toc_nav_in_spine_by_default(tmp_path):
     assert "EPUB/nav.xhtml" in entries
     opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
     spine = opf.split("<spine", 1)[1].split("</spine>", 1)[0]
-    assert '"nav"' in spine or "nav\"" in spine
+    assert '"nav"' in spine or 'nav"' in spine
 
 
 # ---------- 分页：只 h1~h3 单独成页 ----------
@@ -240,7 +253,9 @@ def test_toc_depth_hides_deep_headings(tmp_path):
 
 def test_deep_only_tree_still_gets_a_page(tmp_path):
     """只启用 h4 当层级时它没有成页的祖先，也得自己成页，正文才不至于无家可归。"""
-    tree = parse(["※清晨", "正文甲"], build_levels(["h4.section:^※"]), fallback_title="测试书")[0]
+    tree = parse(
+        ["※清晨", "正文甲"], build_levels(["h4.section:^※"]), fallback_title="测试书"
+    )[0]
     entries = _entries(_build(tmp_path, tree=tree))
     html = entries["EPUB/text/p0001.xhtml"].decode("utf-8")
     assert '<h4 class="section">※清晨</h4>' in html  # 根标题不带 id
@@ -294,7 +309,9 @@ def test_text_cover_page_is_linear(tmp_path):
 
 def test_text_cover_page_has_no_cover_image_property(tmp_path):
     """文字封面不是图片，不能带 cover-image / meta name=cover。"""
-    entries = _entries(_build(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名")))
+    entries = _entries(
+        _build(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名"))
+    )
     opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
     assert "cover-image" not in opf
     assert 'name="cover"' not in opf
@@ -317,7 +334,9 @@ def test_text_cover_escapes_markup(tmp_path):
 
 
 def test_text_cover_omits_author_when_empty(tmp_path):
-    page = _cover_xhtml(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名"))
+    page = _cover_xhtml(
+        tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名")
+    )
     assert "<p>" not in page
 
 
@@ -464,7 +483,10 @@ def test_text_body_omits_missing_parts():
 
 
 def test_text_body_empty_still_valid_section():
-    assert text_cover_body("", "") == '<section class="cover" epub:type="cover">\n</section>'
+    assert (
+        text_cover_body("", "")
+        == '<section class="cover" epub:type="cover">\n</section>'
+    )
 
 
 def test_text_body_escapes_markup():

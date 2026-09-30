@@ -1,8 +1,8 @@
 """图形界面入口：直接运行即可，无需依赖 CLI/core。
 
-    pip install "simple-ebook-converter[gui]"
-    python -m simple_ebook_converter.gui
-    simple-ebook-converter
+pip install "simple-ebook-converter[gui]"
+python -m simple_ebook_converter.gui
+simple-ebook-converter
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ def main() -> int:
         return 3
 
     from .app import App
+
     App().mainloop()
     return 0
 
