@@ -55,7 +55,8 @@ from .toc_panel import build as build_toc_panel
 from .utils import open_with_default_app
 
 
-#: 扁平条目列表 → `preview_titles` 需要的 `list[Node]`
+#: 扁平条目列表 → `preview_titles` 需要的 `list[Node]`（仅供预览；`line` / `deleted`
+#: 不参与标题替换预览，留给后续生成路径）
 def _entries_to_nodes(entries: list[dict]) -> list:
     from ..core.parser import Node
 
@@ -181,7 +182,7 @@ class App(ctk.CTk):
 
         # 初始化目录条目：用测试数据填充，等真实扫描后再替换
         self.ctx.toc_entries = [
-            {"raw_title": e["raw_title"], "level": e["level"]}
+            {"raw_title": e["raw_title"], "level": e["level"], "deleted": False}
             for e in TEST_ENTRIES
         ]
 
@@ -305,9 +306,10 @@ class App(ctk.CTk):
         except ValueError as e:
             messagebox.showerror("扫描失败", str(e))
             return
-        # 把扫描结果转成扁平条目列表，供 preview_titles 和 populate_toc 使用
+        # 把扫描结果转成扁平条目列表，供 preview_titles 和 populate_toc 使用；
+        # `line` 留给后续生成（被删条目当正文）用，`deleted` 由删除/恢复按钮改
         self.ctx.toc_entries = [
-            {"raw_title": n.raw_title, "level": n.level}
+            {"raw_title": n.raw_title, "level": n.level, "line": n.line, "deleted": False}
             for n in core_walk(tree)
         ]
         self._refresh_toc_preview()
@@ -316,21 +318,31 @@ class App(ctk.CTk):
         """用当前替换规则对 `ctx.toc_entries` 做预览，刷新右侧表格。
 
         收集逻辑收在 `tabs.replace.collect_rules()` 里（§5.3），此处只负责刷新。
+        预览条目与 `toc_entries` 文档序一一对应，按序号把用户手标的 `deleted` 与扫描
+        得到的 `line` 带过来——否则每次规则变动重建表格都会把删除线抹掉。
         所有节点默认展开（无主键，按标题恢复不可靠）。
         """
         from .tabs.replace import collect_rules
 
+        old_entries = self.ctx.toc_entries
         rules_list = collect_rules(self.tab_widgets["replace"]["rule_cards"])
         try:
             results = preview_titles(
-                _entries_to_nodes(self.ctx.toc_entries), rules_list
+                _entries_to_nodes(old_entries), rules_list
             )
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("预览失败", str(e))
             return
+        entries = entries_from_preview(results)
+        for i, entry in enumerate(entries):
+            prev = old_entries[i] if i < len(old_entries) else {}
+            entry["deleted"] = bool(prev.get("deleted", False))
+            if "line" in prev:
+                entry["line"] = prev["line"]
+        self.ctx.toc_entries = entries
         table = self.toc_widgets["table"]
         table.delete(*table.get_children())
-        populate_toc(table, entries_from_preview(results))
+        populate_toc(table, entries)
 
     def _open_cover(self) -> None:
         """用系统默认程序打开封面图；跨 Tab 读值，所以回调注册在 app 层。"""

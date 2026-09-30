@@ -92,14 +92,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         text="删除",
         width=BTN_W_M,
         font=font,
-        command=lambda: set_deleted(table, True),
+        command=lambda: set_deleted(table, ctx.toc_entries, True),
     ).pack(side="left", padx=(0, BTN_GAP))
     ctk.CTkButton(
         right,
         text="恢复",
         width=BTN_W_M,
         font=font,
-        command=lambda: set_deleted(table, False),
+        command=lambda: set_deleted(table, ctx.toc_entries, False),
     ).pack(side="left")
 
     return {
@@ -125,15 +125,19 @@ def _tags_for(deleted: bool, html_hit: bool) -> tuple[str, ...]:
     return ()
 
 
-def set_deleted(table: ttk.Treeview, deleted: bool) -> None:
-    """给选中的条目打/去删除线。
+def set_deleted(table: ttk.Treeview, entries: list[dict], deleted: bool) -> None:
+    """给选中的条目打/去删除线，并把标记写回 `entries`。
 
+    表格 item 的 iid 就是它在 `entries` 里的下标（见 `populate_toc`），据此一一对应。
     删除**不删**正文也不把条目从树上摘下来，原样留着显示删除线，装配时再自动融合到
-    前一条（和 CLI 的「目录树 JSON → --toc-file」那条路一样）。
+    前一条、内容当正文处理（和 CLI 的「目录树 JSON → --toc-file」那条路一样）。
 
     这里读—改—写而不是直接覆盖 `tags`：覆盖会把 html 命中的蓝色一起抹掉。
     """
     for item_id in table.selection():
+        index = int(item_id)
+        if 0 <= index < len(entries):
+            entries[index]["deleted"] = deleted
         current = set(table.item(item_id, "tags") or ())
         html_hit = bool(current & {TAG_HTML, TAG_HTML_DELETED})
         table.item(item_id, tags=_tags_for(deleted, html_hit))
@@ -163,17 +167,20 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
     `deleted` 为真时画删除线，`html_hit` 为真时整行标蓝（html 阶段命中过），
     `open` 为真时默认展开。`result` / `html_hit` 由 `entries_from_preview()` 算好。
 
+    item 的 iid 用条目下标，`set_deleted()` 靠它把删除标记写回对应 entry。
     tag 由 `_tags_for()` 统一算：删除优先，既删除又命中时灰字带删除线，蓝色等恢复后回来。
     """
     stack: list[tuple[int, str]] = []  # (level, item_id)，栈顶是当前父节点
-    for entry in entries:
+    for index, entry in enumerate(entries):
         level = int(entry.get("level", 0))
         title = str(entry.get("raw_title", ""))
         result = str(entry.get("result", title))
         while stack and stack[-1][0] >= level:
             stack.pop()
         parent = stack[-1][1] if stack else ""
-        item_id = table.insert(parent, "end", values=(title, result), open=True)
+        item_id = table.insert(
+            parent, "end", iid=str(index), values=(title, result), open=True
+        )
         tags = _tags_for(bool(entry.get("deleted")), bool(entry.get("html_hit")))
         if tags:
             table.item(item_id, tags=tags)

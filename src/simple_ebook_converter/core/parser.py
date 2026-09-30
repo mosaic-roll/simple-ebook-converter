@@ -19,8 +19,9 @@ class Node:
 
     `line` 是节点在输入里的**标题行**行号（1-based）。正文范围不落盘：由「本行
     之后到下一个条目的 `line` 之前」派生（见 `toc.tree_from_json`）。前言
-    （level 0）没有标题行，`line` 记的是正文首行。供目录树往返
-    （`toc.to_json` / `toc.tree_from_json`）与预览定位用。
+    （level 0）没有标题行，`line` 记的是正文首行；整篇无标题时兜底成的单章同样是
+    level 0。供目录树往返（`toc.to_json` / `toc.tree_from_json`）与预览定位用。
+    `line=0` 表示未设置（如界面直接构造的预览节点），这种节点不能回喂。
     """
 
     title: str
