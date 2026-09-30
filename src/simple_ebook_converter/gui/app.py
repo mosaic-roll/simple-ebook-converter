@@ -365,6 +365,10 @@ class App(ctk.CTk):
         预览条目与 `toc_entries` 文档序一一对应，按序号把用户手标的 `deleted` 与扫描
         得到的 `line` 带过来——否则每次规则变动重建表格都会把删除线抹掉。
         所有节点默认展开（无主键，按标题恢复不可靠）。
+
+        保持纯函数语义：无论谁调用、规则是否真的变了，都无条件执行一次。
+        「规则是否变了」的判断由 replace tab 的 `_fire()` 在触发点完成，
+        app 层不掺杂缓存状态。
         """
         from .tabs.replace import collect_rules
 
