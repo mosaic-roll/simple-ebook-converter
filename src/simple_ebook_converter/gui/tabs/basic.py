@@ -35,7 +35,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     m = make_group(parent, "书籍信息", 1, ctx)
     book_title = make_field(m, 1, "书名", ctx, "书名", col=0)
     book_author = make_field(m, 1, "作者", ctx, "作者", col=2)
-    book_date = make_field(m, 2, "日期", ctx, "2024-05-13", col=0)
+    book_date = make_field(m, 2, "出版日期", ctx, "2024-05-13", col=0)
     lang_menu = make_field_combo(m, 2, "语言", LANGUAGES, ctx, col=2)
 
     c = make_group(parent, "封面", 2, ctx)
