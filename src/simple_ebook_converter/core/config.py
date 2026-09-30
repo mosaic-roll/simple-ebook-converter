@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import codecs
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -153,6 +154,14 @@ class Config:
         `resolve()` 会自动调用，正常走 CLI / GUI 都会校验；直接调 `build_epub()`
         的调用方应自己先过一遍。
         """
+        if self.encoding and self.encoding.lower() != AUTO_ENCODING:
+            try:
+                codecs.lookup(self.encoding)
+            except LookupError:
+                raise ValueError(
+                    f"未知编码：{self.encoding}（要填 Python 的 codec 名，如 utf-8 /"
+                    " gb18030 / cp932）"
+                ) from None
         if self.max_title_len < 1:
             raise ValueError(f"标题最大字数需为正整数，收到：{self.max_title_len}")
         if not 1 <= self.toc_depth <= 6:

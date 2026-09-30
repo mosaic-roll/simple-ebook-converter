@@ -669,7 +669,9 @@ def test_unknown_encoding_name_reports_clean_error(tmp_path):
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "-e", "no-such-encoding"])
     assert result.exit_code == 2, result.output
-    assert "无法用编码 no-such-encoding 解码" in result.output
+    # Config.validate() 就拦下了：不用等读文件，且告诉用户要填 codec 名
+    assert "未知编码：no-such-encoding" in result.output
+    assert "codec" in result.output
 
 
 def test_invalid_replace_regex_reports_clean_error(tmp_path):

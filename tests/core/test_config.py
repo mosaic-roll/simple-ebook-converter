@@ -123,6 +123,7 @@ def test_validate_rejects_out_of_range():
         ({"toc_depth": 0}, "目录深度"),
         ({"toc_depth": 7}, "目录深度"),
         ({"toc_format": "md"}, "目录格式"),
+        ({"encoding": "bogus-enc"}, "未知编码"),
         ({"indent": -1}, "段落缩进"),
         ({"chapter_align": "middle"}, "章对齐"),
         ({"volume_align": "MIDDLE"}, "卷对齐"),
@@ -140,6 +141,16 @@ def test_validate_accepts_edge_values():
         max_title_len=1, toc_depth=1, indent=0, date="2024-05-13 08:30:00"
     ).validate()
     Config(toc_depth=6, date="2024-05-13").validate()
+
+
+def test_validate_accepts_any_codec_python_resolves():
+    """不在任何名单里的合法编码照样放行——名单管显示，不管能不能用。
+
+    chardet 能报出 `FALLBACK_ENCODINGS` 之外的名字（cp1252 / koi8-r…），
+    `windows-1252` 这种非规范写法也认，所以这里只查 `codecs.lookup()` 解不解析得开。
+    """
+    for encoding in ("auto", "cp1252", "windows-1252", "koi8-r", "euc_kr"):
+        Config(encoding=encoding).validate()
 
 
 def test_css_file_and_css_append_are_mutually_exclusive(tmp_path):
