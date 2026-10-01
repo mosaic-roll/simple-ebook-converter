@@ -73,7 +73,7 @@ def scan_toc(
     所以这里**一次文件都不读**。
     """
     if entries is not None:
-        tree = tree_from_json(entries, lines)
+        tree = tree_from_json(entries, lines, cfg.preface_title)
         return tree, _stats_from_tree(tree, len(lines))
     return parse(
         lines,

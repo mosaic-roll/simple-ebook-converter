@@ -2,8 +2,10 @@
 
 JSON 是 `--toc-only --toc-format json` 导出与 `--toc-file` 回喂之间的中间产物：按文档序
 一行一个条目，只存原始标题（`raw_title`）、层级（`level`）与**标题行号**（`line`）——层级由
-`level` 决定，嵌套不落盘，正文范围由相邻条目派生。标题的清理替换推迟到组装阶段。`to_json` /
-`tree_from_json` 互为逆操作，中间可以插一步人工编辑（改标题、删除线标记、合并章节）。
+`level` 决定，嵌套不落盘，正文范围由相邻**保留**条目派生。标题的清理替换推迟到组装阶段。
+`to_json` / `tree_from_json` 互为逆操作，中间可以插一步人工编辑（改标题、删除线标记、
+合并章节）。`deleted` 条目不生成标题节点：其行号被完全跳过，标题行与直属段落自然并入
+前一个保留条目的正文；文档序最前的若干条目被删时，这些散落行归到前言。
 """
 
 from __future__ import annotations
@@ -63,31 +65,64 @@ def load_toc(path: Path) -> list:
     return data
 
 
-def tree_from_json(data: list, lines: list[str]) -> list[Node]:
+def tree_from_json(
+    data: list,
+    lines: list[str],
+    preface_title: str = DEFAULTS.preface_title,
+) -> list[Node]:
     """扁平条目列表 + 原始行 → 章节树。`tree_from_json` 的逆操作是 `to_json`。
 
     `data` 是 Python 结构（`to_json` 的产物，或 GUI 目录面板维护的同形列表），
     **不是 JSON 文本**——文本形态由 `load_toc()` 先解析成结构再传进来。
 
-    条目按行号顺序给出，层级由 `level` 栈式重建（与 `line` 无关）；直属正文取
-    「本条目 `line` 之后到下一个条目的 `line` 之前」，末项到文件尾。标题用条目现值，
-    切完照常过清理与替换。`deleted` 条目不生成标题：直属正文并入文档序上一个未删除
-    条目（最前方没有归宿的丢弃），其未删除的子条目自动挂到更上层的未删除祖先。
+    条目按行号顺序给出，层级由 `level` 栈式重建（与 `line` 无关）。`deleted`
+    条目**不生成标题节点**：它没有对应的 `Node`，其行号被完全跳过——正文范围
+    由相邻**保留**条目的 `line` 派生，所以被删条目的标题行与直属段落自然并入
+    前一个保留条目的正文。文档序最前的若干条目被删时前面没有可并的条目，
+    这些散落行归到前言；一条未删条目都没有时整篇作为前言。
     """
     nodes = [
         _node_from_entry(e, lines, f"第 {i} 个条目")
         for i, e in enumerate(data, start=1)
     ]
-    for node, nxt in zip(nodes, [*nodes[1:], None]):
-        # 正文：本标题行之后到下一项的标题行之前；末项到文件尾。
-        # 前言/兜底（level 0）没有标题行，从自身 line 起就是正文。
+    kept = [n for n in nodes if not n.deleted]
+
+    if not kept:
+        # 所有条目都被删——整篇作为前言
+        tree: list[Node] = [
+            Node(preface_title, 0, "preface",
+                 paragraphs=list(lines), raw_title=preface_title, line=1)
+        ]
+        assign_anchors(tree)
+        return tree
+
+    # 正文范围：本条目 line 之后到下一个**保留**条目的 line 之前；末项到文件尾。
+    # 被删条目的行号被跨过，它们的内容自动并进前一个保留条目的正文范围。
+    for node, nxt in zip(kept, [*kept[1:], None]):
         body_end = nxt.line - 1 if nxt else len(lines)
         body_start = node.line if node.level == 0 else node.line + 1
         node.paragraphs = (
             lines[body_start - 1 : body_end] if body_end >= body_start else []
         )
-    tree = _rebuild(nodes)
-    # level 0 在前言/兜底里固定用 anchor="preface"；多于一个会生成重名 xhtml，EPUB 损坏。
+
+    builder = TreeBuilder()
+    for node in kept:
+        builder.add(node)
+    tree = builder.tree
+
+    # 首个保留条目的 line 之前还有行：文档序最前的若干条目被删，这些散落行
+    # 归到前言。level 0 条目本身的 line 就是正文首行，它前面没有"标题行"可跳，
+    # 所以这一支不触发。
+    first = kept[0]
+    if first.level > 0 and first.line > 1:
+        tree.insert(
+            0,
+            Node(preface_title, 0, "preface",
+                 paragraphs=lines[0 : first.line - 1],
+                 raw_title=preface_title, line=1),
+        )
+
+    # level 0 固定用 anchor="preface"；多于一个会生成重名 xhtml，EPUB 损坏。
     level0 = [n for n in tree if n.level == 0]
     if len(level0) > 1:
         raise ValueError(
@@ -95,20 +130,6 @@ def tree_from_json(data: list, lines: list[str]) -> list[Node]:
         )
     assign_anchors(tree)
     return tree
-
-
-def _rebuild(nodes: list[Node]) -> list[Node]:
-    """重建层级并溶解 deleted 条目：文档序单遍。"""
-    builder = TreeBuilder()
-    for node in nodes:
-        if node.deleted:
-            # 被划掉的条目，它的正文并进前面最近一个保留下来的条目；
-            # 顶到最前面时前面没有条目可并，只能丢弃。
-            if builder.last is not None:
-                builder.last.paragraphs.extend(node.paragraphs)
-            continue
-        builder.add(node)
-    return builder.tree
 
 
 def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:

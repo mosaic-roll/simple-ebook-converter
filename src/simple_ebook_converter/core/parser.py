@@ -37,7 +37,8 @@ class Node:
     title_html: str = ""
     line: int = 0
     #: 界面上被标记删除（目录条目 JSON 里的 `"deleted": true`）；
-    #: `toc.tree_from_json` 会把这类节点溶解进相邻条目。`parse()` 从不设置它。
+    #: `toc.tree_from_json` 会把这类节点的行号完全跳过——标题行与直属段落自然并入
+    #: 前一个保留条目的正文；文档序最前的若干被删条目归到前言。`parse()` 从不设置它。
     deleted: bool = False
 
 
