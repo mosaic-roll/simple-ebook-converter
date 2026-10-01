@@ -48,6 +48,7 @@ def test_euc_jp_japanese():
 def test_manual_encoding():
     raw = "中文".encode("gb18030")
     text, enc = decode(raw, encoding="gb18030")
+    assert text == "中文"
     assert enc == "gb18030"
 
 

@@ -21,7 +21,7 @@ def _modules() -> dict[str, ModuleType]:
 def _public_names() -> set[str]:
     """各子模块里"自己定义"的公共名字（排除下划线私有、import 进来的模块与再导出）。"""
     names: set[str] = set()
-    for name, mod in _modules().items():
+    for mod in _modules().values():
         for attr, obj in vars(mod).items():
             if attr.startswith("_") or isinstance(obj, ModuleType):
                 continue

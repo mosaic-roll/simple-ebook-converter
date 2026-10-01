@@ -47,7 +47,7 @@ def test_no_volume_top_level_chapters():
 
 def test_no_titles_single_chapter():
     lines = ["第1行", "随便写点什么", "第3行"]
-    tree, stats = parse(lines, default_levels(), fallback_title="书名")
+    tree, _stats = parse(lines, default_levels(), fallback_title="书名")
     assert len(tree) == 1
     assert tree[0].title == "书名"
     assert tree[0].paragraphs == lines

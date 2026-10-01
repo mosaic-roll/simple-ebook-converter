@@ -301,7 +301,7 @@ def import_toc_json(path: Path) -> list[dict]:
     entries: list[dict] = []
     for i, item in enumerate(data, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"第 {i} 个条目不是 JSON 对象")
+            raise ValueError(f"第 {i} 个条目不是 JSON 对象")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
         title = item.get("raw_title")
         level = item.get("level")
         line = item.get("line")
@@ -313,10 +313,10 @@ def import_toc_json(path: Path) -> list[dict]:
             raise ValueError(f"第 {i} 个条目的行号不合法：{line!r}")
         class_name = item.get("class_name", "")
         if not isinstance(class_name, str):
-            raise ValueError(f"第 {i} 个条目的 class_name 不合法：{class_name!r}")
+            raise ValueError(f"第 {i} 个条目的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
         deleted = item.get("deleted", False)
         if not isinstance(deleted, bool):
-            raise ValueError(f"第 {i} 个条目的 deleted 只能是 true/false")
+            raise ValueError(f"第 {i} 个条目的 deleted 只能是 true/false")  # noqa: TRY004  # 同上
         entries.append(
             {
                 "raw_title": title.strip(),

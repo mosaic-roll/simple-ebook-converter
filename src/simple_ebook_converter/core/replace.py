@@ -79,11 +79,11 @@ def rules_from_list(data: object) -> list[Rule]:
     直接存进配置文件的一层数组，读回来直接喂这里。
     """
     if not isinstance(data, list):
-        raise ValueError("替换规则必须是 JSON 列表")
+        raise ValueError("替换规则必须是 JSON 列表")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
     rules: list[Rule] = []
     for index, item in enumerate(data, start=1):
         if not isinstance(item, dict) or not isinstance(item.get("pattern"), str):
-            raise ValueError(f"第 {index} 条替换规则缺少 pattern：{item!r}")
+            raise ValueError(f"第 {index} 条替换规则缺少 pattern：{item!r}")  # noqa: TRY004  # 同上
         pattern = item["pattern"]
         try:
             re.compile(pattern)

@@ -59,7 +59,7 @@ def load_toc(path: Path) -> list:
     except json.JSONDecodeError as e:
         raise ValueError(f"目录树不是合法 JSON：{e}") from e
     if not isinstance(data, list):
-        raise ValueError("目录树必须是 JSON 列表")
+        raise ValueError("目录树必须是 JSON 列表")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
     return data
 
 
@@ -133,7 +133,7 @@ def _entry(node: Node) -> dict:
 def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
     """一个 JSON 条目 → `Node`（直属正文随后统一切）；不合法时抛指出位置的 ValueError。"""
     if not isinstance(entry, dict):
-        raise ValueError(f"{where}不是 JSON 对象")
+        raise ValueError(f"{where}不是 JSON 对象")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
     title = entry.get("raw_title")
     level = entry.get("level")
     line = entry.get("line")
@@ -142,15 +142,15 @@ def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
     if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
         raise ValueError(f"{where}的层级不合法：{level!r}")
     if not isinstance(line, int) or isinstance(line, bool):
-        raise ValueError(f"{where}的行号不合法：{line!r}（应为整数行号）")
+        raise ValueError(f"{where}的行号不合法：{line!r}（应为整数行号）")  # noqa: TRY004  # 同上
     if not 1 <= line <= len(lines):
         raise ValueError(f"{where}的行号超出输入范围：{line}（输入共 {len(lines)} 行）")
     deleted = entry.get("deleted", False)
     if not isinstance(deleted, bool):
-        raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")
+        raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")  # noqa: TRY004  # 同上
     class_name = entry.get("class_name", "")
     if not isinstance(class_name, str):
-        raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")
+        raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
     return Node(
         title.strip(),
         level,
