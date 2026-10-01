@@ -110,14 +110,16 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         所以只有「全部建完后的首次调用」和用户点击才跑得起来。
         """
         if source_var.get() == CSS_SOURCE_FILE:
-            # 使用文件：只有路径生效，模式与文本框禁用
+            # 使用文件：只有路径生效，模式、文本框、清空、加载内置样式均禁用
             css_mode.configure(state="disabled")
             css_text.configure(state="disabled")
+            clear_btn.configure(state="disabled")
             load_builtin_btn.configure(state="disabled")
         else:
             # 直接编辑：模式 + 文本框生效
             css_mode.configure(state="normal")
             css_text.configure(state="normal")
+            clear_btn.configure(state="normal")
             load_builtin_btn.configure(state="normal")
 
     src_row = ctk.CTkFrame(css, fg_color="transparent")
