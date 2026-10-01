@@ -631,8 +631,9 @@ class App(ctk.CTk):
         input_path = self.tab_widgets["basic"]["input_entry"].get().strip()
         if not input_path:
             return
+        scan_cfg = self._collect_scan_cfg()
         try:
-            lines, _encoding = read_lines(input_path)
+            lines, _encoding = read_lines(input_path, scan_cfg.encoding)
         except OSError as e:
             messagebox.showerror("读取失败", f"无法读取输入文件：{e}")
             return
