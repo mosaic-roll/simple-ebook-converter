@@ -586,11 +586,12 @@ class App(ctk.CTk):
         font_path = layout_tab["font_entry"].get().strip()
         font = font_resource(font_path) if font_path else None
 
-        # 封面：显式优先，留空则按 CLI 同一套规则自动发现（同目录恰好一张 cover.*）。
-        # 交给 core 的 `cover_for()`，GUI 不自己写一遍发现逻辑。
+        # 封面：显式优先，留空则按 CLI 同一套规则自动发现（同目录恰好一张 cover.*）；
+        # text_cover=False 时跳过自动发现，由 builder 走文字封面逻辑。
         cover = cover_for(
             basic_tab["cover_entry"].get().strip() or None,
             basic_tab["input_entry"].get().strip() or None,
+            basic_tab["text_cover_var"].get(),
         )
 
         return Sources(

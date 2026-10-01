@@ -138,6 +138,12 @@ def test_cover_for_returns_none_without_input():
     assert cover_for(None, None) is None
 
 
+def test_cover_for_skips_auto_detect_when_text_cover_false(tmp_path):
+    """text_cover=False 且无显式封面时，即使同目录有 cover.* 也不自动发现。"""
+    _png(tmp_path)
+    assert cover_for(None, _cfg(tmp_path).input, text_cover=False) is None
+
+
 def test_cover_for_treats_blank_as_absent(tmp_path):
     """GUI 传的是输入框内容，空串 = 用户没填 = 自动发现。"""
     _png(tmp_path)

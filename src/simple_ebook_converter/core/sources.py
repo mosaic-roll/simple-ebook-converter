@@ -94,19 +94,25 @@ def read_text(path: str | Path, label: str = "文件") -> str:
 
 
 def cover_for(
-    explicit: str | Path | None, input_path: str | Path | None
+    explicit: str | Path | None,
+    input_path: str | Path | None,
+    text_cover: bool = True,
 ) -> Resource | None:
     """封面内容：显式给的路径优先，否则在输入同目录找**恰好一张** `cover.*`。
 
-    **两个前端都调这个函数**，谁也不自己写一遍优先级判断：CLI 传 `cfg.cover` /
-    `cfg.input`，GUI 传封面输入框与输入输入框的内容。「留空 = 自动发现」因此在两边是
-    同一件事，不会各写一份慢慢分叉。
+    `text_cover=False` 且 `explicit=None` 时跳过自动发现，直接返回 `None`，
+    由调用方走文字封面逻辑。两个前端都调这个函数，谁也不自己写一遍优先级判断：
+    CLI 传 `cfg.cover` / `cfg.input` / `cfg.text_cover`，GUI 传封面输入框与输入
+    输入框的内容及 `text_cover` 勾选项。「留空 = 自动发现」因此在两边是同一件事，
+    不会各写一份慢慢分叉。
 
     自动发现要读文件系统，所以放在这里（加载资源）而不是 `resolve()`（补参数）。
     都没有返回 `None`，由 `builder` 再降一级到文字封面页。
     """
     if explicit:
         return cover_resource(explicit)
+    if not text_cover:
+        return None
     if not input_path:
         return None
     found = find_cover(Path(input_path))
@@ -126,7 +132,7 @@ def load_sources(cfg: Config) -> Sources:
             read_text(cfg.css_append, "附加 CSS") if cfg.css_append else None
         ),
         font=font_resource(cfg.font) if cfg.font else None,
-        cover=cover_for(cfg.cover, cfg.input),
+        cover=cover_for(cfg.cover, cfg.input, cfg.text_cover),
     )
 
 
