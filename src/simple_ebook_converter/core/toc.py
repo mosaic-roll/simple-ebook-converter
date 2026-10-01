@@ -81,11 +81,38 @@ def tree_from_json(
     前一个保留条目的正文。文档序最前的若干条目被删时前面没有可并的条目，
     这些散落行归到前言；一条未删条目都没有时整篇作为前言。
     """
-    nodes = [
-        _node_from_entry(e, lines, f"第 {i} 个条目")
-        for i, e in enumerate(data, start=1)
-    ]
-    kept = [n for n in nodes if not n.deleted]
+    # 两阶段：先构建 Node（只含元数据，paragraphs 为空），再按 kept 列表派生正文范围。
+    # 节点对象与正文切片解耦，这样 deleted 过滤只需在构建阶段跳过，
+    # 不用在切片阶段额外处理。
+    kept: list[Node] = []
+    for i, e in enumerate(data, start=1):
+        where = f"第 {i} 个条目"
+        if not isinstance(e, dict):
+            raise ValueError(f"{where}不是 JSON 对象")  # noqa: TRY004
+        deleted = e.get("deleted", False)
+        if not isinstance(deleted, bool):
+            raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
+        # deleted 条目不生成 Node，不参与正文范围计算，不做行号校验；
+        # 只需确认它是布尔值，避免把 "yes" 之类误当 False。
+        if deleted:
+            continue
+        title = e.get("raw_title")
+        level = e.get("level")
+        line = e.get("line")
+        class_name = e.get("class_name", "")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError(f"{where}缺少标题（raw_title）")
+        if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
+            raise ValueError(f"{where}的层级不合法：{level!r}")
+        if not isinstance(class_name, str):
+            raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
+        _check_line(e, lines, where)
+        kept.append(
+            Node(
+                title.strip(), level, class_name,
+                raw_title=title.strip(), line=line,
+            )
+        )
 
     if not kept:
         # 所有条目都被删——整篇作为前言
@@ -96,9 +123,9 @@ def tree_from_json(
         assign_anchors(tree)
         return tree
 
-    # 正文范围：本条目 line 之后到下一个**保留**条目的 line 之前；末项到文件尾。
-    # 被删条目的行号被跨过，它们的内容自动并进前一个保留条目的正文范围。
     for node, nxt in zip(kept, [*kept[1:], None]):
+        # 正文范围：本条目 line 之后到下一个**保留**条目的 line 之前；末项到文件尾。
+        # 被删条目的行号被跨过，它们的内容自动并进前一个保留条目的正文范围。
         body_end = nxt.line - 1 if nxt else len(lines)
         body_start = node.line if node.level == 0 else node.line + 1
         node.paragraphs = (
@@ -110,10 +137,10 @@ def tree_from_json(
         builder.add(node)
     tree = builder.tree
 
+    first = kept[0]
     # 首个保留条目的 line 之前还有行：文档序最前的若干条目被删，这些散落行
     # 归到前言。level 0 条目本身的 line 就是正文首行，它前面没有"标题行"可跳，
     # 所以这一支不触发。
-    first = kept[0]
     if first.level > 0 and first.line > 1:
         tree.insert(
             0,
@@ -130,6 +157,15 @@ def tree_from_json(
         )
     assign_anchors(tree)
     return tree
+
+
+def _check_line(entry: dict, lines: list[str], where: str) -> None:
+    """校验条目的 `line` 字段合法（仅 kept 条目需要）。"""
+    line = entry.get("line")
+    if not isinstance(line, int) or isinstance(line, bool):
+        raise ValueError(f"{where}的行号不合法：{line!r}（应为整数行号）")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
+    if not 1 <= line <= len(lines):
+        raise ValueError(f"{where}的行号超出输入范围：{line}（输入共 {len(lines)} 行）")
 
 
 def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:
@@ -150,33 +186,3 @@ def _entry(node: Node) -> dict:
         entry["deleted"] = True  # false 时不写这个键，导出的 JSON 干净些
     return entry
 
-
-def _node_from_entry(entry: object, lines: list[str], where: str) -> Node:
-    """一个 JSON 条目 → `Node`（直属正文随后统一切）；不合法时抛指出位置的 ValueError。"""
-    if not isinstance(entry, dict):
-        raise ValueError(f"{where}不是 JSON 对象")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
-    title = entry.get("raw_title")
-    level = entry.get("level")
-    line = entry.get("line")
-    if not isinstance(title, str) or not title.strip():
-        raise ValueError(f"{where}缺少标题（raw_title）")
-    if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
-        raise ValueError(f"{where}的层级不合法：{level!r}")
-    if not isinstance(line, int) or isinstance(line, bool):
-        raise ValueError(f"{where}的行号不合法：{line!r}（应为整数行号）")  # noqa: TRY004  # 同上
-    if not 1 <= line <= len(lines):
-        raise ValueError(f"{where}的行号超出输入范围：{line}（输入共 {len(lines)} 行）")
-    deleted = entry.get("deleted", False)
-    if not isinstance(deleted, bool):
-        raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")  # noqa: TRY004  # 同上
-    class_name = entry.get("class_name", "")
-    if not isinstance(class_name, str):
-        raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
-    return Node(
-        title.strip(),
-        level,
-        class_name,
-        raw_title=title.strip(),
-        line=line,
-        deleted=deleted,
-    )
