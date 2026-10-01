@@ -252,10 +252,9 @@ class App(ctk.CTk):
         theme_seg = ctk.CTkSegmentedButton(
             right, values=THEME_CHOICES, command=self._on_theme_change
         )
-        # 启动时已按存档调过 _apply_gui_settings（含 ctk.set_appearance_mode），
-        # 这里直接用存档值决定开关显示，别硬编码默认，避免开关与实际主题不一致。
-        saved_theme = self._saved_settings.get("theme", "light")
-        theme_seg.set("深色" if saved_theme == "dark" else "浅色")
+        # 开关状态直接从 ctk 当前外观模式推导，不读存档——避免存档结构与
+        # 实际状态不同步（存档键改名、格式变化都会让开关显示错误）。
+        theme_seg.set("深色" if ctk.get_appearance_mode() == "Dark" else "浅色")
         theme_seg.pack(side="left", padx=(0, GAP))
 
         ctk.CTkButton(
