@@ -53,7 +53,7 @@ def to_json(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> list[dict]:
 def load_toc(path: Path) -> list:
     """读目录树 JSON：解析并校验是列表，读不了或解不开一律转可读的 ValueError。"""
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except OSError as e:
         raise ValueError(f"无法读取目录树文件：{e}") from e
     except json.JSONDecodeError as e:

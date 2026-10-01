@@ -65,15 +65,24 @@ class Sources:
 
 
 def font_resource(path: str | Path) -> Resource:
-    """字体文件 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。"""
+    """字体文件 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。
+
+    先认扩展名再读：实参是从左到右求值的，反过来写会先白读一遍字节，
+    而且 `foo.xyz` 不存在时报的是"无法读取字体"而不是更贴切的"不支持的字体格式"。
+    """
     path = Path(path)
-    return Resource(path.name, _read_bytes(path, "字体"), font_media_type(path))
+    media_type = font_media_type(path)
+    return Resource(path.name, _read_bytes(path, "字体"), media_type)
 
 
 def cover_resource(path: str | Path) -> Resource:
-    """封面图 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。"""
+    """封面图 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。
+
+    同 `font_resource`：先认扩展名再读字节。
+    """
     path = Path(path)
-    return Resource(path.name, _read_bytes(path, "封面图"), cover_media_type(path))
+    media_type = cover_media_type(path)
+    return Resource(path.name, _read_bytes(path, "封面图"), media_type)
 
 
 def read_text(path: str | Path, label: str = "文件") -> str:

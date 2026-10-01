@@ -96,6 +96,14 @@ def test_cover_resource_rejects_unknown_extension(tmp_path):
         cover_resource(bad)
 
 
+def test_bad_extension_is_reported_before_a_missing_file(tmp_path):
+    """扩展名先验：文件压根不存在时，也该说"格式不对"而不是"读不出"。"""
+    with pytest.raises(ValueError, match="字体"):
+        font_resource(tmp_path / "f.xyz")
+    with pytest.raises(ValueError, match="封面图"):
+        cover_resource(tmp_path / "c.xyz")
+
+
 def test_resource_reports_unreadable_file(tmp_path):
     with pytest.raises(ValueError, match="无法读取字体"):
         font_resource(tmp_path / "nope.ttf")

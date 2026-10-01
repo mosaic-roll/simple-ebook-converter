@@ -36,8 +36,8 @@ class Node:
     #: 目录/元数据仍用纯文本的 `title`。
     title_html: str = ""
     line: int = 0
-    #: Struck out in the GUI (`"deleted": true` in a `--toc-file` JSON); `toc.tree_from_json`
-    #: dissolves such nodes into their neighbors. Never set by parse().
+    #: 界面上被标记删除（目录条目 JSON 里的 `"deleted": true`）；
+    #: `toc.tree_from_json` 会把这类节点溶解进相邻条目。`parse()` 从不设置它。
     deleted: bool = False
 
 

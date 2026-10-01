@@ -194,6 +194,9 @@ class Config:
                 raise ValueError(
                     f"日期格式错误：{self.date}（应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]）"
                 ) from e
+        # 这里只做扩展名快检：`sources.font_resource` / `cover_resource` 读字节时还会再
+        # 调一遍同样两个函数。不重复，是因为用户可能想在加载资源、解析输入之前就看到
+        # "字体格式不对"，而不是先等半天读文件才报同一件事。
         if self.font:
             font_media_type(Path(self.font))
         if self.cover:

@@ -195,7 +195,7 @@ def toc_text(book: Book) -> str:
 
 
 def write_toc(book: Book) -> Path:
-    """把目录写到 `cfg.out`。"""
+    """把目录写到 `cfg.out`。没给 `out` 就报错——想输出到终端由 CLI 自己调 `toc_text`。"""
     return write_text(_target(book.cfg.out), toc_text(book) + "\n", book.cfg.overwrite)
 
 
@@ -249,8 +249,16 @@ def _epub_path(cfg: Config) -> Path:
     )
 
 
-def _target(out: str | Path) -> Path:
-    path = Path(str(out))
+def _target(out: str | Path | None) -> Path:
+    """把输出位置翻成 `Path`，明确拒绝「空」。
+
+    形参收 `None` 是因为 `Config.out` 就是 `Path | None`。`Path(str(None))` 不会报错，
+    它老老实实变成 `Path("None")`——名字非空，于是混过去，最后写出一个叫 `None` 的
+    文件。这里显式拦下来，让"没给输出路径"停在边界上。
+    """
+    if out is None or (isinstance(out, str) and not out.strip()):
+        raise ValueError("缺少输出路径")
+    path = Path(out)
     if not path.name:
         raise ValueError("缺少输出路径")
     return path

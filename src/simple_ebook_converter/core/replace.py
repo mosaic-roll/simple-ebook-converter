@@ -126,8 +126,8 @@ def rules_from_rows(rows: Iterable[Sequence[str] | Rule]) -> list[Rule]:
 def rules_from_file(path: str | Path | None) -> list[Rule]:
     """从 JSON 文件读规则；路径为空返回空列表，读不出或格式非法抛 `ValueError`。
 
-    CLI 与 GUI 都只经文件这一条路（GUI 把表格落成临时文件），命令行不再收内联 JSON，
-    免得在 shell 里跟一层转义搏斗。
+    CLI 用它读 `--replace-rules`。GUI 不走文件这条路——直接由卡片 `collect_rules`
+    收集，只把下面的 `rules_from_json` 用来解析配置文件里的 `replacements` 数组。
     """
     if not path:
         return []

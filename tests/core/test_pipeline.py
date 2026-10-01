@@ -470,6 +470,17 @@ def test_write_toc_json(cfg, tmp_path):
     assert json.loads(out.read_text(encoding="utf-8"))[0]["raw_title"] == "第一卷 风起"
 
 
+def test_write_toc_without_out_refuses_to_write_a_file_named_none(cfg):
+    """`Path(str(None))` 会变成 `Path("None")`，名字非空就混过去了。
+
+    真写出的话是相对路径，落在当前工作目录，所以查那儿。
+    """
+    book = read_book(replace(cfg, out=None))
+    with pytest.raises(ValueError, match="缺少输出路径"):
+        write_toc(book)
+    assert not (Path.cwd() / "None").exists()
+
+
 # ---------- EPUB ----------
 
 
