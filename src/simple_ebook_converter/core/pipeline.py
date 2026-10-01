@@ -166,12 +166,13 @@ def read_book(cfg: Config, sources: Sources | None = None) -> Book:
     """
     if cfg.input is None:
         raise ValueError("缺少输入文件")
+    sources = sources or Sources()
     resolved = resolve(cfg)
     lines, used = read_input(resolved)
-    tree, stats = process(lines, resolved, (sources or Sources()).toc_entries)
+    tree, stats = process(lines, resolved, sources.toc_entries)
     if not any(node.paragraphs for node in walk(tree)):
         raise ValueError(f"文件里没有可生成的内容：{resolved.input.name}")
-    return Book(resolved, tree, stats, used, sources or Sources())
+    return Book(resolved, tree, stats, used, sources)
 
 
 def read_input(cfg: Config) -> tuple[list[str], str]:

@@ -22,7 +22,7 @@ from typing import Any, get_args, get_type_hints
 from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, LEVEL_PRESETS, Config
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
-from .replace import rules_from_file
+from .replace import Rule, rules_from_file
 
 
 def _config_kinds() -> dict[str, type]:
@@ -268,20 +268,30 @@ def _option(name: str) -> Option:
     return next(opt for opt in OPTIONS if opt.name == name)
 
 
-def build_config(values: Mapping[str, Any]) -> Config:
+def build_config(
+    values: Mapping[str, Any],
+    *,
+    replacements: list[Rule] | None = None,
+) -> Config:
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
     值的语义与 `Config` 字段一致：反面选项（`--no-clean`）收上来时已经是 `False`。
     留空一律表示「用默认值」，取值范围由 `Config.validate()` 负责。
+
+    `replacements` 留给 GUI：它的替换规则来自表格卡片，不经文件。给了就直接收下，
+    不再走 `--replace-rules` 那条路——否则 GUI 只能先造 `Config` 再事后改字段。
+    `None`（CLI 的情形）表示按 `--replace-rules` 读文件。
     """
     values = dict(values)
     if values.pop("no_volume", None) and values.get("volume") is None:
         values["volume"] = ""  # --no-volume only wins when --volume is not given
+    if replacements is None:
+        replacements = rules_from_file(
+            _path(_option("replace_rules"), values.get("replace_rules"))
+        )
     return Config(
         levels=build_levels(_level_specs(values)),
-        replacements=rules_from_file(
-            _path(_option("replace_rules"), values.get("replace_rules"))
-        ),
+        replacements=replacements,
         **{
             opt.name: _convert(opt, values.get(opt.name))
             for opt in OPTIONS

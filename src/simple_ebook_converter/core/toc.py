@@ -102,8 +102,8 @@ def _rebuild(nodes: list[Node]) -> list[Node]:
     builder = TreeBuilder()
     for node in nodes:
         if node.deleted:
-            # Body of a struck-out entry joins the closest kept one before it;
-            # at the very front there is no such entry, so it is dropped.
+            # 被划掉的条目，它的正文并进前面最近一个保留下来的条目；
+            # 顶到最前面时前面没有条目可并，只能丢弃。
             if builder.last is not None:
                 builder.last.paragraphs.extend(node.paragraphs)
             continue
@@ -126,7 +126,7 @@ def _entry(node: Node) -> dict:
         "line": node.line,
     }
     if node.deleted:
-        entry["deleted"] = True  # omitted when false, to keep exports clean
+        entry["deleted"] = True  # false 时不写这个键，导出的 JSON 干净些
     return entry
 
 

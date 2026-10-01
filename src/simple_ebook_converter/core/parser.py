@@ -57,7 +57,7 @@ class TreeBuilder:
         while self._stack and self._stack[-1].level >= node.level:
             self._stack.pop()
         (self._stack[-1].children if self._stack else self.tree).append(node)
-        if node.level > 0:  # the preface (level 0) holds only its own paragraphs
+        if node.level > 0:  # 前言（level 0）只装自己的段落，不当容器往下挂
             self._stack.append(node)
         self.last = node
 

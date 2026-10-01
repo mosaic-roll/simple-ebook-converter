@@ -517,10 +517,13 @@ class App(ctk.CTk):
             "toc_depth": self.toc_widgets["depth_menu"].get(),
             "out": basic_tab["output_entry"].get().strip() or None,
         }
-        cfg = build_config(values)
-        # 替换规则不经 options 的文件入口（`build_config` 对 replacements 硬编码走
-        # `rules_from_file`），从卡片收集后直接覆盖字段。`Config` 非 frozen，可直接改。
-        cfg.replacements = collect_rules(replace_tab["rule_cards"])
+        cfg = build_config(
+            values,
+            # 替换规则来自表格卡片，不经 `--replace-rules` 的文件入口。走关键字参数
+            # 而不是造完 `Config` 再改字段——后者能跑，但让 GUI 落在一条"事后修改"的
+            # 通路上，和 CLI 共用同一份 `build_config` 的意图也就没了。
+            replacements=collect_rules(replace_tab["rule_cards"]),
+        )
         return cfg
 
     def _collect_sources(self) -> Sources:

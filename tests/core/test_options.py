@@ -293,6 +293,23 @@ def test_core_ignores_rule_objects(tmp_path):
     assert _config(tmp_path, replacements=[Rule("甲", "乙", "all")]).replacements == []
 
 
+def test_replacements_kwarg_wins_over_replace_rules(tmp_path):
+    """GUI 走表格，不读 `--replace-rules`；给了关键字参数就不该再碰那个文件。"""
+    path = tmp_path / "rules.json"
+    path.write_text('[{"pattern": "丙", "replace": "丁"}]', encoding="utf-8")
+    cfg = build_config(
+        _values(tmp_path, replace_rules=str(path)),
+        replacements=[Rule("甲", "乙", "html")],
+    )
+    assert [(r.pattern, r.replace) for r in cfg.replacements] == [("甲", "乙")]
+
+
+def test_replacements_kwarg_accepts_an_empty_list(tmp_path):
+    """空列表是"确实没有规则"，与"没给，去读文件"要分得开。"""
+    cfg = build_config(_values(tmp_path), replacements=[])
+    assert cfg.replacements == []
+
+
 # ---------- 选项表自身 ----------
 
 
