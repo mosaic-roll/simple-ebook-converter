@@ -695,35 +695,24 @@ class App(ctk.CTk):
     def _collect_saved(self) -> dict[str, Any]:
         """收集要落盘的配置子集（其余项每次启动只用默认值）。
 
-        `int` 字段按类型存成数字；提示型字段（`max_title_len` / `preface_title`）
-        留空表示「用默认」，直接不写进文件，免得 JSON 里一堆空串噪音。
+        字段按 tab 顺序排列：基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
+        `int` 字段经 `_as_stored` 转成数字；提示型字段（`max_title_len` / `preface_title`）
+        留空会被 `.strip() or None` 过滤掉，不会写进 JSON，避免噪音。
         """
         basic_tab = self.tab_widgets["basic"]
         layout_tab = self.tab_widgets["layout"]
         rules_tab = self.tab_widgets["rules"]
-        data: dict[str, Any] = {
-            # 留空 = 用默认：`_as_stored` 对 int 返回 None、末尾过滤掉空串，
-            # 不在存档里留一堆 "" ——省得下次启动把空框当用户的选择
-            "indent": _as_stored("indent", layout_tab["indent"].get()),
-            "line_height": layout_tab["line_height"].get().strip() or None,
-            "para_spacing": layout_tab["para_spacing"].get().strip() or None,
-            "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
-            "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
-            "body_align": ALIGN_LABELS[layout_tab["align_body"].get()],
-            # 「基本选项」单选组：持久化选择，不存值本身（存了会和 restore 打架）
-            "css_source": layout_tab["css_source"].get(),
-            "css_mode": layout_tab["css_mode"].get(),
-            # `css_path` 不存：文件模式的路径指向用户自己的外部文件，下次启动不该
-            # 悄悄沿用一个可能已经换了内容的路径
-            "font": layout_tab["font_entry"].get().strip() or None,
+        rule_entries = rules_tab["rule_entries"]
+
+        return {
+            # 基础 tab：文件、书籍信息、封面、其他
             "clean": bool(basic_tab["clean_var"].get()),
             "text_cover": bool(basic_tab["text_cover_var"].get()),
             "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
-            "toc_depth": _as_stored("toc_depth", self.toc_widgets["depth_menu"].get()),
-            "replacements": rules_to_list(
-                collect_rules(self.tab_widgets["replace"]["rule_cards"])
-            ),
-            # 额外层级：空行也是状态，用户刻意加的空行下次还在
+            # 规则 tab：卷/章/排除正则 + 额外层级行
+            "volume": rule_entries["卷"].get().strip() or None,
+            "chapter": rule_entries["章"].get().strip() or None,
+            "exclude": rule_entries["排除"].get().strip() or None,
             "extra_levels": [
                 {
                     "level": row["level"].get().strip(),
@@ -732,15 +721,25 @@ class App(ctk.CTk):
                 }
                 for row in rules_tab["extra_rows"]
             ],
+            # 额外层级：空行也是状态，用户刻意加的空行下次还在
+            # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
+            "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
+            "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
+            "body_align": ALIGN_LABELS[layout_tab["align_body"].get()],
+            "indent": _as_stored("indent", layout_tab["indent"].get()),
+            "line_height": layout_tab["line_height"].get().strip() or None,
+            "para_spacing": layout_tab["para_spacing"].get().strip() or None,
+            # `css_path` 不存：文件模式的路径指向用户自己的外部文件，下次启动不该
+            # 悄悄沿用一个可能已经换了内容的路径
+            "css_source": layout_tab["css_source"].get(),
+            "css_mode": layout_tab["css_mode"].get(),
+            # TOC 面板（底栏右侧）
+            "toc_depth": _as_stored("toc_depth", self.toc_widgets["depth_menu"].get()),
+            # 替换 tab：有序规则卡片列表
+            "replacements": rules_to_list(
+                collect_rules(self.tab_widgets["replace"]["rule_cards"])
+            ),
         }
-        rule_entries = rules_tab["rule_entries"]
-        for label, opt_name, mode in rules.BUILTIN_ROWS:
-            value = _as_stored(opt_name, rule_entries[label].get())
-            # 提示型字段空 = 用默认，跳过；预填型（卷/章/排除）空 = 用户主动清空，保留
-            if value is None or (value == "" and mode == rules.HINT):
-                continue
-            data[opt_name] = value
-        return {key: value for key, value in data.items() if value is not None}
 
     def _apply_saved(self) -> None:
         """把 `_saved_settings` 回填到表单。
