@@ -90,7 +90,6 @@ def test_level_presets_match_config_levels():
 def test_default_chapter_regex_covers_common_headings():
     for heading in (
         "第12章 初遇",
-        "第 3 回 风起",
         "第一章",
         "第一节",
         "楔子",
@@ -100,11 +99,17 @@ def test_default_chapter_regex_covers_common_headings():
         "1、",
         "番外 后日谈",
         "最终章",
+        "终章",
+        "第100章:副标题",
+        "引子",
+        "前言",
     ):
         assert re.match(DEFAULT_CHAPTER_RE, heading), heading
     assert re.match(DEFAULT_VOLUME_RE, "第一卷 风起")
     # 「篇」不算卷，避免正文里的「第一篇」被误判
     assert not re.match(DEFAULT_VOLUME_RE, "第一篇 习作")
+    # 章节号与分类词之间不能有空格（卷标题允许）
+    assert not re.match(DEFAULT_CHAPTER_RE, "第 3 回 风起")
 
 
 def test_default_regexes_only_match_from_line_start():
