@@ -83,6 +83,11 @@ class Config:
     字段默认值 = 省略该参数时的行为。两个前端都只收值、调 `pipeline`，不各自拼流程；
     字段一律用正面表述（`overwrite` 而不是 `no_overwrite`），「关掉某功能」由前端表达为
     `--no-xxx` / 反向勾选框，收上来时已经是这里的正面语义。取值范围校验在 `validate()`。
+
+    注意资源路径字段（`cover` / `font` / `css_file` / `css_append` / `toc_file`）：
+    它们是**选项解析的落点**，唯一消费者是 `sources.load_sources()`，转换流程
+    （`pipeline` / `builder`）一次都不看。GUI 从不填它们（恒为 `None`），它的资源走
+    `Sources`。保留这些字段是为了 `options.build_config()` 有地方放 CLI 给的路径。
     """
 
     # 输入

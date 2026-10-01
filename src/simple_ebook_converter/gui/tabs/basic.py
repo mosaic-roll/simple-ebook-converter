@@ -14,6 +14,7 @@ from ..constants import (
     LANGUAGES,
 )
 from ..context import GuiContext
+from ..defaults import default_text
 from ..widgets import (
     make_field,
     make_field_btn,
@@ -21,6 +22,17 @@ from ..widgets import (
     make_field_menu,
     make_group,
 )
+
+
+def _bool_default(name: str, ctx: GuiContext) -> bool:
+    """勾选项初值：存档里有就用存档，否则 core 的默认值。
+
+    勾选项的值就是布尔本身（不是字符串），所以不走 `default_text()` 的字符串路子，
+    但「真源在 core、存档优先」这条规矩一样。
+    """
+    if name in ctx.saved:
+        return bool(ctx.saved[name])
+    return default_text(name) == "True"
 
 
 def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
@@ -36,7 +48,9 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     m = make_group(parent, "书籍信息", 1, ctx)
     book_title = make_field(m, 1, "书名", ctx, "书名", col=0)
     book_author = make_field(m, 1, "作者", ctx, "作者", col=2)
-    book_date = make_field(m, 2, "出版日期", ctx, "2024-05-13", col=0)
+    # core 的 `DEFAULTS.date` 是 None（不写就省掉 dc:date），所以这里给的是**格式提示**，
+    # 不是默认值：留空即「不写」
+    book_date = make_field(m, 2, "出版日期", ctx, "年-月-日，留空则不写", col=0)
     lang_menu = make_field_combo(m, 2, "语言", LANGUAGES, ctx, col=2)
 
     c = make_group(parent, "封面", 2, ctx)
@@ -49,8 +63,8 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         placeholder="封面图片（.jpg / .png / .webp）",
         extra_btns=[("查看", ctx.cb("open_cover"))],
     )
-    # TODO: 接 core 后初值取 core.config.DEFAULTS["text_cover"]
-    text_cover_var = tk.BooleanVar(master=c, value=True)
+    # 初值走 core 的 DEFAULTS（有存档用存档），不手抄字面量
+    text_cover_var = tk.BooleanVar(master=c, value=_bool_default("text_cover", ctx))
     ctk.CTkCheckBox(
         c,
         text="无封面时生成文字封面",
@@ -66,8 +80,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     )
 
     o = make_group(parent, "其他", 3, ctx)
-    # TODO: 接 core 后初值取 core.config.DEFAULTS["clean"]
-    clean_var = tk.BooleanVar(master=o, value=True)
+    clean_var = tk.BooleanVar(master=o, value=_bool_default("clean", ctx))
     ctk.CTkCheckBox(
         o,
         text="清理段首空格及空行",
@@ -82,8 +95,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         sticky="w",
     )
 
-    # TODO: 接 core 后初值取 core.config.DEFAULTS["toc"]（--no-toc 取反）
-    toc_in_book_var = tk.BooleanVar(master=o, value=True)
+    toc_in_book_var = tk.BooleanVar(master=o, value=_bool_default("toc_in_spine", ctx))
     ctk.CTkCheckBox(
         o,
         text="生成书内目录页",

@@ -164,7 +164,7 @@ class Replacer:
     patterns: tuple[re.Pattern[str], ...] = ()
 
     @classmethod
-    def of(cls, rules: Iterable[Rule]) -> "Replacer":
+    def of(cls, rules: Iterable[Rule]) -> Replacer:
         rules = tuple(rules)
         return cls(rules, tuple(re.compile(r.pattern) for r in rules))
 

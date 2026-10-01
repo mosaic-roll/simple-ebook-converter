@@ -27,6 +27,7 @@ from ..core.pipeline import (
     write_epub,
     write_toc,
 )
+from ..core.sources import load_sources
 
 #: 来自 `_meta`，即 pyproject.toml 那一个版本号；这里不要再写死一份
 VERSION = __version__
@@ -141,7 +142,14 @@ def _produce(cfg: Config) -> None:
     if cfg.dump_css:
         click.echo(f"CSS 已写入：{write_css(cfg)}")
         return
-    book = read_book(cfg)
+    # 先 validate 一次再读资源：参数错（如 --css-file 与 --css-append 同时给）当场
+    # 报出来，不必等资源读完、输入都解析完了才说。
+    #
+    # `read_book()` 内部的 `resolve()` 还会再 validate 一次，重复调用无妨：validate 是
+    # 纯检查、无副作用，且不改动 `cfg`——`Book.cfg` 仍是 `resolve()` 的产物（补全过
+    # 书名/作者的那一份），不是这里这份。
+    cfg.validate()
+    book = read_book(cfg, load_sources(cfg))
     if cfg.toc_only:
         if cfg.out is None or str(cfg.out) == STDOUT:
             click.echo(toc_text(book))

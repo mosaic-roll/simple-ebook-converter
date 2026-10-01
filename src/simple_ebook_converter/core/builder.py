@@ -3,6 +3,8 @@
 封面页只往 `epub.EpubHtml` 塞 `<body>` 片段，`<head>` 交给 `add_meta()` / `add_link()`：
 `EpubHtml.get_content()` 会丢掉外部传入的 head 自己重拼，直接给完整文档会把 charset
 与 CSS 链接弄丢。
+
+本模块不读文件：CSS、字体、封面都以**内容**形式由 `Sources` 送来。
 """
 
 from __future__ import annotations
@@ -14,46 +16,57 @@ from pathlib import Path
 from ebooklib import epub
 
 from .config import Config
-from .mediatypes import cover_media_type, font_media_type
 from .parser import Node
+from .sources import Resource, Sources
 
 #: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
 COVER_SECTION_TYPE = "cover"
 
-#: 内置字体的 CSS 家族名：@font-face 声明与正文引用共用这一份
+#: 内嵌字体的 CSS 家族名：@font-face 声明与正文引用共用这一份
 _FONT_FAMILY = "sec-font"
+
+#: 内嵌资源在 EPUB 内的目录（写进 manifest 的 href 前缀，与 CSS 里的 url() 对应）
+FONT_DIR = "fonts"
+IMAGE_DIR = "images"
 
 #: 只给 h1~h3 单独建内容文档；更深的层级并入最近的上级页，作为页内锚点
 PAGE_MAX_LEVEL = 3
 
 
-def build_css(cfg: Config) -> str:
-    """产出用的 CSS。
+def build_css(cfg: Config, sources: Sources | None = None) -> str:
+    """产出用的 CSS。三种情形：整份替代内置、追加在内置之后、纯内置。
 
-    三种情形：给了 `--css-file` 就以它为全部样式（**替代**内置）；给了 `--css-append`
-    就把它追加在内置样式之后；都不给就是内置模板。三者不同时出现（`Config.validate()`
-    会拦下 `--css-file` 与 `--css-append` 同给）。
+    - `sources.css_text` 非空：以它为**全部**样式（替代内置）
+    - `sources.css_append_text` 非空：把它**追加**在内置样式之后
+    - 都不给：内置模板
 
-    想在内置基础上大改，先用 `--dump-css` 导一份 `builtin_css()`，改完再当 `--css-file`
-    传回来。
+    前两者互斥（`Sources.__post_init__` 兜住），不会同时出现。
+    想在内置基础上大改，先用 `--dump-css` 导一份 `builtin_css()`，改完再作为整份替代传回来。
     """
-    if cfg.css_file:
-        return _read_css(cfg.css_file)
-    css = builtin_css(cfg)
-    if cfg.css_append:
-        css = f"{css}\n{_read_css(cfg.css_append)}"
+    sources = sources or Sources()
+    if sources.css_text is not None:
+        return sources.css_text
+    css = builtin_css(cfg, sources.font.name if sources.font else None)
+    if sources.css_append_text is not None:
+        css = f"{css}\n{sources.css_append_text}"
     return css
 
 
-def builtin_css(cfg: Config) -> str:
-    """内置 CSS 模板：@font-face → 正文样式 → 封面页样式。`--dump-css` 导出的就是这一份。"""
+def builtin_css(cfg: Config, font_name: str | None = None) -> str:
+    """内置 CSS 模板：@font-face → 正文样式 → 封面页样式。`--dump-css` 导出的就是这一份。
+
+    `font_name` 是字体**文件名**（不含目录），不是路径：`@font-face` 里的
+    `src: url("fonts/<name>")` 只需要文件名，用不到字体的实际字节——所以导出模板这条
+    路径不必加载字体资源。
+    """
     css: list[str] = []
-    if cfg.font:
-        name = Path(cfg.font).name
+    if font_name:
         css.append(
-            f'@font-face {{\n  font-family: "{_FONT_FAMILY}";\n  src: url("fonts/{name}");\n}}'
+            f'@font-face {{\n  font-family: "{_FONT_FAMILY}";\n'
+            f'  src: url("{FONT_DIR}/{font_name}");\n}}'
         )
-    family = f'"{_FONT_FAMILY}", ' if cfg.font else ""
+    family = f'"{_FONT_FAMILY}", ' if font_name else ""
+
     css.append(
         f"""body {{
   margin: 5%;
@@ -105,13 +118,6 @@ body {{
     return "\n".join(css)
 
 
-def _read_css(path: Path) -> str:
-    try:
-        return Path(path).read_text(encoding="utf-8")
-    except OSError as e:
-        raise ValueError(f"无法读取外部 CSS：{e}") from e
-
-
 def image_cover_body(image_name: str, alt: str = "封面") -> str:
     """图片封面页的 body 片段：一个带 class="cover" 的封面容器。"""
     return (
@@ -135,8 +141,12 @@ def text_cover_body(title: str, author: str = "") -> str:
     return "\n".join(parts)
 
 
-def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
-    """把 `nodes` 写成 EPUB 文件。`css` 由 `build_css()` 生成。"""
+def build_epub(
+    cfg: Config, nodes: list[Node], sources: Sources | None, output: Path
+) -> None:
+    """把 `nodes` 写成 EPUB 文件。CSS、字体、封面都从 `sources` 取，不读文件。"""
+    sources = sources or Sources()
+    css = build_css(cfg, sources)
     book = epub.EpubBook()
     book.set_identifier(f"urn:uuid:{uuid.uuid4()}")
     book.set_title(cfg.book_title)
@@ -154,20 +164,12 @@ def build_epub(cfg: Config, nodes: list[Node], css: str, output: Path) -> None:
             content=css.encode("utf-8"),
         )
     )
-    if cfg.font:
-        path = Path(cfg.font)
-        book.add_item(
-            epub.EpubItem(
-                uid="font",
-                file_name=f"fonts/{path.name}",
-                media_type=font_media_type(path),
-                content=path.read_bytes(),
-            )
-        )
+    if sources.font is not None:
+        _add_font(book, sources.font)
 
     pages: list[epub.EpubHtml] = []
     page_map: dict[str, epub.EpubHtml] = {}
-    _add_cover(book, cfg, pages)
+    _add_cover(book, cfg, sources.cover, pages)
 
     roots = _page_roots(nodes)
     owner = _page_owner_by_anchor(roots)
@@ -289,28 +291,46 @@ def _toc_entry(
     return epub.Link(f"{page.file_name}#{node.anchor}", node.title, node.anchor)
 
 
-def _add_cover(book: epub.EpubBook, cfg: Config, pages: list[epub.EpubHtml]) -> None:
+def _add_font(book: epub.EpubBook, font: Resource) -> None:
+    """内嵌字体：按 `Resource.media_type` 登记，路径与 CSS 里的 `url()` 对应。"""
+    book.add_item(
+        epub.EpubItem(
+            uid="font",
+            file_name=f"{FONT_DIR}/{font.name}",
+            media_type=font.media_type,
+            content=font.data,
+        )
+    )
+
+
+def _add_cover(
+    book: epub.EpubBook,
+    cfg: Config,
+    cover: Resource | None,
+    pages: list[epub.EpubHtml],
+) -> None:
     """装配封面页并追加到 `pages`（它会进 spine）。三种情况：
 
     - 有封面图：图进 manifest（带 `properties="cover-image"`），另补一条
       `<meta name="cover">` 兼容 EPUB2 时代的阅读器；封面页 `linear="no"`，不打断正文。
     - 没图但 `text_cover` 开着：放只含书名/作者的封面页，`linear="yes"`，它就是第一页。
     - 都没有：整本书没有封面，spine 直接从第一章开始。
+
+    `cover` 是**内容**而非路径：有没有封面、是哪一张，上游（`sources.cover_for()`）
+    已经判完了，这里只管装配，不再发现文件。
     """
     title = cfg.book_title
-    if cfg.cover:
-        path = Path(cfg.cover)
-        book.set_cover(f"images/{path.name}", path.read_bytes(), create_page=False)
+    if cover is not None:
+        image = f"{IMAGE_DIR}/{cover.name}"
+        book.set_cover(image, cover.data, create_page=False)
         item = book.get_item_with_id("cover-img")
         if item is None:
             # 静默跳过的话，media_type 会停在 ebooklib 猜错的值上，最后产出打不开的 epub
-            raise ValueError(f"未能取得封面图片项，封面类型无法修正：{cfg.cover}")
-        item.media_type = cover_media_type(path)
+            raise ValueError(f"未能取得封面图片项，封面类型无法修正：{cover.name}")
+        item.media_type = cover.media_type
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
         page.is_linear = False
-        page.content = image_cover_body(f"images/{path.name}", alt=title).encode(
-            "utf-8"
-        )
+        page.content = image_cover_body(image, alt=title).encode("utf-8")
     elif cfg.text_cover:
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
         page.content = text_cover_body(title, cfg.author).encode("utf-8")

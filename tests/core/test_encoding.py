@@ -4,7 +4,7 @@ from simple_ebook_converter.core.encoding import EncodingError, decode, read_lin
 
 
 def test_bom_utf8():
-    raw = b"\xef\xbb\xbf" + "第一行\r\n第二行".encode("utf-8")
+    raw = b"\xef\xbb\xbf" + "第一行\r\n第二行".encode()
     text, enc = decode(raw)
     assert enc == "utf-8-sig"
     assert text.splitlines() == ["第一行", "第二行"]
@@ -18,7 +18,7 @@ def test_utf16_le_bom():
 
 
 def test_utf8_plain():
-    raw = "第一行\n第二行".encode("utf-8")
+    raw = "第一行\n第二行".encode()
     text, enc = decode(raw)
     assert enc == "utf-8"
     assert text == "第一行\n第二行"
@@ -59,7 +59,7 @@ def test_manual_wrong_encoding():
 
 def test_read_lines(tmp_path):
     p = tmp_path / "a.txt"
-    p.write_bytes("行一\r\n行二\r\n行三".encode("utf-8"))
+    p.write_bytes("行一\r\n行二\r\n行三".encode())
     lines, enc = read_lines(p)
     assert lines == ["行一", "行二", "行三"]
     assert enc == "utf-8"

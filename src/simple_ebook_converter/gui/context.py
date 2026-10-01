@@ -23,17 +23,15 @@ class GuiContext:
 
     - `fonts`：共享字体实例与字号/字体族状态
     - `callbacks`：名字 → 无参可调用，由 app 层注册；Tab 用 `ctx.cb()` 取
-    - `config` / `pipeline`：接 core 后的扩展位，现在留空
     - `toc_entries`：当前目录条目列表（扁平 dict 列表），由扫描或示例数据填充
     - `rules_changed`：替换规则列表变动时的回调链（由 app 注册）
+
+    这里**不放** `Config` 或 core 模块引用：参数收集、校验、资源加载都归 app 层的
+    `_collect_config()` / `_collect_sources()`，Tab 只管控件，没人需要摸 core。
     """
 
     fonts: FontManager
     callbacks: dict[str, Callable[..., Any]] = field(default_factory=dict)
-    #: TODO: 接 core 后填 core.config.Config 对象（表单初值 → 收集 → 校验）
-    config: Any | None = None
-    #: TODO: 接 core 后填 core.pipeline 模块引用（扫描 / 预览 / 生成）
-    pipeline: Any | None = None
     #: 当前目录条目列表：扁平 `dict` 列表，每项含 `raw_title` / `level` 等键；
     #: 由扫描结果或示例数据填充，规则变动时直接在此数据上预览
     toc_entries: list[dict[str, Any]] = field(default_factory=list)

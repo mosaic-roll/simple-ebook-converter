@@ -96,6 +96,28 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
 
     # row=1：来源单选框，两个选项直接并排
     source_var = tk.StringVar(master=css, value=CSS_SOURCE_TEXT)
+
+    def on_source_change() -> None:
+        """来源切换时改各控件的可用状态。
+
+        路径框两种来源下都能编辑，不跟着切 state。禁用只是不让改，值都还留着——
+        所以切回「直接编辑」时上次写的文本还在。
+
+        定义在单选框之前（按钮的 `command` 要拿到它），但它引用的 `css_mode` /
+        `css_text` / `load_builtin_btn` 在下面才建：闭包在调用时才查名字，
+        所以只有「全部建完后的首次调用」和用户点击才跑得起来。
+        """
+        if source_var.get() == CSS_SOURCE_FILE:
+            # 使用文件：只有路径生效，模式与文本框禁用
+            css_mode.configure(state="disabled")
+            css_text.configure(state="disabled")
+            load_builtin_btn.configure(state="disabled")
+        else:
+            # 直接编辑：模式 + 文本框生效
+            css_mode.configure(state="normal")
+            css_text.configure(state="normal")
+            load_builtin_btn.configure(state="normal")
+
     src_row = ctk.CTkFrame(css, fg_color="transparent")
     src_row.grid(
         row=1,
@@ -111,7 +133,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         variable=source_var,
         value=CSS_SOURCE_TEXT,
         font=font,
-        command=lambda: _on_source_change(),
+        command=on_source_change,
     ).pack(side="left", padx=(0, 16))
     ctk.CTkRadioButton(
         src_row,
@@ -119,7 +141,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         variable=source_var,
         value=CSS_SOURCE_FILE,
         font=font,
-        command=lambda: _on_source_change(),
+        command=on_source_change,
     ).pack(side="left")
 
     # row=2：路径行，走 make_field_btn，和嵌入字体/封面对齐
@@ -164,25 +186,12 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         sticky="nsew",
     )
 
-    # ---- 来源切换 ----
-    def _on_source_change() -> None:
-        # 路径框两种来源下都能编辑，不跟着切 state
-        if source_var.get() == CSS_SOURCE_FILE:
-            # 使用文件：只有路径生效，模式与文本框禁用（内容保留）
-            css_mode.configure(state="disabled")
-            css_text.configure(state="disabled")
-            load_builtin_btn.configure(state="disabled")
-        else:
-            # 直接编辑：模式 + 文本框生效
-            css_mode.configure(state="normal")
-            css_text.configure(state="normal")
-            load_builtin_btn.configure(state="normal")
-
-    _on_source_change()
+    # 首次应用来源对应的禁用态（控件都建齐了才安全）
+    on_source_change()
     parent.grid_rowconfigure(3, weight=1)
 
-    # TODO: 接 core 后收集配置要以 css_source 为准 —— 文件模式只用 css_path（覆盖
-    # 内置 CSS），文本模式才看 css_mode + css_text。禁用只是不让改，值都还留着。
+    # 收集阶段（`app._collect_sources()`）以 `css_source` 为准：文件模式只用
+    # `css_path`（整份替代内置样式），文本模式才看 `css_mode` + `css_text`。
     return {
         "indent": indent,
         "line_height": line_height,
@@ -195,4 +204,5 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "css_mode": css_mode,
         "css_path": css_path,
         "css_text": css_text,
+        "on_source_change": on_source_change,
     }

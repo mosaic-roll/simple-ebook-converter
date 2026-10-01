@@ -106,18 +106,28 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     )
     holder.grid_columnconfigure(0, weight=1)
 
-    def add_extra_rule() -> None:
+    def add_extra_row() -> dict:
+        """末尾加一行额外层级，返回该行控件（启动回填存档时要逐个 `set`）。"""
         i = len(extra_rows)
         item = _extra_level_row(holder, _default_level(i), ctx)
         extra_rows.append(item)
         item["frame"].grid(row=i, column=0, sticky="ew", pady=4)
         del_btn.configure(state="normal")
+        return item
 
     def remove_extra_rule() -> None:
+        """去掉最后一行；空了就禁用按钮。"""
         if not extra_rows:
             return
         extra_rows.pop()["frame"].destroy()
         del_btn.configure(state="normal" if extra_rows else "disabled")
+
+    def clear_extra_rows() -> None:
+        """清空所有额外层级行（启动回填存档前用，避免和默认的两行叠加）。"""
+        for row in extra_rows:
+            row["frame"].destroy()
+        extra_rows.clear()
+        del_btn.configure(state="disabled")
 
     # row=1：按钮条，全左对齐
     btns = ctk.CTkFrame(a, fg_color="transparent")
@@ -128,7 +138,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         text="＋ 添加",
         width=BTN_W_XL,
         font=font,
-        command=add_extra_rule,
+        command=add_extra_row,
     ).pack(side="left", padx=(0, BTN_GAP))
 
     del_btn = ctk.CTkButton(
@@ -140,12 +150,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     )
     del_btn.pack(side="left")
 
-    add_extra_rule()
-    add_extra_rule()
+    add_extra_row()
+    add_extra_row()
 
     return {
         "rule_entries": rule_entries,
         "extra_rows": extra_rows,
+        "add_extra_row": add_extra_row,
+        "clear_extra_rows": clear_extra_rows,
     }
 
 

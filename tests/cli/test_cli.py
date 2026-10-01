@@ -322,12 +322,37 @@ def test_asset_check_is_mode_independent(tmp_path):
     src = _write_sample(tmp_path)
     bad = tmp_path / "font.ttc"
     bad.write_bytes(b"\x00\x00\x00\x00tc")
-    for extra in ([], ["--dump-css", str(_write_sample(tmp_path, name="x.css"))]):
-        result = CliRunner().invoke(
-            convert, [str(src), "--toc-only", *extra, "--font", str(bad)]
-        )
-        assert result.exit_code != 0
-        assert "font.ttc" in result.output
+    result = CliRunner().invoke(convert, [str(src), "--toc-only", "--font", str(bad)])
+    assert result.exit_code != 0
+    assert "font.ttc" in result.output
+
+
+def test_dump_css_skips_validation(tmp_path):
+    """`--dump-css` 不跑 validate：值域越界也照样出模板（只要有输出路径）。
+
+    导样式模板是排障入口，用户手上往往正是一份「不对劲」的参数组合，被校验拦住
+    就拿不到对比用的样式表了。
+    """
+    out = tmp_path / "t.css"
+    for extra in (["--indent", "-5"], ["--toc-depth", "99"]):
+        result = CliRunner().invoke(convert, ["--dump-css", str(out), *extra])
+        assert result.exit_code == 0, result.output
+        assert "body {" in out.read_text(encoding="utf-8")
+
+
+def test_dump_css_still_needs_output_path():
+    """唯一保留的检查：没有输出路径就没法写。"""
+    result = CliRunner().invoke(convert, ["--dump-css"])
+    assert result.exit_code != 0
+
+
+def test_unparseable_value_still_rejected_for_dump_css(tmp_path):
+    """跳过的只是 `validate()` 的值域检查；「压根不是个数」仍在 click 解析时就报错。"""
+    result = CliRunner().invoke(
+        convert, ["--dump-css", str(tmp_path / "t.css"), "--indent", "abc"]
+    )
+    assert result.exit_code != 0
+    assert "not a valid integer" in result.output
 
 
 def test_toc_text(tmp_path):

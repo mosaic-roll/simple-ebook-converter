@@ -5,62 +5,75 @@
 参数，也没有需要前端记住的调用顺序。
 
 变换分两个阶段：`scan_toc()` 从原始行扫出目录树（原始标题 + 标题行号），`process()`
-再对树做清理与替换。目录树文件（`cfg.toc_file`）就是两阶段之间的契约——正常流程在
-内存里直接走完，`--toc-file` 则让第一阶段的结果可被人工编辑后从文件读回。
+再对树做清理与替换。阶段之间传的是**内容**：目录条目由前端经 `sources` 预加载成
+`Sources.toc_entries` 传进来，所以两个阶段一次文件都不读。
+
+本模块不读 `Config` 上的资源路径（`toc_file` / `cover` / `font` / `css_file` /
+`css_append`）——那是 `sources.load_sources()` 的事。唯一的例外是 `write_css()`：
+导出模板只需要内嵌字体的**文件名**，不读字节。
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from .builder import build_css, build_epub, builtin_css, escape
+from .builder import build_epub, builtin_css, escape
 from .cleaner import clean_lines
 from .config import Config
 from .encoding import EncodingError, read_lines
-from .mediatypes import find_cover
 from .meta import resolve_metadata
 from .parser import Node, ParseStats, parse, walk
 from .replace import Replacer, Rule, replacers_by_stage
-from .toc import load_toc, render, tree_from_json
+from .sources import Sources
+from .toc import render, tree_from_json
 
 
 @dataclass(frozen=True)
 class Book:
-    """读进来并切分好的一本书。`cfg` 是补全过封面与书名/作者的那一份。"""
+    """读进来并切分好的一本书。
+
+    `cfg` 是补全过书名/作者的那一份；`sources` 是前端预加载的资源内容，产出阶段
+    （`write_epub()`）从中取 CSS、字体与封面。
+    """
 
     cfg: Config
     tree: list[Node]
     stats: ParseStats
     encoding: str
+    #: 前端预加载的资源内容；默认为空 `Sources()`（无外部 CSS、无字体、无封面）
+    sources: Sources = field(default_factory=Sources)
 
 
 def resolve(cfg: Config) -> Config:
-    """补全封面与书名/作者，返回新的 `Config`（不改传入的那一个）。
+    """补全书名/作者，返回新的 `Config`（不改传入的那一个）。
 
-    顺序不能调换：封面自动发现要在 `validate()` 之前（否则 validate 只看得到 `None`），
-    元数据猜测要在切分之前（一条标题都没命中时要用书名当章节名）。
+    只做元数据两件事：封面自动发现已经挪到 `sources.cover_for()`——它要读文件系统，
+    不属于「补参数」。元数据猜测要在切分之前（一条标题都没命中时要用书名当章节名）。
     """
-    cover = cfg.cover
-    if cover is None and cfg.input is not None:
-        cover = find_cover(cfg.input)
     title, author = cfg.title, cfg.author
     if cfg.input is not None:
         title, author = resolve_metadata(cfg.input, title, author)
-    resolved = replace(cfg, cover=cover, title=title, author=author)
+    resolved = replace(cfg, title=title, author=author)
     resolved.validate()
     return resolved
 
 
-def scan_toc(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
+def scan_toc(
+    lines: list[str],
+    cfg: Config,
+    entries: list[dict] | None = None,
+) -> tuple[list[Node], ParseStats]:
     """阶段一：从原始行扫出目录树（原始标题 + 标题行号），不做清理与替换。
 
-    `cfg.toc_file` 给了就跳过正则解析，按目录树文件构树（可经界面编辑），
-    卷/章/节正则与 `max_title_len` 在这一形态下都不参与。
+    `entries` 给了就跳过正则解析，按条目构树（可经界面编辑），卷/章/节正则与
+    `max_title_len` 在这一形态下都不参与。条目来自 `Sources.toc_entries`：
+    CLI 侧的 `--toc-file` 由 `load_sources()` 读成条目，GUI 侧是目录面板那份，
+    所以这里**一次文件都不读**。
     """
-    if cfg.toc_file is not None:
-        tree = tree_from_json(load_toc(cfg.toc_file), lines)
+    if entries is not None:
+        tree = tree_from_json(entries, lines)
         return tree, _stats_from_tree(tree, len(lines))
     return parse(
         lines,
@@ -72,7 +85,7 @@ def scan_toc(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
 
 
 def _stats_from_tree(tree: list[Node], total_lines: int) -> ParseStats:
-    """目录树文件没有切分过程，统计信息从树本身数出来。"""
+    """目录条目没有切分过程，统计信息从树本身数出来。"""
     stats = ParseStats(total_lines=total_lines)
     for node in walk(tree):
         if node.level == 0:
@@ -83,14 +96,18 @@ def _stats_from_tree(tree: list[Node], total_lines: int) -> ParseStats:
     return stats
 
 
-def process(lines: list[str], cfg: Config) -> tuple[list[Node], ParseStats]:
+def process(
+    lines: list[str],
+    cfg: Config,
+    entries: list[dict] | None = None,
+) -> tuple[list[Node], ParseStats]:
     """把原始行变成章节树：扫目录（阶段一）→ 清理 → 替换标题（阶段二）。
 
     替换只作用于标题：`raw` 规则改原始标题，结果写进 `node.title`（目录/元数据/正文页
     都用它）；随后转义，`html` 规则在转义结果上再替换一次，写进 `node.title_html`
     供书页标题原样输出。只动 `lines` 与新节点。
     """
-    tree, stats = scan_toc(lines, cfg)
+    tree, stats = scan_toc(lines, cfg, entries)
     raw_replacer, html_replacer = replacers_by_stage(cfg.replacements)
     for node in walk(tree):
         if cfg.clean:
@@ -141,16 +158,20 @@ def preview_titles(tree: list[Node], replacements: Iterable[Rule]) -> list[Title
     return [_transform_title(node, raw_replacer, html_replacer) for node in walk(tree)]
 
 
-def read_book(cfg: Config) -> Book:
-    """读输入文件并切分。文件读不了、解不开或没有正文时抛 `ValueError`。"""
+def read_book(cfg: Config, sources: Sources | None = None) -> Book:
+    """读输入文件并切分。文件读不了、解不开或没有正文时抛 `ValueError`。
+
+    `sources` 是前端预加载的资源内容（CLI 传 `load_sources(cfg)`，GUI 从表单直接构造）；
+    `None` 等价于空的 `Sources()`。产出阶段从 `Book.sources` 取 CSS / 字体 / 封面。
+    """
     if cfg.input is None:
         raise ValueError("缺少输入文件")
     resolved = resolve(cfg)
     lines, used = read_input(resolved)
-    tree, stats = process(lines, resolved)
+    tree, stats = process(lines, resolved, (sources or Sources()).toc_entries)
     if not any(node.paragraphs for node in walk(tree)):
         raise ValueError(f"文件里没有可生成的内容：{resolved.input.name}")
-    return Book(resolved, tree, stats, used)
+    return Book(resolved, tree, stats, used, sources or Sources())
 
 
 def read_input(cfg: Config) -> tuple[list[str], str]:
@@ -184,7 +205,7 @@ def write_epub(book: Book) -> Path:
     _guard_overwrite(target, book.cfg.overwrite)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        build_epub(book.cfg, book.tree, build_css(book.cfg), target)
+        build_epub(book.cfg, book.tree, book.sources, target)
     except (OSError, ValueError) as e:
         raise ValueError(f"无法生成 EPUB：{e}") from e
     return target
@@ -193,13 +214,18 @@ def write_epub(book: Book) -> Path:
 def write_css(cfg: Config) -> Path:
     """把内置 CSS 模板写到 `cfg.dump_css`。只用排版参数，不必读输入。
 
-    导出的是 `builtin_css()`（不受 `--css-file` / `--css-append` 影响，方便当样式表起点）。
-    格式校验（字体、封面）照样走 `Config.validate()`：参数错在哪，哪种产出方式都该报。
+    导出的是 `builtin_css()`（不受外部 CSS 影响，方便当样式表起点）。只需要内嵌字体的
+    **文件名**——那是样式表里 `@font-face` 的 `src` 片段，用不到字体字节，
+    所以这条路径上不加载任何资源。
+
+    **刻意不调 `cfg.validate()`**：`--dump-css` 是排障入口，用户往往就是想拿一份样式表
+    去对比，此时输入文件、字体、封面都可能根本不存在。校验拦在这里只会让人拿不到模板。
+    真正生成那条路（`read_book()` → `resolve()`）才校验。
     """
     if not cfg.dump_css:
         raise ValueError("缺少 CSS 输出路径")
-    cfg.validate()
-    return write_text(_target(cfg.dump_css), builtin_css(cfg), cfg.overwrite)
+    font_name = Path(cfg.font).name if cfg.font else None
+    return write_text(_target(cfg.dump_css), builtin_css(cfg, font_name), cfg.overwrite)
 
 
 def write_text(path: Path, text: str, overwrite: bool = True) -> Path:

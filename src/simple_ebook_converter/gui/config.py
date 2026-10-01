@@ -18,6 +18,35 @@ from typing import Any
 DIR_NAME = "config"
 #: 配置文件名
 FILENAME = "config.json"
+#: 自定义 CSS 文本的文件名（与 `config.json` 同目录，单独一个文件）
+CSS_FILENAME = "custom.css"
+
+
+def css_path(config_dir: Path) -> Path:
+    """自定义 CSS 文本的落盘位置。
+
+    **只表示落盘位置**，不参与生成：GUI 的文本框内容直接变成 `Sources.css_text` /
+    `Sources.css_append_text`，生成过程不读这个文件。
+    """
+    return Path(config_dir) / CSS_FILENAME
+
+
+def save_css(config_dir: Path, text: str) -> None:
+    """把自定义 CSS 文本写到 `custom.css`；`text` 为空则删掉这个文件。
+
+    与 `save()` 同样的「先写 `.tmp` 再 `os.replace`」：直接覆写时进程被杀会留下
+    半截 CSS，下次启动回填出来就是坏样式。删除走 `unlink(missing_ok=True)`——
+    本来就没有文件不是错误。
+    """
+    directory = Path(config_dir)
+    target = directory / CSS_FILENAME
+    if not text.strip():
+        target.unlink(missing_ok=True)
+        return
+    directory.mkdir(parents=True, exist_ok=True)
+    tmp = directory / f"{CSS_FILENAME}.tmp"
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, target)
 
 
 def default_dir() -> Path:

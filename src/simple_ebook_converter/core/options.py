@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, Config, LEVEL_PRESETS
+from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, LEVEL_PRESETS, Config
 from .encoding import ENCODING_CHOICES
 from .levels import build_levels
 from .replace import rules_from_file

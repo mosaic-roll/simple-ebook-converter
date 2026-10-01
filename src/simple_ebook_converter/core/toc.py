@@ -64,10 +64,13 @@ def load_toc(path: Path) -> list:
 
 
 def tree_from_json(data: list, lines: list[str]) -> list[Node]:
-    """`to_json` 的逆操作：扁平条目列表 + 原始行 → 章节树。
+    """扁平条目列表 + 原始行 → 章节树。`tree_from_json` 的逆操作是 `to_json`。
+
+    `data` 是 Python 结构（`to_json` 的产物，或 GUI 目录面板维护的同形列表），
+    **不是 JSON 文本**——文本形态由 `load_toc()` 先解析成结构再传进来。
 
     条目按行号顺序给出，层级由 `level` 栈式重建（与 `line` 无关）；直属正文取
-    「本条目 `line` 之后到下一个条目的 `line` 之前」，末项到文件尾。标题用 json 现值，
+    「本条目 `line` 之后到下一个条目的 `line` 之前」，末项到文件尾。标题用条目现值，
     切完照常过清理与替换。`deleted` 条目不生成标题：直属正文并入文档序上一个未删除
     条目（最前方没有归宿的丢弃），其未删除的子条目自动挂到更上层的未删除祖先。
     """

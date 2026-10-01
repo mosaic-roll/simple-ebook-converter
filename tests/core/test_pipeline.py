@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
-from simple_ebook_converter.core.parser import NoEnabledRulesError, Node, walk
+from simple_ebook_converter.core.parser import Node, NoEnabledRulesError, walk
 from simple_ebook_converter.core.pipeline import (
     preview_titles,
     process,
@@ -22,6 +22,7 @@ from simple_ebook_converter.core.pipeline import (
     write_toc,
 )
 from simple_ebook_converter.core.replace import Rule
+from simple_ebook_converter.core.sources import Sources, cover_for
 from simple_ebook_converter.core.toc import to_json, tree_from_json
 
 SAMPLE = [
@@ -81,32 +82,44 @@ def test_resolve_validates_config(tmp_path):
         resolve(_cfg(tmp_path, toc_depth=99))
 
 
-# ---------- 封面自动发现 ----------
+# ---------- 封面自动发现（在 sources.cover_for()，不在 resolve()） ----------
 
 
-def test_resolve_discovers_cover_next_to_input(tmp_path):
+def test_resolve_no_longer_discovers_cover(tmp_path):
+    """`resolve()` 只补元数据，不碰文件系统资源——发现封面是 `cover_for()` 的事。"""
+    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
+    assert resolve(_cfg(tmp_path)).cover is None
+
+
+def test_cover_for_discovers_cover_next_to_input(tmp_path):
     cover = tmp_path / "cover.png"
     cover.write_bytes(b"\x89PNG")
     cfg = _cfg(tmp_path)
     assert cfg.cover is None
-    assert resolve(cfg).cover == cover
+    assert cover_for(None, cfg.input).name == cover.name
 
 
-def test_resolve_keeps_explicit_cover(tmp_path):
+def test_cover_for_keeps_explicit_cover(tmp_path):
     (tmp_path / "cover.png").write_bytes(b"\x89PNG")
     explicit = tmp_path / "mine.jpg"
     explicit.write_bytes(b"\xff\xd8")
-    assert resolve(_cfg(tmp_path, cover=explicit)).cover == explicit
+    assert cover_for(explicit, _cfg(tmp_path).input).name == "mine.jpg"
 
 
-def test_resolve_leaves_cover_none_when_absent(tmp_path):
-    assert resolve(_cfg(tmp_path)).cover is None
+def test_cover_for_returns_none_when_absent(tmp_path):
+    assert cover_for(None, _cfg(tmp_path).input) is None
+
+
+def test_cover_for_returns_none_without_input():
+    assert cover_for(None, None) is None
 
 
 def test_discovered_cover_passes_validation(tmp_path):
-    """自动发现的封面也必须过得了 Config.validate()。"""
+    """自动发现的封面也要过得了格式校验（`Config` 侧与 `Resource` 侧都过）。"""
     (tmp_path / "cover.webp").write_bytes(b"RIFF")
-    resolve(_cfg(tmp_path)).validate()
+    cfg = _cfg(tmp_path)
+    cfg.validate()
+    assert cover_for(None, cfg.input).media_type == "image/webp"
 
 
 # ---------- read_book：读入 ----------
@@ -117,6 +130,24 @@ def test_read_book_reads_and_parses(cfg):
     assert book.tree[0].title == "第一卷 风起"
     assert book.encoding == "utf-8"
     assert book.cfg is not cfg  # 补全过的那一份
+
+
+def test_read_book_defaults_to_empty_sources(cfg):
+    """单参调用仍可用：`sources=None` 等价于空 `Sources()`。"""
+    assert read_book(cfg).sources == Sources()
+
+
+def test_read_book_keeps_the_sources_it_got(cfg):
+    entries = to_json(scan_toc(LINES.splitlines(), resolve(cfg))[0])
+    sources = Sources(toc_entries=entries)
+    assert read_book(cfg, sources).sources is sources
+
+
+def test_read_book_with_entries_matches_regex_result(cfg):
+    """目录条目走一圈回来的结果，与直接正则解析一致（往返一致）。"""
+    lines = LINES.splitlines()
+    entries = to_json(scan_toc(lines, resolve(cfg))[0])
+    assert read_book(cfg, Sources(toc_entries=entries)).tree == read_book(cfg).tree
 
 
 def test_read_book_fills_metadata_on_its_own_config(cfg):
@@ -389,17 +420,20 @@ def test_toc_json_round_trips(cfg):
     assert [n.paragraphs for n in walk(restored)] == [n.paragraphs for n in walk(tree)]
 
 
-def test_scan_toc_from_toc_file(cfg, tmp_path):
-    """--toc-file：跳过正则解析按行号取正文；标题用文件现值，替换照常跑。"""
+def test_scan_toc_from_entries(cfg, tmp_path):
+    """目录条目：跳过正则解析按行号取正文；标题用条目现值，替换照常跑。
+
+    `cfg.toc_file` 分支已从 `scan_toc()` 删除——条目由 `load_sources()` 读成
+    `Sources.toc_entries` 传进来，所以这里只认 `entries`。
+    """
     lines = LINES.splitlines()
     data = to_json(scan_toc(lines, resolve(cfg))[0])
     data[0]["raw_title"] = "第一卷 改名"
-    toc_path = tmp_path / "toc.json"
-    toc_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
     tree, stats = process(
         lines,
-        replace(resolve(cfg), toc_file=toc_path, replacements=[Rule("初遇", "重逢")]),
+        replace(resolve(cfg), replacements=[Rule("初遇", "重逢")]),
+        data,
     )
     assert tree[0].title == "第一卷 改名"
     assert tree[0].children[0].title == "第一章 重逢"
@@ -407,6 +441,15 @@ def test_scan_toc_from_toc_file(cfg, tmp_path):
     assert tree[0].children[1].paragraphs == ["正文二字"]
     assert stats.level_counts == {2: 1, 3: 2}
     assert stats.has_preface is False
+
+
+def test_scan_toc_ignores_toc_file(cfg, tmp_path):
+    """`cfg.toc_file` 不再被 `scan_toc()` 读——目录来源只认 `entries`。"""
+    toc_path = tmp_path / "toc.json"
+    toc_path.write_text(json.dumps([], ensure_ascii=False), encoding="utf-8")
+    lines = LINES.splitlines()
+    tree, _ = scan_toc(lines, replace(resolve(cfg), toc_file=toc_path))
+    assert tree  # 走的是正则解析，不是空目录
 
 
 def test_toc_rejects_unknown_format(cfg):
@@ -475,19 +518,24 @@ def test_write_epub_can_overwrite(cfg, tmp_path):
     assert zipfile.is_zipfile(write_epub(book))
 
 
+def _blocked_out(tmp_path):
+    """一个落在**文件**下面的输出路径：建目录那步就会失败。"""
+    blocker = tmp_path / "blocker"
+    blocker.write_bytes(b"not a directory")
+    return blocker / "a.epub"
+
+
 def test_write_epub_reports_failure_with_context(cfg, tmp_path):
     """组装阶段出错要补上「无法生成 EPUB」这个上下文。"""
-    book = read_book(
-        replace(cfg, out=tmp_path / "a.epub", css_file=tmp_path / "nope.css")
-    )
+    book = read_book(replace(cfg, out=_blocked_out(tmp_path)))
     with pytest.raises(ValueError, match="无法生成 EPUB"):
         write_epub(book)
 
 
 def test_write_epub_leaves_no_partial_file(cfg, tmp_path):
     """失败时不该留下半个 EPUB。"""
-    out = tmp_path / "a.epub"
-    book = read_book(replace(cfg, out=out, css_file=tmp_path / "nope.css"))
+    out = _blocked_out(tmp_path)
+    book = read_book(replace(cfg, out=out))
     with pytest.raises(ValueError):
         write_epub(book)
     assert not out.exists()
@@ -527,7 +575,7 @@ def test_write_text_creates_parents(tmp_path):
 def test_write_text_writes_plain_utf8(tmp_path):
     target = tmp_path / "out.md"
     write_text(target, "内容")
-    assert target.read_bytes() == "内容".encode("utf-8")
+    assert target.read_bytes() == "内容".encode()
 
 
 def test_write_text_respects_overwrite_flag(tmp_path):

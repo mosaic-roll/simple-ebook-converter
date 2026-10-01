@@ -68,8 +68,7 @@ def build(
 
     def _snapshot(cards: list[dict[str, Any]]) -> tuple:
         return tuple(
-            (r.pattern, r.replace, r.stage, r.enabled)
-            for r in collect_rules(cards)
+            (r.pattern, r.replace, r.stage, r.enabled) for r in collect_rules(cards)
         )
 
     def _fire() -> None:
@@ -277,11 +276,13 @@ def _make_card(
         if pattern_entry._entry.get() == "":
             pattern_entry._is_focused = False
             pattern_entry._activate_placeholder()
+
     def _on_replace_focusout(_event=None) -> None:
         on_change()
         if replace_entry._entry.get() == "":
             replace_entry._is_focused = False
             replace_entry._activate_placeholder()
+
     pattern_entry._entry.bind("<FocusOut>", _on_pattern_focusout)  # type: ignore[attr-defined]
     replace_entry._entry.bind("<FocusOut>", _on_replace_focusout)  # type: ignore[attr-defined]
 
