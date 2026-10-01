@@ -276,22 +276,24 @@ class App(ctk.CTk):
 
     def _apply_gui_settings(self, saved: dict[str, Any]) -> None:
         """从存档恢复 GUI 设置（字体、字号、主题），应用到 FontManager 和 ctk。"""
-        if "theme" in saved:
-            theme_mode = saved["theme"]
-            ctk.set_appearance_mode("dark" if theme_mode == "dark" else "light")
-        if "font_family" in saved:
-            self.fonts.set_family_label(saved["font_family"])
-        if "ui_font_size" in saved:
-            self.fonts.set_ui_size(int(saved["ui_font_size"]))
-        if "toc_font_size" in saved:
-            self.fonts.set_toc_size(int(saved["toc_font_size"]))
+        ui = saved.get("ui") or {}
+        if ui.get("theme"):
+            ctk.set_appearance_mode("dark" if ui["theme"] == "dark" else "light")
+        if ui.get("font"):
+            self.fonts.set_family_label(ui["font"])
+        if ui.get("ui_font_size"):
+            self.fonts.set_ui_size(int(ui["ui_font_size"]))
+        if ui.get("toc_font_size"):
+            self.fonts.set_toc_size(int(ui["toc_font_size"]))
 
     def _save_gui_settings(self) -> None:
-        """把当前 FontManager 与主题写回存档并落盘。"""
-        self._saved_settings["theme"] = ctk.get_appearance_mode().lower()
-        self._saved_settings["font_family"] = self.fonts.family_label
-        self._saved_settings["ui_font_size"] = self.fonts.ui_size
-        self._saved_settings["toc_font_size"] = self.fonts.toc_size
+        """把当前 FontManager 与主题写回存档并落盘。字段收进 `ui` 下。"""
+        self._saved_settings["ui"] = {
+            "theme": ctk.get_appearance_mode().lower(),
+            "font": self.fonts.family_label,
+            "ui_font_size": self.fonts.ui_size,
+            "toc_font_size": self.fonts.toc_size,
+        }
         config.save(self._config_dir, self._collect_saved())
 
     # ---------------------------------------------------------------- 主体
@@ -733,11 +735,13 @@ class App(ctk.CTk):
         rule_entries = rules_tab["rule_entries"]
 
         return {
-            # GUI 设置：字体、字号、主题，始终存在
-            "theme": ctk.get_appearance_mode().lower(),
-            "font_family": self.fonts.family_label,
-            "ui_font_size": self.fonts.ui_size,
-            "toc_font_size": self.fonts.toc_size,
+            # GUI 设置：收进 `ui`，不与业务配置混在一起
+            "ui": {
+                "theme": ctk.get_appearance_mode().lower(),
+                "font": self.fonts.family_label,
+                "ui_font_size": self.fonts.ui_size,
+                "toc_font_size": self.fonts.toc_size,
+            },
             # 基础 tab：文件、书籍信息、封面、其他
             "clean": bool(basic_tab["clean_var"].get()),
             "text_cover": bool(basic_tab["text_cover_var"].get()),
