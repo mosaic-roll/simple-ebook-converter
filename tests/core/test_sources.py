@@ -116,7 +116,7 @@ def test_read_text_reports_unreadable_file(tmp_path):
         read_text(tmp_path / "nope.css", "外部 CSS")
 
 
-# ---------- cover_for：两个前端共用的那一份封面优先级 ----------
+# ---------- cover_for：显式路径优先，无显式路径一律返回 None ----------
 
 
 def test_cover_for_prefers_explicit(tmp_path):
@@ -125,12 +125,9 @@ def test_cover_for_prefers_explicit(tmp_path):
     assert cover_for(explicit, _cfg(tmp_path).input).name == "mine.jpg"
 
 
-def test_cover_for_discovers_next_to_input(tmp_path):
-    cover = _png(tmp_path)
-    assert cover_for(None, _cfg(tmp_path).input).name == cover.name
-
-
-def test_cover_for_returns_none_without_candidates(tmp_path):
+def test_cover_for_returns_none_when_no_explicit(tmp_path):
+    """不传显式路径时一律返回 None——自动发现由打开文件时填路径负责，不在这里。"""
+    _png(tmp_path)
     assert cover_for(None, _cfg(tmp_path).input) is None
 
 
@@ -138,20 +135,14 @@ def test_cover_for_returns_none_without_input():
     assert cover_for(None, None) is None
 
 
-def test_cover_for_skips_auto_detect_when_text_cover_false(tmp_path):
-    """text_cover=False 且无显式封面时，即使同目录有 cover.* 也不自动发现。"""
-    _png(tmp_path)
-    assert cover_for(None, _cfg(tmp_path).input, text_cover=False) is None
-
-
 def test_cover_for_treats_blank_as_absent(tmp_path):
-    """GUI 传的是输入框内容，空串 = 用户没填 = 自动发现。"""
+    """GUI 传的是输入框内容，空串 = 用户没填 = 返回 None（不自动发现）。"""
     _png(tmp_path)
-    assert cover_for("", _cfg(tmp_path).input) is not None
+    assert cover_for("", _cfg(tmp_path).input) is None
 
 
-def test_cover_for_needs_a_single_candidate(tmp_path):
-    """命中多张说明作者没拿准，静默挑一张反而会咬人，所以不猜。"""
+def test_cover_for_needs_explicit_path(tmp_path):
+    """多张候选图也不会乱挑——没有显式路径就不封。"""
     _png(tmp_path, "cover.png")
     _png(tmp_path, "cover.jpg")
     assert cover_for(None, _cfg(tmp_path).input) is None
@@ -194,10 +185,10 @@ def test_load_sources_empty_config_gives_empty_sources(tmp_path):
     assert sources.cover is None
 
 
-def test_load_sources_discovers_cover(tmp_path):
-    """封面发现是 `load_sources()` 的事，与 GUI 走同一个 `cover_for()`。"""
+def test_load_sources_no_cover_without_explicit(tmp_path):
+    """CLI 侧同样不自动发现：cover_for 只认显式路径。"""
     _png(tmp_path)
-    assert load_sources(_cfg(tmp_path)).cover is not None
+    assert load_sources(_cfg(tmp_path)).cover is None
 
 
 def test_load_sources_reports_unreadable_css(tmp_path):

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .mediatypes import cover_media_type, find_cover, font_media_type
+from .mediatypes import cover_media_type, font_media_type
 from .toc import load_toc
 
 
@@ -95,28 +95,19 @@ def read_text(path: str | Path, label: str = "文件") -> str:
 
 def cover_for(
     explicit: str | Path | None,
-    input_path: str | Path | None,
+    input_path: str | Path | None = None,
     text_cover: bool = True,
 ) -> Resource | None:
-    """封面内容：显式给的路径优先，否则在输入同目录找**恰好一张** `cover.*`。
+    """封面内容：显式给的路径优先，否则返回 `None` 由调用方处理。
 
-    `text_cover=False` 且 `explicit=None` 时跳过自动发现，直接返回 `None`，
-    由调用方走文字封面逻辑。两个前端都调这个函数，谁也不自己写一遍优先级判断：
-    CLI 传 `cfg.cover` / `cfg.input` / `cfg.text_cover`，GUI 传封面输入框与输入
-    输入框的内容及 `text_cover` 勾选项。「留空 = 自动发现」因此在两边是同一件事，
-    不会各写一份慢慢分叉。
-
-    自动发现要读文件系统，所以放在这里（加载资源）而不是 `resolve()`（补参数）。
-    都没有返回 `None`，由 `builder` 再降一级到文字封面页。
+    自动发现封面图片（同目录恰好一张 `cover.*`）只在「打开输入文件」时由
+    GUI 调 `find_cover()` 预填路径；生成阶段只认显式给出的路径。
+    两个前端共用：CLI 传 `cfg.cover` / `cfg.input` / `cfg.text_cover`，
+    GUI 传封面输入框与输入输入框的内容及 `text_cover` 勾选项。
     """
     if explicit:
         return cover_resource(explicit)
-    if not text_cover:
-        return None
-    if not input_path:
-        return None
-    found = find_cover(Path(input_path))
-    return cover_resource(found) if found is not None else None
+    return None
 
 
 def load_sources(cfg: Config) -> Sources:

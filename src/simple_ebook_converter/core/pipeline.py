@@ -49,8 +49,9 @@ class Book:
 def resolve(cfg: Config) -> Config:
     """补全书名/作者，返回新的 `Config`（不改传入的那一个）。
 
-    只做元数据两件事：封面自动发现已经挪到 `sources.cover_for()`——它要读文件系统，
-    不属于「补参数」。元数据猜测要在切分之前（一条标题都没命中时要用书名当章节名）。
+    只做元数据两件事：封面处理由 `sources.cover_for()` / `load_sources()` 负责——
+    它只认显式给出的路径，不碰文件系统做自动发现。元数据猜测要在切分之前
+    （一条标题都没命中时要用书名当章节名）。
     """
     title, author = cfg.title, cfg.author
     if cfg.input is not None:

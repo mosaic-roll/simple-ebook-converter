@@ -178,8 +178,8 @@ def test_replace_rejects_unknown_stage(tmp_path):
     assert "阶段只能是" in result.output
 
 
-def test_cover_is_discovered_next_to_input(tmp_path):
-    """不给 --cover 时，同目录唯一的 cover.* 自动生效。"""
+def test_no_image_cover_without_explicit(tmp_path):
+    """不给 --cover 时，同目录有 cover.* 也不自动用，生成文字封面。"""
     src = _write_sample(tmp_path)
     (tmp_path / "cover.png").write_bytes(b"\x89PNG\r\n\x1a\n")
     result = CliRunner().invoke(convert, [str(src)])
@@ -188,27 +188,15 @@ def test_cover_is_discovered_next_to_input(tmp_path):
         opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode(
             "utf-8"
         )
-    assert "cover.png" in opf
-
-
-def test_ambiguous_covers_are_ignored(tmp_path):
-    """两个候选就不猜了，宁可没有封面。"""
-    src = _write_sample(tmp_path)
-    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
-    (tmp_path / "cover.jpg").write_bytes(b"\xff\xd8")
-    result = CliRunner().invoke(convert, [str(src)])
-    assert result.exit_code == 0, result.output
-    with zipfile.ZipFile(tmp_path / "novel.epub") as z:
-        opf = z.read(next(n for n in z.namelist() if n.endswith("content.opf"))).decode(
-            "utf-8"
-        )
     assert "cover.png" not in opf
-    assert "cover.jpg" not in opf
+    # text_cover=True（默认），应有文字封面页
+    page = _cover_page(tmp_path)
+    assert "<h1>" in page
 
 
-def test_explicit_cover_wins_over_discovery(tmp_path):
+def test_explicit_cover_is_embedded(tmp_path):
+    """给 --cover 时，指定图片嵌入 epub。"""
     src = _write_sample(tmp_path)
-    (tmp_path / "cover.png").write_bytes(b"\x89PNG")
     mine = tmp_path / "mine.jpg"
     mine.write_bytes(b"\xff\xd8")
     result = CliRunner().invoke(convert, [str(src), "--cover", str(mine)])
@@ -218,7 +206,6 @@ def test_explicit_cover_wins_over_discovery(tmp_path):
             "utf-8"
         )
     assert "mine.jpg" in opf
-    assert "cover.png" not in opf
 
 
 def _cover_page(tmp_path, name="novel.epub"):
@@ -252,15 +239,15 @@ def test_no_text_cover_skips_page(tmp_path):
         assert "EPUB/cover.xhtml" not in z.namelist()
 
 
-def test_text_cover_not_used_when_cover_found(tmp_path):
-    """同目录有 cover.* 时用图，不再生成文字页。"""
+def test_text_cover_generated_without_explicit_cover(tmp_path):
+    """无显式封面时用文字页，同目录的 cover.* 不干扰。"""
     src = _write_sample(tmp_path)
     (tmp_path / "cover.png").write_bytes(b"\x89PNG")
     result = CliRunner().invoke(convert, [str(src), "--title", "书名"])
     assert result.exit_code == 0, result.output
     page = _cover_page(tmp_path)
-    assert "<img" in page
-    assert "<h1>" not in page
+    assert "<h1>" in page
+    assert "<img" not in page
 
 
 def test_text_cover_uses_guessed_metadata(tmp_path):

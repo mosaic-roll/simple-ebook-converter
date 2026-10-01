@@ -82,21 +82,22 @@ def test_resolve_validates_config(tmp_path):
         resolve(_cfg(tmp_path, toc_depth=99))
 
 
-# ---------- 封面自动发现（在 sources.cover_for()，不在 resolve()） ----------
+# ---------- cover_for：显式路径优先，无显式路径返回 None ----------
 
 
 def test_resolve_no_longer_discovers_cover(tmp_path):
-    """`resolve()` 只补元数据，不碰文件系统资源——发现封面是 `cover_for()` 的事。"""
+    """`resolve()` 只补元数据，不碰文件系统资源。"""
     (tmp_path / "cover.png").write_bytes(b"\x89PNG")
     assert resolve(_cfg(tmp_path)).cover is None
 
 
-def test_cover_for_discovers_cover_next_to_input(tmp_path):
+def test_cover_for_returns_none_when_no_explicit(tmp_path):
+    """自动发现由打开文件时填路径负责，生成阶段不找封面。"""
     cover = tmp_path / "cover.png"
     cover.write_bytes(b"\x89PNG")
     cfg = _cfg(tmp_path)
     assert cfg.cover is None
-    assert cover_for(None, cfg.input).name == cover.name
+    assert cover_for(None, cfg.input) is None
 
 
 def test_cover_for_keeps_explicit_cover(tmp_path):
@@ -112,14 +113,6 @@ def test_cover_for_returns_none_when_absent(tmp_path):
 
 def test_cover_for_returns_none_without_input():
     assert cover_for(None, None) is None
-
-
-def test_discovered_cover_passes_validation(tmp_path):
-    """自动发现的封面也要过得了格式校验（`Config` 侧与 `Resource` 侧都过）。"""
-    (tmp_path / "cover.webp").write_bytes(b"RIFF")
-    cfg = _cfg(tmp_path)
-    cfg.validate()
-    assert cover_for(None, cfg.input).media_type == "image/webp"
 
 
 # ---------- read_book：读入 ----------
