@@ -14,7 +14,12 @@ import sys
 
 import customtkinter as ctk
 
-from .constants import DEFAULT_FONT_LABEL, DEFAULT_TOC_SIZE, FONT_PRESETS_BY_OS
+from .constants import (
+    DEFAULT_FONT_LABEL,
+    DEFAULT_TOC_SIZE,
+    FONT_PRESETS_BY_OS,
+    SIZE_LABEL_DEFAULT,
+)
 
 # 派生偏移属于 FontManager 的内部实现，留在本模块
 FONT_TITLE_OFFSET = 1  # 标题比正文大 1 号
@@ -86,3 +91,13 @@ class FontManager:
         self.family_label = label
         self.family = resolve_family(label)
         self.refresh()
+
+
+def size_to_label(size: int, default: int) -> str:
+    """字号 → 下拉框显示标签；默认值用"默认"。"""
+    return SIZE_LABEL_DEFAULT if size == default else str(size)
+
+
+def label_to_size(label: str, default: int) -> int:
+    """下拉框显示标签 → 字号；"默认"回退到 `default`。"""
+    return default if label == SIZE_LABEL_DEFAULT else int(label)

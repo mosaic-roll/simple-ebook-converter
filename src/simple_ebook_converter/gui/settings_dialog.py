@@ -2,10 +2,13 @@
 
 字体族与界面字号走 `FontManager`（CTk 字体实例，就地更新），目录字号是 ttk 的
 字体，要另外调 `theme.apply_toc_font()`。
+
+应用时通过 `on_apply` 回调统一写盘，避免设置窗本身依赖 app 层的 config 模块。
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -17,10 +20,9 @@ from .constants import (
     DEFAULT_TOC_SIZE,
     DEFAULT_UI_SIZE,
     FONT_SIZES,
-    SIZE_LABEL_DEFAULT,
 )
 from .context import GuiContext
-from .fonts import font_presets
+from .fonts import font_presets, label_to_size, size_to_label
 
 # ---- 只有设置窗用 ----
 PAD = 20
@@ -33,8 +35,15 @@ BTN_ROW_PADY = (ROW_PADY, 0)
 _CORNER_TRANSPARENT = "transparent"
 
 
-def open(app: ctk.CTk, ctx: GuiContext, toc_table: ttk.Treeview) -> None:
-    """打开设置窗。`toc_table` 用于把新字号套到目录表格上。"""
+def open(
+    app: ctk.CTk,
+    ctx: GuiContext,
+    toc_table: ttk.Treeview,
+    *,
+    on_apply: Callable[[], None],
+) -> None:
+    """打开设置窗。`toc_table` 用于把新字号套到目录表格上；`on_apply` 在用户点
+    「应用」时调用，负责同步 FontManager 与持久化配置。"""
     fonts = ctx.fonts
     win = ctk.CTkToplevel(app)
     win.attributes("-alpha", 0.0)  # ① 先透明，别让用户看到初始态
@@ -65,7 +74,7 @@ def open(app: ctk.CTk, ctx: GuiContext, toc_table: ttk.Treeview) -> None:
         font=fonts.base,
         dropdown_font=fonts.base,
     )
-    ui_menu.set(_size_label(fonts.ui_size, DEFAULT_UI_SIZE))
+    ui_menu.set(size_to_label(fonts.ui_size, DEFAULT_UI_SIZE))
 
     toc_menu = ctk.CTkOptionMenu(
         body,
@@ -75,7 +84,7 @@ def open(app: ctk.CTk, ctx: GuiContext, toc_table: ttk.Treeview) -> None:
         font=fonts.base,
         dropdown_font=fonts.base,
     )
-    toc_menu.set(_size_label(fonts.toc_size, DEFAULT_TOC_SIZE))
+    toc_menu.set(size_to_label(fonts.toc_size, DEFAULT_TOC_SIZE))
 
     add_row(body, 0, "字体", font_combo, ctx)
     add_row(body, 1, "界面字号", ui_menu, ctx)
@@ -83,9 +92,10 @@ def open(app: ctk.CTk, ctx: GuiContext, toc_table: ttk.Treeview) -> None:
 
     def apply_and_close() -> None:
         fonts.set_family_label(font_combo.get())
-        fonts.set_ui_size(_size_value(ui_menu.get(), DEFAULT_UI_SIZE))
-        fonts.set_toc_size(_size_value(toc_menu.get(), DEFAULT_TOC_SIZE))
+        fonts.set_ui_size(label_to_size(ui_menu.get(), DEFAULT_UI_SIZE))
+        fonts.set_toc_size(label_to_size(toc_menu.get(), DEFAULT_TOC_SIZE))
         theme.apply_toc_font(toc_table, fonts.family, fonts.toc_size)
+        on_apply()
         win.destroy()
 
     btns = ctk.CTkFrame(body, fg_color=_CORNER_TRANSPARENT)
@@ -117,13 +127,3 @@ def add_row(
         row=r, column=0, sticky="w", padx=LABEL_PADX, pady=(0, ROW_PADY)
     )
     widget.grid(row=r, column=1, sticky="ew", pady=(0, ROW_PADY))
-
-
-def _size_label(size: int, default: int) -> str:
-    """当前字号 → 下拉框里的显示值。"""
-    return SIZE_LABEL_DEFAULT if size == default else str(size)
-
-
-def _size_value(label: str, default: int) -> int:
-    """下拉框里的显示值 → 实际字号。"""
-    return default if label == SIZE_LABEL_DEFAULT else int(label)

@@ -191,6 +191,7 @@ class App(ctk.CTk):
 
         # ---- 运行时状态 ----
         self.fonts = FontManager(DEFAULT_UI_SIZE, DEFAULT_FONT_LABEL, DEFAULT_TOC_SIZE)
+        self._apply_gui_settings(self._saved_settings)
         self.ctx = GuiContext(
             fonts=self.fonts, callbacks={}, saved=self._saved_settings
         )
@@ -251,7 +252,10 @@ class App(ctk.CTk):
         theme_seg = ctk.CTkSegmentedButton(
             right, values=THEME_CHOICES, command=self._on_theme_change
         )
-        theme_seg.set(DEFAULT_THEME_CHOICE)
+        # 启动时已按存档调过 _apply_gui_settings（含 ctk.set_appearance_mode），
+        # 这里直接用存档值决定开关显示，别硬编码默认，避免开关与实际主题不一致。
+        saved_theme = self._saved_settings.get("theme", "light")
+        theme_seg.set("深色" if saved_theme == "dark" else "浅色")
         theme_seg.pack(side="left", padx=(0, GAP))
 
         ctk.CTkButton(
@@ -265,7 +269,30 @@ class App(ctk.CTk):
         theme.apply_toc_font(table, self.fonts.family, self.fonts.toc_size)
 
     def _open_settings(self) -> None:
-        settings_dialog.open(self, self.ctx, self.toc_widgets["table"])
+        settings_dialog.open(
+            self, self.ctx, self.toc_widgets["table"],
+            on_apply=self._save_gui_settings,
+        )
+
+    def _apply_gui_settings(self, saved: dict[str, Any]) -> None:
+        """从存档恢复 GUI 设置（字体、字号、主题），应用到 FontManager 和 ctk。"""
+        if "theme" in saved:
+            theme_mode = saved["theme"]
+            ctk.set_appearance_mode("dark" if theme_mode == "dark" else "light")
+        if "font_family" in saved:
+            self.fonts.set_family_label(saved["font_family"])
+        if "ui_font_size" in saved:
+            self.fonts.set_ui_size(int(saved["ui_font_size"]))
+        if "toc_font_size" in saved:
+            self.fonts.set_toc_size(int(saved["toc_font_size"]))
+
+    def _save_gui_settings(self) -> None:
+        """把当前 FontManager 与主题写回存档并落盘。"""
+        self._saved_settings["theme"] = ctk.get_appearance_mode().lower()
+        self._saved_settings["font_family"] = self.fonts.family_label
+        self._saved_settings["ui_font_size"] = self.fonts.ui_size
+        self._saved_settings["toc_font_size"] = self.fonts.toc_size
+        config.save(self._config_dir, self._collect_saved())
 
     # ---------------------------------------------------------------- 主体
 
@@ -696,7 +723,7 @@ class App(ctk.CTk):
     def _collect_saved(self) -> dict[str, Any]:
         """收集要落盘的配置子集（其余项每次启动只用默认值）。
 
-        字段按 tab 顺序排列：基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
+        字段顺序：GUI 设置 → 基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
         `int` 字段经 `_as_stored` 转成数字；提示型字段（`max_title_len` / `preface_title`）
         留空会被 `.strip() or None` 过滤掉，不会写进 JSON，避免噪音。
         """
@@ -706,6 +733,11 @@ class App(ctk.CTk):
         rule_entries = rules_tab["rule_entries"]
 
         return {
+            # GUI 设置：字体、字号、主题，始终存在
+            "theme": ctk.get_appearance_mode().lower(),
+            "font_family": self.fonts.family_label,
+            "ui_font_size": self.fonts.ui_size,
+            "toc_font_size": self.fonts.toc_size,
             # 基础 tab：文件、书籍信息、封面、其他
             "clean": bool(basic_tab["clean_var"].get()),
             "text_cover": bool(basic_tab["text_cover_var"].get()),
