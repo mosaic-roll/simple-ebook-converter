@@ -13,7 +13,9 @@ import customtkinter as ctk
 
 from ..constants import (
     ALIGN_LABELS,
+    BTN_GAP,
     BTN_W_L,
+    BTN_W_M,
     CHECK_PADX,
     CHECK_PADY_LAST,
     SEG_PADY,
@@ -166,6 +168,19 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     css_mode.set(CSS_MODES[0])
     css_mode.grid(row=0, column=0, sticky="w")
 
+    def clear_css_text() -> None:
+        """清空 CSS 文本框。"""
+        css_text.delete("1.0", "end")
+
+    clear_btn = ctk.CTkButton(
+        mode_row,
+        text="清空",
+        width=BTN_W_M,
+        font=font,
+        command=clear_css_text,
+    )
+    clear_btn.grid(row=0, column=1, sticky="e", padx=(0, BTN_GAP))
+
     load_builtin_btn = ctk.CTkButton(
         mode_row,
         text="加载内置样式",
@@ -173,7 +188,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         font=font,
         command=ctx.cb("load_builtin_css"),
     )
-    load_builtin_btn.grid(row=0, column=1, sticky="e")
+    load_builtin_btn.grid(row=0, column=2, sticky="e")
 
     # row=4：文本框
     css_text = ctk.CTkTextbox(css, font=font)
