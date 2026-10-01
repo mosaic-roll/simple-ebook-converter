@@ -50,7 +50,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     book_author = make_field(m, 1, "作者", ctx, "作者", col=2)
     # core 的 `DEFAULTS.date` 是 None（不写就省掉 dc:date），所以这里给的是**格式提示**，
     # 不是默认值：留空即「不写」
-    book_date = make_field(m, 2, "出版日期", ctx, "年-月-日，留空则不写", col=0)
+    book_date = make_field(m, 2, "出版日期", ctx, "如 1949-10-01", col=0)
     lang_menu = make_field_combo(m, 2, "语言", LANGUAGES, ctx, col=2)
 
     c = make_group(parent, "封面", 2, ctx)
