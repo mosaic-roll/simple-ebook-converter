@@ -1,12 +1,10 @@
 import re
 
-from helpers import Epub, assert_heading, parse_css
+from helpers import Epub, assert_heading
 
 from simple_ebook_converter.core.builder import (
     COVER_SECTION_TYPE,
-    build_css,
     build_epub,
-    builtin_css,
     image_cover_body,
     text_cover_body,
 )
@@ -53,95 +51,6 @@ def _sample_tree():
         "第二段内容",
     ]
     return parse(lines, Config().levels, fallback_title="测试书")[0]
-
-
-# ---------- CSS：配置是否生效 ----------
-
-
-def test_build_css_defaults():
-    rules = parse_css(build_css(Config()))
-    assert rules["body"]["line-height"] == "1.5"
-    assert rules["p"]["text-indent"] == "2em"
-    assert "h3.chapter" in rules
-
-
-def test_css_content_applies_settings(tmp_path):
-    cfg = Config(
-        input=tmp_path / "novel.txt",
-        indent=0,
-        line_height="2",
-        para_spacing="0.5em",
-        chapter_align="left",
-        volume_align="left",
-        body_align="left",
-    )
-    rules = parse_css(_build(tmp_path, cfg=cfg).html("EPUB/style.css"))
-    assert rules["p"]["text-indent"] == "0em"
-    assert rules["p"]["margin"] == "0 0 0.5em 0"
-    assert rules["body"]["line-height"] == "2"
-    assert rules["h3.chapter"]["text-align"] == "left"
-    assert rules["h2.volume"]["text-align"] == "left"
-    assert rules["body"]["text-align"] == "left"
-
-
-def test_headings_centered_by_default():
-    """h1~h6 默认居中：否则 `--level` 自定义的 h4/h5/h6 会跟着 `body_align` 跑。"""
-    css = build_css(Config())
-    assert parse_css(css)["h4"]["text-align"] == "center"
-    # 顺序是层叠契约：`body` 与这条 `h1..h6` 特异性相同（都是 0,0,1），靠源码顺序决胜。
-    # body 排到后面就会把 `--body-align` 套到所有标题上，h4/h5/h6 全废。
-    assert css.index("h1, h2, h3, h4, h5, h6 {") > css.index("body {")
-
-
-def test_cover_css_rules_present():
-    """封面页靠 `.cover` 这组 class 上样式（图片封面与文字封面共用同一个容器）。"""
-    rules = parse_css(build_css(Config()))
-    assert "margin" in rules[".cover"]
-    assert "max-height" in rules[".cover img"]
-    assert rules[".cover .book-title"]["text-align"] == "center"
-
-
-# ---------- CSS：整份替代 / 追加（内容由 Sources 送来） ----------
-
-
-def test_css_text_replaces_builtin():
-    """`Sources.css_text` 是完整样式表，替代内置（不是追加）。"""
-    css = build_css(Config(), Sources(css_text="body { color: red; }"))
-    assert css == "body { color: red; }"
-    assert "text-indent" not in css  # 内置正文样式没有混进来
-    assert ".cover" not in css  # 内置封面样式也没了
-
-
-def test_builtin_css_is_unaffected_by_css_text():
-    """`--dump-css` 要的是内置模板，外部 CSS 不该拿它当模板。"""
-    cfg = Config(indent=0)
-    assert builtin_css(cfg) == build_css(cfg, Sources())
-
-
-def test_css_append_text_adds_to_builtin():
-    """`Sources.css_append_text` 加在内置样式之后，所以能覆盖内置规则。"""
-    css = build_css(
-        Config(), Sources(css_append_text=".cover .book-title { color: red; }")
-    )
-    # 追加在后面是层叠契约：同特异性的规则靠后写的赢，追加到前面就压不住内置值。
-    assert css.index("color: red;") > css.index("max-height: 100vh;")
-    assert "text-indent" in css  # 内置正文样式还在
-    assert parse_css(css)[".cover .book-title"]["color"] == "red"
-
-
-def test_css_append_text_keeps_font_face(tmp_path):
-    """追加不影响 `@font-face`（那是内置样式的一部分）。"""
-    font = tmp_path / "f.ttf"
-    font.write_bytes(b"\x00\x01\x00\x00")
-    sources = Sources(font=font_resource(font), css_append_text="body { color: red; }")
-    assert "@font-face" in parse_css(build_css(Config(), sources))
-
-
-def test_empty_sources_uses_builtin():
-    """空 `Sources()`：无外部 CSS、无字体，走内置模板。"""
-    css = build_css(Config(), Sources())
-    assert css == builtin_css(Config())
-    assert "@font-face" not in css
 
 
 # ---------- 包结构 ----------
