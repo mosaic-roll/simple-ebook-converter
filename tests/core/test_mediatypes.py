@@ -9,6 +9,7 @@ from simple_ebook_converter.core.mediatypes import (
     cover_media_type,
     find_cover,
     font_media_type,
+    sniff_font,
     sniff_image,
 )
 
@@ -106,6 +107,36 @@ def test_sniffed_types_are_all_in_the_cover_table():
         sniff_image(b"<svg/>"),
     ):
         assert COVER_TYPES[suffix] == media
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (b"wOFFrest", ("font/woff", ".woff")),
+        (b"wOF2rest", ("font/woff2", ".woff2")),
+        (b"OTTOrest", ("font/otf", ".otf")),
+        (b"\x00\x01\x00\x00rest", ("font/ttf", ".ttf")),
+        (b"truerest", ("font/ttf", ".ttf")),
+    ],
+)
+def test_sniff_font_detects_format(data, expected):
+    assert sniff_font(data) == expected
+
+
+@pytest.mark.parametrize("data", [b"", b"\x00\x01\x00", b"ttcfcollection"])
+def test_sniff_font_returns_none_for_unknown(data):
+    """ttcf 是字体集合，本项目不收，认不出就该走扩展名那条路。"""
+    assert sniff_font(data) is None
+
+
+def test_sniffed_font_types_are_all_in_the_font_table():
+    for media, suffix in (
+        sniff_font(b"wOFF"),
+        sniff_font(b"wOF2"),
+        sniff_font(b"OTTO"),
+        sniff_font(b"\x00\x01\x00\x00"),
+    ):
+        assert FONT_TYPES[suffix] == media
 
 
 # ---------- 封面自动发现 ----------

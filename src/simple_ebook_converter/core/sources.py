@@ -15,11 +15,12 @@ GUI 不调 `load_sources()`：它的资源来自内存里的表单（CSS 文本�
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .mediatypes import cover_media_type, font_media_type, sniff_image
+from .mediatypes import cover_media_type, font_media_type, sniff_font, sniff_image
 from .toc import load_toc
 
 
@@ -65,32 +66,35 @@ class Sources:
 
 
 def font_resource(path: str | Path) -> Resource:
-    """字体文件 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。
-
-    先认扩展名再读：实参是从左到右求值的，反过来写会先白读一遍字节，
-    而且 `foo.xyz` 不存在时报的是"无法读取字体"而不是更贴切的"不支持的字体格式"。
-    """
-    path = Path(path)
-    media_type = font_media_type(path)
-    return Resource(path.name, _read_bytes(path, "字体"), media_type)
+    """字体文件 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。"""
+    return _resource(Path(path), font_media_type, "字体", sniff_font)
 
 
 def cover_resource(path: str | Path) -> Resource:
-    """封面图 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。
+    """封面图 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。"""
+    return _resource(Path(path), cover_media_type, "封面图", sniff_image)
 
-    同 `font_resource`：先认扩展名再读字节（`foo.xyz` 报"格式不对"而不是"读不出"）。
 
-    读完再用字节头复核一遍。扩展名对不上实际内容时，按实际格式写包内的文件名和
-    media-type——两处都抄扩展名的话，epubcheck 会报 OPF-029 加 PKG-022。用户磁盘上
-    那个文件不动，只改 EPUB 里叫什么。
+def _resource(
+    path: Path,
+    media_type_of: Callable[[Path], str],
+    label: str,
+    sniff: Callable[[bytes], tuple[str, str] | None],
+) -> Resource:
+    """先按扩展名定类型，再读字节复核。
+
+    顺序不能反：`foo.xyz` 不存在时报的应该是"不支持的字体格式"而不是"无法读取字体"。
+
+    复核不一致就按实际格式改写包内文件名和 media-type——OPF 里两处都是从扩展名抄的，
+    对不上 epubcheck 会报 OPF-029 / PKG-022。用户磁盘上的原文件不动。字节认不出就按扩展名
+    走：认不出不是错，猜错才是。
     """
-    path = Path(path)
-    declared = cover_media_type(path)
-    data = _read_bytes(path, "封面图")
-    sniffed = sniff_image(data)
-    if sniffed is None or sniffed[0] == declared:
+    declared = media_type_of(path)
+    data = _read_bytes(path, label)
+    actual = sniff(data)
+    if actual is None or actual[0] == declared:
         return Resource(path.name, data, declared)
-    media_type, suffix = sniffed
+    media_type, suffix = actual
     return Resource(path.with_suffix(suffix).name, data, media_type)
 
 

@@ -25,9 +25,7 @@ COVER_TYPES = {
 def sniff_image(data: bytes) -> tuple[str, str] | None:
     """看字节头判断图片格式，返回 `(media_type, 扩展名)`；认不出返回 `None`。
 
-    扩展名会骗人，字节头不会。JPEG 存成 `.png` 时，epubcheck 会同时报两条：OPF-029
-    （声明的 media-type 与实际内容不符）和 PKG-022（后缀与实际内容不符）——因为 OPF 里
-    的 `media-type` 和 href 都是从扩展名抄的。
+    扩展名会骗人：JPEG 存成 `.png` 时 epubcheck 会报 OPF-029 和 PKG-022。
     """
     if data.startswith(b"\xff\xd8\xff"):
         return "image/jpeg", ".jpg"
@@ -39,9 +37,23 @@ def sniff_image(data: bytes) -> tuple[str, str] | None:
         return "image/webp", ".webp"
     if data[4:8] == b"ftyp" and data[8:12] in (b"avif", b"avis"):
         return "image/avif", ".avif"
-    # 放最后：前面的二进制格式都先排除了，剩下的才轮到文本。SVG 没有固定头，只能这样试。
+    # SVG 没固定头，只能试，放最后。
     if b"<svg" in data[:2048].lower():
         return "image/svg+xml", ".svg"
+    return None
+
+
+def sniff_font(data: bytes) -> tuple[str, str] | None:
+    """看字节头判断字体格式，同 `sniff_image`。"""
+    if data.startswith(b"wOFF"):
+        return "font/woff", ".woff"
+    if data.startswith(b"wOF2"):
+        return "font/woff2", ".woff2"
+    if data.startswith(b"OTTO"):
+        return "font/otf", ".otf"
+    # `true` 是 Apple 的 TrueType 变体
+    if data.startswith((b"\x00\x01\x00\x00", b"true")):
+        return "font/ttf", ".ttf"
     return None
 
 

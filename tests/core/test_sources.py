@@ -102,6 +102,45 @@ def test_font_resource_rejects_unknown_extension(tmp_path):
         font_resource(bad)
 
 
+def test_font_resource_corrects_mislabelled_font(tmp_path):
+    """OTF 存成 .ttf 时按内容来：名字和 media-type 一起改。"""
+    path = tmp_path / "f.ttf"
+    path.write_bytes(b"OTTO" + b"\x00" * 64)
+    res = font_resource(path)
+    assert res.name == "f.otf"
+    assert res.media_type == "font/otf"
+
+
+def test_font_resource_corrects_woff2_named_ttf(tmp_path):
+    path = tmp_path / "f.ttf"
+    path.write_bytes(b"wOF2" + b"\x00" * 64)
+    res = font_resource(path)
+    assert res.name == "f.woff2"
+    assert res.media_type == "font/woff2"
+
+
+def test_font_resource_keeps_name_when_type_agrees(tmp_path):
+    res = font_resource(_ttf(tmp_path))
+    assert res.name == "f.ttf"
+    assert res.media_type == "font/ttf"
+
+
+def test_font_resource_falls_back_to_extension_when_bytes_unknown(tmp_path):
+    """认不出字节就别硬猜，不能因此把原本能转的文件判死。"""
+    path = tmp_path / "f.ttf"
+    path.write_bytes(b"not a font at all")
+    res = font_resource(path)
+    assert res.name == "f.ttf"
+    assert res.media_type == "font/ttf"
+
+
+def test_font_resource_does_not_touch_the_source_file(tmp_path):
+    path = tmp_path / "f.ttf"
+    path.write_bytes(b"OTTO" + b"\x00" * 64)
+    font_resource(path)
+    assert path.exists() and path.name == "f.ttf"
+
+
 def test_cover_resource_rejects_unknown_extension(tmp_path):
     bad = tmp_path / "c.xyz"
     bad.write_bytes(b"\x00")
