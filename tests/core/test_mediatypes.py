@@ -9,6 +9,7 @@ from simple_ebook_converter.core.mediatypes import (
     cover_media_type,
     find_cover,
     font_media_type,
+    sniff_image,
 )
 
 
@@ -58,6 +59,53 @@ def test_tables_are_consistent():
     """两个表都不该是空的，且 jpg/jpeg 指向同一类型。"""
     assert FONT_TYPES and COVER_TYPES
     assert COVER_TYPES[".jpg"] == COVER_TYPES[".jpeg"] == "image/jpeg"
+
+
+# ---------- sniff_image：不信扩展名，看字节头 ----------
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (b"\xff\xd8\xff\xe0rest", ("image/jpeg", ".jpg")),
+        (b"\x89PNG\r\n\x1a\nrest", ("image/png", ".png")),
+        (b"GIF87arest", ("image/gif", ".gif")),
+        (b"GIF89arest", ("image/gif", ".gif")),
+        (b"RIFF\x00\x00\x00\x00WEBPrest", ("image/webp", ".webp")),
+        (b"\x00\x00\x00\x20ftypavifrest", ("image/avif", ".avif")),
+        (b"\x00\x00\x00\x20ftypavisrest", ("image/avif", ".avif")),
+        (b'<?xml version="1.0"?>\n<svg xmlns="..."/>', ("image/svg+xml", ".svg")),
+        (b"<svg xmlns='...'></svg>", ("image/svg+xml", ".svg")),
+    ],
+)
+def test_sniff_image_detects_format(data, expected):
+    assert sniff_image(data) == expected
+
+
+def test_sniff_image_jpeg_under_png_extension():
+    """就是 epubcheck 报 OPF-029 + PKG-022 的那种文件。"""
+    assert sniff_image(b"\xff\xd8\xff\xe0" + b"\x00" * 64) == ("image/jpeg", ".jpg")
+
+
+@pytest.mark.parametrize(
+    "data", [b"", b"not an image at all", b"BM\x00\x00bitmap", b"\x00\x00\x00 ftypisom"]
+)
+def test_sniff_image_returns_none_for_unknown(data):
+    """认不出就返回 None，让调用方退回扩展名，而不是硬猜一个。"""
+    assert sniff_image(data) is None
+
+
+def test_sniffed_types_are_all_in_the_cover_table():
+    """sniff 得出的类型必须都在 COVER_TYPES 里，否则会写出 manifest 不认的 media-type。"""
+    for media, suffix in (
+        sniff_image(b"\xff\xd8\xff"),
+        sniff_image(b"\x89PNG\r\n\x1a\n"),
+        sniff_image(b"GIF89a"),
+        sniff_image(b"RIFF\x00\x00\x00\x00WEBP"),
+        sniff_image(b"\x00\x00\x00 ftypavif"),
+        sniff_image(b"<svg/>"),
+    ):
+        assert COVER_TYPES[suffix] == media
 
 
 # ---------- 封面自动发现 ----------

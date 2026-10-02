@@ -22,6 +22,29 @@ COVER_TYPES = {
 }
 
 
+def sniff_image(data: bytes) -> tuple[str, str] | None:
+    """看字节头判断图片格式，返回 `(media_type, 扩展名)`；认不出返回 `None`。
+
+    扩展名会骗人，字节头不会。JPEG 存成 `.png` 时，epubcheck 会同时报两条：OPF-029
+    （声明的 media-type 与实际内容不符）和 PKG-022（后缀与实际内容不符）——因为 OPF 里
+    的 `media-type` 和 href 都是从扩展名抄的。
+    """
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", ".jpg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", ".png"
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif", ".gif"
+    if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp", ".webp"
+    if data[4:8] == b"ftyp" and data[8:12] in (b"avif", b"avis"):
+        return "image/avif", ".avif"
+    # 放最后：前面的二进制格式都先排除了，剩下的才轮到文本。SVG 没有固定头，只能这样试。
+    if b"<svg" in data[:2048].lower():
+        return "image/svg+xml", ".svg"
+    return None
+
+
 def font_media_type(path: Path) -> str:
     """字体格式不认识就抛 ValueError，交给调用方转成前端友好的报错。"""
     return _media_type(path, FONT_TYPES, "字体")

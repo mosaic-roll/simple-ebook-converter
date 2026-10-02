@@ -25,6 +25,19 @@ def _png(tmp_path, name="cover.png"):
     return path
 
 
+def _jpeg_named_png(tmp_path, name="cover.png"):
+    """扩展名是 .png，内容其实是 JPEG——epubcheck 会报 OPF-029 + PKG-022。"""
+    path = tmp_path / name
+    path.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
+    return path
+
+
+def _jpeg(tmp_path, name="cover.jpg"):
+    path = tmp_path / name
+    path.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
+    return path
+
+
 def _ttf(tmp_path, name="f.ttf"):
     path = tmp_path / name
     path.write_bytes(b"\x00\x01\x00\x00")
@@ -96,6 +109,54 @@ def test_cover_resource_rejects_unknown_extension(tmp_path):
         cover_resource(bad)
 
 
+def test_cover_resource_corrects_mislabelled_image(tmp_path):
+    """扩展名和内容不符时按内容来：名字和 media-type 一起改，OPF 里才自洽。"""
+    res = cover_resource(_jpeg_named_png(tmp_path))
+    assert res.name == "cover.jpg"
+    assert res.media_type == "image/jpeg"
+    assert res.data.startswith(b"\xff\xd8\xff")
+
+
+def test_cover_resource_corrects_reverse_direction(tmp_path):
+    """反过来也一样：PNG 存成 .jpg 要改回 .png。"""
+    path = tmp_path / "cover.jpg"
+    path.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    res = cover_resource(path)
+    assert res.name == "cover.png"
+    assert res.media_type == "image/png"
+
+
+def test_cover_resource_keeps_name_when_type_agrees(tmp_path):
+    """`.jpeg` 和 `.jpg` 都对，不必改名。"""
+    path = tmp_path / "cover.jpeg"
+    path.write_bytes(b"\xff\xd8\xff\xe0")
+    res = cover_resource(path)
+    assert res.name == "cover.jpeg"
+    assert res.media_type == "image/jpeg"
+
+
+def test_cover_resource_keeps_multi_suffix_stem(tmp_path):
+    path = tmp_path / "my.book.png"
+    path.write_bytes(b"\xff\xd8\xff\xe0")
+    assert cover_resource(path).name == "my.book.jpg"
+
+
+def test_cover_resource_falls_back_to_extension_when_bytes_unknown(tmp_path):
+    """认不出字节就别硬猜，退回扩展名——不能因此把原本能转的文件判死。"""
+    path = tmp_path / "cover.png"
+    path.write_bytes(b"not an image at all")
+    res = cover_resource(path)
+    assert res.name == "cover.png"
+    assert res.media_type == "image/png"
+
+
+def test_cover_resource_does_not_touch_the_source_file(tmp_path):
+    """改名只改 EPUB 里叫什么，用户磁盘上的文件不动。"""
+    path = _jpeg_named_png(tmp_path)
+    cover_resource(path)
+    assert path.exists() and path.name == "cover.png"
+
+
 def test_bad_extension_is_reported_before_a_missing_file(tmp_path):
     """扩展名先验：文件压根不存在时，也该说"格式不对"而不是"读不出"。"""
     with pytest.raises(ValueError, match="字体"):
@@ -121,7 +182,7 @@ def test_read_text_reports_unreadable_file(tmp_path):
 
 def test_cover_for_prefers_explicit(tmp_path):
     _png(tmp_path)
-    explicit = _png(tmp_path, "mine.jpg")
+    explicit = _jpeg(tmp_path, "mine.jpg")
     assert cover_for(explicit, _cfg(tmp_path).input).name == "mine.jpg"
 
 

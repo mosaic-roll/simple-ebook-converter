@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .mediatypes import cover_media_type, font_media_type
+from .mediatypes import cover_media_type, font_media_type, sniff_image
 from .toc import load_toc
 
 
@@ -78,11 +78,20 @@ def font_resource(path: str | Path) -> Resource:
 def cover_resource(path: str | Path) -> Resource:
     """封面图 → `Resource`。扩展名不认识、或读不出字节，就在这里报错。
 
-    同 `font_resource`：先认扩展名再读字节。
+    同 `font_resource`：先认扩展名再读字节（`foo.xyz` 报"格式不对"而不是"读不出"）。
+
+    读完再用字节头复核一遍。扩展名对不上实际内容时，按实际格式写包内的文件名和
+    media-type——两处都抄扩展名的话，epubcheck 会报 OPF-029 加 PKG-022。用户磁盘上
+    那个文件不动，只改 EPUB 里叫什么。
     """
     path = Path(path)
-    media_type = cover_media_type(path)
-    return Resource(path.name, _read_bytes(path, "封面图"), media_type)
+    declared = cover_media_type(path)
+    data = _read_bytes(path, "封面图")
+    sniffed = sniff_image(data)
+    if sniffed is None or sniffed[0] == declared:
+        return Resource(path.name, data, declared)
+    media_type, suffix = sniffed
+    return Resource(path.with_suffix(suffix).name, data, media_type)
 
 
 def read_text(path: str | Path, label: str = "文件") -> str:
