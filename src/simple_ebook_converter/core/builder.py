@@ -318,36 +318,25 @@ def _add_cover(
 ) -> epub.EpubHtml | None:
     """装配封面页并返回它；没有封面时返回 `None`（调用方据此决定 spine 开头）。
 
-    三种情况：
-
-    - 有封面图：图进 manifest（带 `properties="cover-image"`），另补一条
-      `<meta name="cover">` 兼容 EPUB2 时代的阅读器。
-    - 没图但 `text_cover` 开着：放只含书名/作者的封面页。
-    - 都没有：返回 `None`。
-
-    两种封面页都不设 `is_linear`（默认 `linear="yes"`，封面就是打开书的第一页）。图片封面页
-    曾经是 `linear="no"`，但没有任何链接指向它，违反 EPUB 3.2 的非线性内容可达要求，
-    epubcheck 报 OPF-096。
-
-    `cover` 是**内容**而非路径：有没有封面、是哪一张，上游（`sources.cover_for()`）
-    已经判完了，这里只管装配，不再发现文件。
+    `cover` 是内容而非路径——上游 `sources.cover_for()` 已经判完有没有封面、是哪一张。
+    两种封面页都不设 `is_linear`：默认的 `linear="yes"` 就是打开书的第一页。
     """
-    title = cfg.book_title
     if cover is not None:
         image = f"{IMAGE_DIR}/{cover.name}"
         book.set_cover(image, cover.data, create_page=False)
         item = book.get_item_with_id("cover-img")
         if item is None:
-            # 静默跳过的话，media_type 会停在 ebooklib 猜错的值上，最后产出打不开的 epub
+            # 拿不到就修不了 media_type，产出打不开的 epub，不如报错
             raise ValueError(f"未能取得封面图片项，封面类型无法修正：{cover.name}")
         item.media_type = cover.media_type
-        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
-        page.content = image_cover_body(image, alt=title).encode("utf-8")
+        title, body = "封面", image_cover_body(image, alt=cfg.book_title)
     elif cfg.text_cover:
-        page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
-        page.content = text_cover_body(title, cfg.author).encode("utf-8")
+        title, body = cfg.book_title, text_cover_body(cfg.book_title, cfg.author)
     else:
         return None
+
+    page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
+    page.content = body.encode("utf-8")
     page.add_meta(charset="utf-8")
     page.add_link(href="style.css", rel="stylesheet", type="text/css")
     book.add_item(page)
