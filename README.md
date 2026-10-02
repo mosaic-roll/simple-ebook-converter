@@ -111,7 +111,11 @@ JSON 文件（内容是一个有序列表），每条规则可带可选的 `stag
 不写进 HTML。作者用 `font-size: 1.5em` 区别于书名的 `3em`，形成封面层级。
 有图时图片在 OPF
 manifest 里带 `properties="cover-image"`，并额外补一条 `<meta name="cover">` 兼容 EPUB2
-时代的阅读器。封面页会链到 `style.css`，内置样式用 `.cover` 这组类选择器排版；
+时代的阅读器。图片的 `media-type` 和包内文件名都以**实际字节**为准（扩展名说是 `.png` 内容
+其实是 JPEG 时，会改写成 `images/cover.jpg`），你磁盘上的原文件不动。
+封面页在 spine 里排最前且是 `linear="yes"`，也就是打开书的第一页；目录页紧随其后，
+正文再往后（`--no-toc-page` 只是不让目录页在书页里显示，目录面板照常有）。
+封面页会链到 `style.css`，内置样式用 `.cover` 这组类选择器排版；
 `--css-append` 追加在内置样式之后，`--css-file` 则是**整份替代**内置样式（两者互斥，
 要用它定封面样式就照抄这组选择器，`--dump-css` 可导出内置模板作起点）
 

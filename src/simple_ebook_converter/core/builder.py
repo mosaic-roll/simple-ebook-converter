@@ -192,9 +192,8 @@ def build_epub(
         book.toc = _toc_entries(nodes, page_map, owner, cfg.toc_depth)
     book.add_item(epub.EpubNav())
     book.add_item(epub.EpubNcx())
-    # 封面 → nav → 正文，跟纸质书一样。图片封面是 linear="no"，位置挪动不影响它
-    # （阅读器从 manifest 的 cover-image 取图）；但文字封面是 linear="yes"，
-    # spine 里排在 nav 之后就变成「打开书先看目录」了。
+    # 封面 → nav → 正文，跟纸质书一样。两种封面页都是 linear="yes"，所以这个顺序是
+    # 阅读器实际看到的顺序：打开书先见封面，再目录，再正文。
     book.spine = (
         ([cover_page] if cover_page is not None else [])
         + (["nav"] if cfg.toc_in_spine else [])
@@ -323,9 +322,15 @@ def _add_cover(
     三种情况：
 
     - 有封面图：图进 manifest（带 `properties="cover-image"`），另补一条
-      `<meta name="cover">` 兼容 EPUB2 时代的阅读器；封面页 `linear="no"`，不打断正文。
-    - 没图但 `text_cover` 开着：放只含书名/作者的封面页，`linear="yes"`，它就是第一页。
+      `<meta name="cover">` 兼容 EPUB2 时代的阅读器；封面页照旧 `linear="yes"`，
+      打开书先看到封面，跟纸质书一样。
+    - 没图但 `text_cover` 开着：放只含书名/作者的封面页，同样 `linear="yes"`。
     - 都没有：返回 `None`，整本书没有封面。
+
+    两种封面页都不设 `is_linear`，用 `EpubHtml` 的默认值 yes。图片封面页曾经是
+    `linear="no"`，想靠 manifest 的 `cover-image` 让阅读器自己显示封面；但那样它就成了
+    没有任何链接指向的非线性内容，违反 EPUB 3.2「非线性内容必须可达」，epubcheck 报
+    OPF-096。既然封面本来就该是打开书的第一页，不如直接进正文流。
 
     `cover` 是**内容**而非路径：有没有封面、是哪一张，上游（`sources.cover_for()`）
     已经判完了，这里只管装配，不再发现文件。
@@ -340,7 +345,6 @@ def _add_cover(
             raise ValueError(f"未能取得封面图片项，封面类型无法修正：{cover.name}")
         item.media_type = cover.media_type
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title="封面")
-        page.is_linear = False
         page.content = image_cover_body(image, alt=title).encode("utf-8")
     elif cfg.text_cover:
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
