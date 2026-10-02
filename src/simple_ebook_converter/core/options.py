@@ -51,7 +51,7 @@ class Option:
     group: str
     short: str = ""
     #: 长旗标词干（不含 `--`）。留空按 `name` 推；个别旗标名与字段名不同时显式写，
-    #: 例如 `toc_in_spine` → `--no-toc`（沿用既有 CLI 表面）。
+    #: 例如 `toc_in_spine` → `--no-toc-page`（目录照生成，只是不作为书页出现）。
     flag: str = ""
     #: 只对不进 `Config` 的选项有意义：它们的类型不在 `Config` 注解里
     value_type: type = str
@@ -222,7 +222,7 @@ OPTIONS: tuple[Option, ...] = (
         "目录页是否进正文流（阅读器导航目录不受影响，始终生成）",
         "目录",
         negative=True,
-        flag="no-toc",
+        flag="no-toc-page",
     ),
     Option("toc_depth", "目录深度", "目录包含到第几级，1~6", "目录"),
     Option(

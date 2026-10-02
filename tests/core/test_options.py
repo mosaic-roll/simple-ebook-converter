@@ -334,10 +334,10 @@ def test_long_flag_comes_from_name_or_explicit_override():
         assert opt.flags[-1] == f"--{expected}", opt.name
 
 
-def test_documented_flag_names_stay_compatible():
-    """`--no-volume` / `--no-toc` 是设计文档写死的旗标，名字与字段不同，不能漂移。"""
+def test_flag_names_differ_from_field_names():
+    """`--no-volume` / `--no-toc-page` 的旗标与字段不同名，显式写死，改名要连测试一起改。"""
     assert _option("no_volume").flags == ("--no-volume",)
-    assert _option("toc_in_spine").flags == ("--no-toc",)
+    assert _option("toc_in_spine").flags == ("--no-toc-page",)
 
 
 def test_no_volume_disables_volume_level(tmp_path):
