@@ -58,8 +58,7 @@ def make_field(
 ) -> ctk.CTkEntry:
     """一行：标签 + 单行输入框。
 
-    `col` 为 0 或 2（左半区 / 右半区）；`span` 是输入框横向占几列，要占满该行
-    剩余宽度（`col=0` 时即整行）传 3。
+    `col` 为 0 或 2（左半区 / 右半区）；`span` 是输入框横向占几列，占满整行传 3。
     """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="w", font=font).grid(

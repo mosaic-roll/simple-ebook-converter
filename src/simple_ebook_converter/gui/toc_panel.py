@@ -206,9 +206,8 @@ def populate_toc(table: ttk.Treeview, entries: Iterable[Mapping[str, Any]]) -> N
         tags = _tags_for(bool(entry.get("deleted")), bool(entry.get("html_hit")))
         if tags:
             table.item(item_id, tags=tags)
-        # level 0（前言）只装自己的段落，不当容器往下挂（与 core 的 TreeBuilder.add 同）：
-        # 它在书里按 h3 渲染，与卷同级；若推进栈，后续 level 2/3 的条目会挂到它下面，
-        # 预览里就看成「前言比卷高一层」。
+        # level 0（前言）不当容器往下挂（与 core 的 TreeBuilder.add 同）：它按 h3 渲染，
+        # 与卷同级；推进栈的话卷/章会挂到它下面，看着比卷高一层
         if level > 0:
             stack.append((level, item_id))
 

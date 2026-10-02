@@ -126,12 +126,9 @@ def _replace_entry(entry: Any, text: str) -> None:
 
 
 def _initial_out(input_path: str) -> tuple[str | None, str | None]:
-    """输出对话框的起始位置：`(initialdir, initialfile)`，都取自输入路径。
+    """输出对话框的 `(initialdir, initialfile)`，都取自输入路径。
 
-    文件名只取 stem，`.epub` 交给 `defaultextension` 补——输入是 `.txt`、输出是
-    `.epub`，别把输入的扩展名带过去。目录一并给，对话框直接开在输入文件旁边，
-    不用退回上次用过的目录。输入框为空（或只有 `.` 之类没有文件名的内容）时两个都
-    返回 `None`，走系统默认，不猜。
+    文件名只取 stem，`.epub` 交给 `defaultextension` 补。输入框为空时都返回 `None`。
     """
     src = Path(input_path.strip())
     if not src.stem:
