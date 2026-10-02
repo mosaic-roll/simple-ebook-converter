@@ -129,8 +129,8 @@ def test_css_content_applies_settings(tmp_path):
     assert "text-indent: 0em" in css
     assert "line-height: 2" in css
     assert "0.5em" in css
-    assert _declarations(css, ".chapter")["text-align"] == "left"
-    assert _declarations(css, ".volume")["text-align"] == "left"
+    assert _declarations(css, "h3.chapter")["text-align"] == "left"
+    assert _declarations(css, "h2.volume")["text-align"] == "left"
     assert _declarations(css, "body")["text-align"] == "left"
 
 
