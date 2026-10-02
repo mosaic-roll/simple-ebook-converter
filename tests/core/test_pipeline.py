@@ -6,6 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from helpers import Epub
 
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
 from simple_ebook_converter.core.parser import Node, NoEnabledRulesError, walk
@@ -480,11 +481,20 @@ def test_write_toc_without_out_refuses_to_write_a_file_named_none(cfg):
 def test_write_epub_writes_zip(cfg, tmp_path):
     out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
     assert zipfile.is_zipfile(out)
-    with zipfile.ZipFile(out) as zf:
-        names = zf.namelist()
-        assert "mimetype" in names
-        assert "EPUB/content.opf" in names
-        assert any(n.startswith("EPUB/text/") for n in names)
+    epub = Epub(out)
+    assert epub.entries["mimetype"] == b"application/epub+zip"
+    assert epub.has_entry("META-INF/container.xml")
+    assert epub.has_entry(epub.opf_name())
+    assert epub.text_pages()
+
+
+def test_end_to_end_book_is_reachable_and_self_consistent(cfg, tmp_path):
+    """整条真实路径：txt → read_book → write_epub → 解包，链接可达且 media-type 与字节一致。"""
+    out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
+    epub = Epub(out)
+    epub.assert_links_reachable()
+    epub.assert_manifest_media_types_match_bytes()
+    assert epub.spine_ids()[0] == "cover"
 
 
 def test_write_epub_falls_back_to_input_name(cfg):
