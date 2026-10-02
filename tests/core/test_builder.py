@@ -422,31 +422,20 @@ def test_image_cover_declares_cover_meta(tmp_path):
 
 
 def test_image_cover_page_is_linear(tmp_path):
-    """图片封面页是打开书的第一页。
-
-    曾经是 linear=no，指望阅读器从 manifest 的 cover-image 取图。但没有任何链接指向它
-    的非线性内容违反 EPUB 3.2，epubcheck 报 OPF-096；封面本来就该是第一页。
-    """
+    """图片封面页也是打开书的第一页（曾是 linear=no，触发 OPF-096）。"""
     items = _spine_items(tmp_path, sources=_cover_sources(tmp_path))
     assert ("cover", True) in items
     assert [i for i, _ in items].index("cover") == 0
 
 
 def test_no_non_linear_spine_item_without_a_link_to_it(tmp_path):
-    """OPF-096：非线性内容必须可达。
-
-    现在只有两种封面页，都是 linear=yes，所以整本书不该再有线性为 no 的 spine 项——
-    真要出现非线性内容，就得同时给它加链接（landmarks 之类）。
-    """
+    """OPF-096：非线性内容必须可达，所以现在全书不该有线性为 no 的 spine 项。"""
     for sources in (_cover_sources(tmp_path), Sources()):
         assert [i for i, linear in _spine_items(tmp_path, sources=sources) if not linear] == []
 
 
 def test_opf_cover_media_type_matches_actual_bytes(tmp_path):
-    """扩展名骗人时，OPF 里的 media-type 和 href 都得跟着实际内容走。
-
-    否则 epubcheck 一次报两条：OPF-029（声明的类型不符）+ PKG-022（后缀不符）。
-    """
+    """扩展名骗人时，OPF 的 media-type 和 href 都得跟着实际内容走（否则 OPF-029/PKG-022）。"""
     mislabeled = tmp_path / "cover.png"
     mislabeled.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
     entries = _entries(
@@ -537,6 +526,20 @@ def test_empty_sources_uses_builtin():
     css = build_css(Config(), Sources())
     assert css == builtin_css(Config())
     assert "@font-face" not in css
+
+
+def test_font_href_and_css_url_follow_the_renamed_file(tmp_path):
+    """OTF 存成 .ttf 时，manifest 的 href、media-type 和 CSS 的 url() 得一起改。"""
+    font = tmp_path / "f.ttf"
+    font.write_bytes(b"OTTO" + b"\x00" * 64)
+    sources = Sources(font=font_resource(font))
+    entries = _entries(_build(tmp_path, sources=sources))
+    opf = entries[next(n for n in entries if n.endswith("content.opf"))].decode("utf-8")
+    assert 'href="fonts/f.otf"' in opf
+    assert 'media-type="font/otf"' in opf
+    assert "EPUB/fonts/f.otf" in entries
+    assert 'url("fonts/f.otf")' in entries["EPUB/style.css"].decode("utf-8")
+    assert "fonts/f.ttf" not in opf
 
 
 # ---------- 封面页的 body 片段 ----------
