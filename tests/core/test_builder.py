@@ -365,8 +365,9 @@ def test_text_cover_page_is_linear(tmp_path):
     cfg = Config(input=tmp_path / "novel.txt", title="书名")
     items = _spine_items(tmp_path, cfg=cfg)
     assert ("cover", True) in items
-    # nav 之后立刻就是封面页，也就是正文的第一页
-    assert [i for i, _ in items].index("cover") == 1
+    # 封面排在 nav 前面：阅读器从 spine 第一个 linear 项开始，不该先落到目录页
+    assert [i for i, _ in items].index("cover") == 0
+    assert [i for i, _ in items].index("nav") == 1
 
 
 def test_text_cover_page_has_no_cover_image_property(tmp_path):

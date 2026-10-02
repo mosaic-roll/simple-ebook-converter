@@ -172,7 +172,7 @@ def build_epub(
 
     pages: list[epub.EpubHtml] = []
     page_map: dict[str, epub.EpubHtml] = {}
-    _add_cover(book, cfg, sources.cover, pages)
+    cover_page = _add_cover(book, cfg, sources.cover)
 
     roots = _page_roots(nodes)
     owner = _page_owner_by_anchor(roots)
@@ -192,7 +192,14 @@ def build_epub(
         book.toc = _toc_entries(nodes, page_map, owner, cfg.toc_depth)
     book.add_item(epub.EpubNav())
     book.add_item(epub.EpubNcx())
-    book.spine = (["nav"] if cfg.toc_in_spine else []) + pages
+    # 封面 → nav → 正文，跟纸质书一样。图片封面是 linear="no"，位置挪动不影响它
+    # （阅读器从 manifest 的 cover-image 取图）；但文字封面是 linear="yes"，
+    # spine 里排在 nav 之后就变成「打开书先看目录」了。
+    book.spine = (
+        ([cover_page] if cover_page is not None else [])
+        + (["nav"] if cfg.toc_in_spine else [])
+        + pages
+    )
     epub.write_epub(output, book, options={"compresslevel": 9})
 
 
@@ -310,14 +317,15 @@ def _add_cover(
     book: epub.EpubBook,
     cfg: Config,
     cover: Resource | None,
-    pages: list[epub.EpubHtml],
-) -> None:
-    """装配封面页并追加到 `pages`（它会进 spine）。三种情况：
+) -> epub.EpubHtml | None:
+    """装配封面页并返回它；没有封面时返回 `None`（调用方据此决定 spine 开头）。
+
+    三种情况：
 
     - 有封面图：图进 manifest（带 `properties="cover-image"`），另补一条
       `<meta name="cover">` 兼容 EPUB2 时代的阅读器；封面页 `linear="no"`，不打断正文。
     - 没图但 `text_cover` 开着：放只含书名/作者的封面页，`linear="yes"`，它就是第一页。
-    - 都没有：整本书没有封面，spine 直接从第一章开始。
+    - 都没有：返回 `None`，整本书没有封面。
 
     `cover` 是**内容**而非路径：有没有封面、是哪一张，上游（`sources.cover_for()`）
     已经判完了，这里只管装配，不再发现文件。
@@ -338,11 +346,11 @@ def _add_cover(
         page = epub.EpubHtml(uid="cover", file_name="cover.xhtml", title=title)
         page.content = text_cover_body(title, cfg.author).encode("utf-8")
     else:
-        return
+        return None
     page.add_meta(charset="utf-8")
     page.add_link(href="style.css", rel="stylesheet", type="text/css")
     book.add_item(page)
-    pages.append(page)
+    return page
 
 
 def escape(text: str) -> str:
