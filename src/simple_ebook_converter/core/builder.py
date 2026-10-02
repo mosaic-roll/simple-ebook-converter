@@ -94,18 +94,19 @@ h1, h2, h3, h4, h5, h6 {{
 }
 .cover .book-title,
 .cover .book-author {
-  text-align: right;
+  text-align: center;
 }
 .cover .book-title {
-  margin-top: 20vh;
+  margin-top: 2em;
   margin-bottom: 0;
-  font-size: 2em;
+  font-size: 3em;
 }
 .cover .book-author {
   margin-top: 1em;
   margin-bottom: 0;
   padding-left: 1.5em;  /* 装饰符号宽度 */
   text-indent: -1.5em;
+  font-size: 1.5em;
 }
 .cover .book-author::before {
   content: "◎";

@@ -107,7 +107,8 @@ JSON 文件（内容是一个有序列表），每条规则可带可选的 `stag
 封面页走 EPUB 标准，用 `<section class="cover" epub:type="cover">` 标语义角色，`class="cover"`
 供 CSS 选用（不用 `epub|type` 属性选择器：各家阅读器对它支持不一致）。文字封面页里书名与作者
 另挂 `book-title` / `book-author` 两个 class，好把它们从正文共用的 `h1~h6` 居中规则里摘出来，
-内置样式把两行都推到右缘（`text-align: right`）；作者名前的 ◎ 由 `::before` 生成，不写进 HTML。
+内置样式把两行都居中（`text-align: center`）；作者名前的 ◎ 由 `::before` 生成，
+不写进 HTML。作者用 `font-size: 1.5em` 区别于书名的 `3em`，形成封面层级。
 有图时图片在 OPF
 manifest 里带 `properties="cover-image"`，并额外补一条 `<meta name="cover">` 兼容 EPUB2
 时代的阅读器。封面页会链到 `style.css`，内置样式用 `.cover` 这组类选择器排版；
