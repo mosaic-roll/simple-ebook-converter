@@ -177,8 +177,13 @@ def test_tree_from_json_deleted_title_line_becomes_body():
     lines = ["第一章 A", "正文 A", "第二章 B", "正文 B", "第三章 C"]
     data = [
         {"raw_title": "第一章 A", "level": 3, "class_name": "chapter", "line": 1},
-        {"raw_title": "第二章 B", "level": 3, "class_name": "chapter", "line": 3,
-         "deleted": True},
+        {
+            "raw_title": "第二章 B",
+            "level": 3,
+            "class_name": "chapter",
+            "line": 3,
+            "deleted": True,
+        },
         {"raw_title": "第三章 C", "level": 3, "class_name": "chapter", "line": 5},
     ]
     tree = tree_from_json(data, lines)
@@ -242,6 +247,7 @@ def test_tree_from_json_preface_title_param():
 def test_tree_from_json_no_delete_round_trip():
     """用例6（回归）：无删除条目的往返一致。"""
     from simple_ebook_converter.core.parser import parse, walk
+
     lines = ["第一卷", "第一章 一", "正文甲"]
     data = [
         {"raw_title": "第一卷", "level": 2, "class_name": "volume", "line": 1},
@@ -250,8 +256,8 @@ def test_tree_from_json_no_delete_round_trip():
     restored = tree_from_json(data, lines)
     # 与 scan_toc 走 parse() 的结果逐节点比对（含子节点）
     from simple_ebook_converter.core.config import LevelRule
-    rules = [LevelRule(2, r"^第一卷$", "volume"),
-             LevelRule(3, r"^第一章 ", "chapter")]
+
+    rules = [LevelRule(2, r"^第一卷$", "volume"), LevelRule(3, r"^第一章 ", "chapter")]
     parsed, _ = parse(lines, rules, fallback_title="书名")
     assert [n.raw_title for n in walk(parsed)] == [n.raw_title for n in walk(restored)]
     for p, r in zip(walk(parsed), walk(restored)):
@@ -263,6 +269,7 @@ def test_pipeline_read_book_deleted_entry_keeps_title_as_paragraph(tmp_path):
     跑 `read_book`，断言生成树里被删条目的标题行确实作为 `<p>` 出现。"""
     from simple_ebook_converter.core.pipeline import read_book
     from simple_ebook_converter.core.sources import Sources
+
     input_file = tmp_path / "novel.txt"
     input_file.write_text(
         "第一章 A\n正文 A\n第100章 误匹配\n误捕的正文\n第二章 B\n正文 B\n",
@@ -274,7 +281,9 @@ def test_pipeline_read_book_deleted_entry_keeps_title_as_paragraph(tmp_path):
         {"raw_title": "第二章 B", "level": 3, "line": 5, "deleted": False},
     ]
     book = read_book(
-        cfg=__import__("simple_ebook_converter.core.config", fromlist=["Config"]).Config(
+        cfg=__import__(
+            "simple_ebook_converter.core.config", fromlist=["Config"]
+        ).Config(
             input=input_file,
         ),
         sources=Sources(toc_entries=toc_entries),

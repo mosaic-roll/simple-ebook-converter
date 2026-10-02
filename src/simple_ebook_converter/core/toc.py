@@ -109,16 +109,25 @@ def tree_from_json(
         _check_line(e, lines, where)
         kept.append(
             Node(
-                title.strip(), level, class_name,
-                raw_title=title.strip(), line=line,
+                title.strip(),
+                level,
+                class_name,
+                raw_title=title.strip(),
+                line=line,
             )
         )
 
     if not kept:
         # 所有条目都被删——整篇作为前言
         tree: list[Node] = [
-            Node(preface_title, 0, "preface",
-                 paragraphs=list(lines), raw_title=preface_title, line=1)
+            Node(
+                preface_title,
+                0,
+                "preface",
+                paragraphs=list(lines),
+                raw_title=preface_title,
+                line=1,
+            )
         ]
         assign_anchors(tree)
         return tree
@@ -144,9 +153,14 @@ def tree_from_json(
     if first.level > 0 and first.line > 1:
         tree.insert(
             0,
-            Node(preface_title, 0, "preface",
-                 paragraphs=lines[0 : first.line - 1],
-                 raw_title=preface_title, line=1),
+            Node(
+                preface_title,
+                0,
+                "preface",
+                paragraphs=lines[0 : first.line - 1],
+                raw_title=preface_title,
+                line=1,
+            ),
         )
 
     # level 0 固定用 anchor="preface"；多于一个会生成重名 xhtml，EPUB 损坏。
@@ -185,4 +199,3 @@ def _entry(node: Node) -> dict:
     if node.deleted:
         entry["deleted"] = True  # false 时不写这个键，导出的 JSON 干净些
     return entry
-

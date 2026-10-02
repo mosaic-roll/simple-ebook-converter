@@ -356,7 +356,6 @@ def test_no_text_cover_has_no_cover_page(tmp_path):
 
 
 def test_text_cover_escapes_markup(tmp_path):
-
     cfg = Config(input=tmp_path / "novel.txt", title='<A & "B">', author="x&y")
     page = _cover_xhtml(tmp_path, cfg=cfg)
     assert "&lt;A &amp; &quot;B&quot;&gt;" in page or "&lt;A &amp;" in page

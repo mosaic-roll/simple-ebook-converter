@@ -269,7 +269,9 @@ class App(ctk.CTk):
 
     def _open_settings(self) -> None:
         settings_dialog.open(
-            self, self.ctx, self.toc_widgets["table"],
+            self,
+            self.ctx,
+            self.toc_widgets["table"],
             on_apply=self._save_gui_settings,
         )
 
