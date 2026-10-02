@@ -397,7 +397,9 @@ def test_text_cover_escapes_markup(tmp_path):
 
 
 def test_text_cover_omits_author_when_empty(tmp_path):
-    page = _cover_xhtml(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名"))
+    page = _cover_xhtml(
+        tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名")
+    )
     assert "<p" not in page
 
 
@@ -431,7 +433,9 @@ def test_image_cover_page_is_linear(tmp_path):
 def test_no_non_linear_spine_item_without_a_link_to_it(tmp_path):
     """OPF-096：非线性内容必须可达，所以现在全书不该有线性为 no 的 spine 项。"""
     for sources in (_cover_sources(tmp_path), Sources()):
-        assert [i for i, linear in _spine_items(tmp_path, sources=sources) if not linear] == []
+        assert [
+            i for i, linear in _spine_items(tmp_path, sources=sources) if not linear
+        ] == []
 
 
 def test_opf_cover_media_type_matches_actual_bytes(tmp_path):
@@ -452,9 +456,7 @@ def test_cover_page_image_src_follows_the_renamed_file(tmp_path):
     """封面页里的 <img src> 得和包内实际文件名一致，否则图裂。"""
     mislabeled = tmp_path / "cover.png"
     mislabeled.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
-    page = _cover_xhtml(
-        tmp_path, sources=Sources(cover=cover_resource(mislabeled))
-    )
+    page = _cover_xhtml(tmp_path, sources=Sources(cover=cover_resource(mislabeled)))
     assert 'src="images/cover.jpg"' in page
     assert 'src="images/cover.png"' not in page
 
@@ -508,7 +510,9 @@ def test_builtin_css_is_unaffected_by_css_text():
 
 def test_css_append_text_adds_to_builtin():
     """`Sources.css_append_text` 加在内置样式之后，所以能覆盖内置规则。"""
-    css = build_css(Config(), Sources(css_append_text=".cover .book-title { color: red; }"))
+    css = build_css(
+        Config(), Sources(css_append_text=".cover .book-title { color: red; }")
+    )
     assert css.index("color: red;") > css.index("max-height: 100vh;")  # 追加在内置之后
     assert "text-indent" in css  # 内置正文样式还在
 
