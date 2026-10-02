@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from helpers import Epub, assert_heading, parse_css, resolve_href
 
 

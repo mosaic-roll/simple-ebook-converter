@@ -7,7 +7,6 @@ helper 是用来抓回归的，它自己坏了就等于回归没拦——所以�
 import zipfile
 
 import pytest
-
 from helpers import Epub, assert_heading, parse_css, resolve_href
 
 CONTAINER = (
@@ -350,6 +349,24 @@ def test_itemref_target_rejects_an_idref_with_no_manifest_item(tmp_path):
     epub = make_epub(tmp_path, items=[item("nav", "nav.xhtml")], refs=["nav"])
     with pytest.raises(AssertionError, match="在 manifest 里没有对应 item"):
         epub.itemref_target("chapter_9")
+
+
+def test_spine_items_defaults_to_linear(tmp_path):
+    """`linear="no"` 才是非线性；缺省属性按 yes 算。"""
+    epub = make_epub(tmp_path, items=[item("nav", "nav.xhtml")], refs=["nav"])
+    assert epub.spine_items() == [("nav", True)]
+
+
+def test_spine_items_reads_an_explicit_linear_no(tmp_path):
+    epub = make_epub(
+        tmp_path,
+        items=[item("cover", "cover.xhtml"), item("nav", "nav.xhtml")],
+        refs=["cover", "nav"],
+    )
+    epub.set_opf(lambda t: t.replace(
+        '<itemref idref="cover"/>', '<itemref idref="cover" linear="no"/>'
+    ))
+    assert epub.spine_items() == [("cover", False), ("nav", True)]
 
 
 def test_manifest_item_selects_by_property(tmp_path):

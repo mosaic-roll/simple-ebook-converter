@@ -13,9 +13,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-
 #: 外部链接不检查可达：EPUB 里可以有指向站外的 href。
-_EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.I)
+_EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.IGNORECASE)
 
 _OPF_NS = "{http://www.idpf.org/2007/opf}"
 #: manifest 里只有这两类能靠字节头验出真伪；其余（css/xhtml/ncx）认不出就跳过。
@@ -51,6 +50,11 @@ class Epub:
 
     def has_entry(self, name: str) -> bool:
         return name in self.entries
+
+    def set_opf(self, transform) -> None:
+        """就地改写 OPF 文本（`transform` 收原文、返新文）。给"故意造坏"用。"""
+        name = self.opf_name()
+        self.entries[name] = transform(self.entries[name].decode("utf-8")).encode("utf-8")
 
     def html(self, name: str) -> str:
         return self.entries[name].decode("utf-8")
@@ -111,10 +115,21 @@ class Epub:
 
     def spine_ids(self) -> list[str]:
         """spine 的 itemref 顺序（item id，不是文件名）。"""
+        return [idref for idref, _linear in self.spine_items()]
+
+    def spine_items(self) -> list[tuple[str, bool]]:
+        """spine 解析成 `[(item id, 是否 linear)]`。
+
+        `linear="no"` 是 EPUB3 里的"辅助内容"：不进正文流，只能靠链接到达。带
+        `linear="no"` 又没有指向它的链接就是 OPF-096。
+        """
         root = ET.fromstring(self.entries[self.opf_name()])
         spine = root.find(f"{_OPF_NS}spine")
         assert spine is not None, "OPF 里没有 spine"
-        return [i.get("idref", "") for i in spine.iter(f"{_OPF_NS}itemref")]
+        return [
+            (item.get("idref", ""), item.get("linear", "yes") != "no")
+            for item in spine.iter(f"{_OPF_NS}itemref")
+        ]
 
     def itemref_target(self, idref: str) -> str:
         """spine 里的 idref → 包内实际路径，顺便验证 idref 有对应 manifest item。"""
@@ -186,7 +201,7 @@ def _is_nav(name: str) -> bool:
 
 
 #: `href` / `src` 的属性值，单双引号都认：XML 声明那边是单引号，属性这边通常是双引号。
-_HREF_RE = re.compile(r"""\b(?:href|src)\s*=\s*(["'])(.*?)\1""", re.I)
+_HREF_RE = re.compile(r"""\b(?:href|src)\s*=\s*(["'])(.*?)\1""", re.IGNORECASE)
 
 
 def parse_css(css: str) -> dict[str, dict[str, str]]:
@@ -195,7 +210,7 @@ def parse_css(css: str) -> dict[str, dict[str, str]]:
     注释先剥掉，免得 `/* 装饰符号宽度 */` 粘在上一条的值后面。`@font-face` 这类
     at-rule 当成一个选择器键返回，键是原样的 at  prelude。
     """
-    stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    stripped = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
     out: dict[str, dict[str, str]] = {}
     for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", stripped):
         decls = {}
@@ -236,7 +251,7 @@ def assert_heading(
 def _headings(html: str) -> list[str]:
     """页面里所有标题的标签+class+id+文本，失败信息里当目录用。"""
     out = []
-    for m in re.finditer(r"<h([1-6])\b([^>]*)>(.*?)</h\1>", html, re.S):
+    for m in re.finditer(r"<h([1-6])\b([^>]*)>(.*?)</h\1>", html, re.DOTALL):
         text = re.sub(r"<[^>]+>", "", m.group(3)).strip()
         out.append(f"h{m.group(1)} {m.group(2).strip()!r} {text!r}")
     return out

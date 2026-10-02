@@ -139,8 +139,11 @@ def test_rules_from_json_rejects_invalid_payload(text):
 
 
 def test_rules_from_json_rejects_an_uncompilable_pattern():
-    with pytest.raises(ValueError, match="第 2 条替换规则正则非法"):
+    with pytest.raises(ValueError) as exc:
         rules_from_json('[{"pattern": "甲", "replace": "乙"}, {"pattern": "("}]')
+    msg = str(exc.value)
+    assert "正则非法" in msg  # 文案只匹关键词，改措辞不该挂
+    assert "第 2 条" in msg  # 索引是契约：得指向出事的那一条
 
 
 def test_rules_from_json_reads_stage():
@@ -156,8 +159,12 @@ def test_rules_from_json_reads_stage():
 
 
 def test_rules_from_json_rejects_unknown_stage():
-    with pytest.raises(ValueError, match="第 1 条替换规则的 阶段只能是"):
+    with pytest.raises(ValueError) as exc:
         rules_from_json(json.dumps([{"pattern": "a", "stage": "chapter"}]))
+    msg = str(exc.value)
+    assert "阶段只能是" in msg
+    assert "第 1 条" in msg  # 索引
+    assert "'chapter'" in msg  # 收到的值要回显，否则用户不知道错在哪
 
 
 def test_rules_from_json_rejects_non_string_stage():
@@ -181,8 +188,12 @@ def test_rules_from_rows_passes_rules_through():
 
 
 def test_rules_from_rows_rejects_unknown_label():
-    with pytest.raises(ValueError, match=r"规则「a」的 阶段只能是 原文/HTML"):
+    with pytest.raises(ValueError) as exc:
         rules_from_rows([("a", "b", "第1章")])
+    msg = str(exc.value)
+    assert "阶段只能是" in msg
+    assert "规则「a」" in msg  # 是哪个查找词出错，要比文案更重要
+    assert "'第1章'" in msg
 
 
 def test_rules_from_file_reads_file(tmp_path):

@@ -173,7 +173,7 @@ def test_tree_from_json_lifts_children_of_deleted_volume():
 
 
 def test_tree_from_json_deleted_title_line_becomes_body():
-    """用例1：中间条目被删——标题行变正文。"""
+    """中间条目被删：标题行并入前一条的正文，该条不产生节点。"""
     lines = ["第一章 A", "正文 A", "第二章 B", "正文 B", "第三章 C"]
     data = [
         {"raw_title": "第一章 A", "level": 3, "class_name": "chapter", "line": 1},
@@ -193,7 +193,7 @@ def test_tree_from_json_deleted_title_line_becomes_body():
 
 
 def test_tree_from_json_deleted_at_front_becomes_preface():
-    """用例2：最前方条目被删——内容变前言。"""
+    """最前方的条目被删：其内容落到前言（level 0），后续标题照常。"""
     lines = ["引子", "引言正文", "第一章 A", "正文 A"]
     data = [
         {"raw_title": "引子", "level": 3, "line": 1, "deleted": True},
@@ -208,7 +208,7 @@ def test_tree_from_json_deleted_at_front_becomes_preface():
 
 
 def test_tree_from_json_multiple_deleted_at_front():
-    """用例3：顶部多条连删——合并为一个前言。"""
+    """顶部连续多条被删：合并成一个前言，不各起一个。"""
     lines = ["引子", "引言正文", "序章", "序章正文", "第一章 A", "正文 A"]
     data = [
         {"raw_title": "引子", "level": 3, "line": 1, "deleted": True},
@@ -222,7 +222,7 @@ def test_tree_from_json_multiple_deleted_at_front():
 
 
 def test_tree_from_json_all_deleted():
-    """用例4：所有条目被删——整篇作为前言。"""
+    """所有条目都被删：整篇作为前言，只剩一个 level 0 节点。"""
     lines = ["引子", "引言正文", "第一章 A", "正文 A"]
     data = [
         {"raw_title": "引子", "level": 3, "line": 1, "deleted": True},
@@ -235,7 +235,7 @@ def test_tree_from_json_all_deleted():
 
 
 def test_tree_from_json_preface_title_param():
-    """用例5：`preface_title` 生效。"""
+    """`preface_title` 指定前言节点的标题。"""
     lines = ["引子", "引言正文"]
     data = [
         {"raw_title": "引子", "level": 3, "line": 1, "deleted": True},
@@ -245,7 +245,7 @@ def test_tree_from_json_preface_title_param():
 
 
 def test_tree_from_json_no_delete_round_trip():
-    """用例6（回归）：无删除条目的往返一致。"""
+    """无删除条目时，回喂的树与 `parse()` 逐节点一致（回归）。"""
     from simple_ebook_converter.core.parser import parse, walk
 
     lines = ["第一卷", "第一章 一", "正文甲"]
@@ -265,8 +265,8 @@ def test_tree_from_json_no_delete_round_trip():
 
 
 def test_pipeline_read_book_deleted_entry_keeps_title_as_paragraph(tmp_path):
-    """用例7（回归）：`Sources(toc_entries=...)` 带 `deleted=true` 条目，
-    跑 `read_book`，断言生成树里被删条目的标题行确实作为 `<p>` 出现。"""
+    """`read_book` 读了带 `deleted=true` 的目录：被删条目的标题行作为 `<p>` 留在前一条正文里。"""
+    from simple_ebook_converter.core.config import Config
     from simple_ebook_converter.core.pipeline import read_book
     from simple_ebook_converter.core.sources import Sources
 
@@ -281,17 +281,15 @@ def test_pipeline_read_book_deleted_entry_keeps_title_as_paragraph(tmp_path):
         {"raw_title": "第二章 B", "level": 3, "line": 5, "deleted": False},
     ]
     book = read_book(
-        cfg=__import__(
-            "simple_ebook_converter.core.config", fromlist=["Config"]
-        ).Config(
-            input=input_file,
-        ),
-        sources=Sources(toc_entries=toc_entries),
+        cfg=Config(input=input_file), sources=Sources(toc_entries=toc_entries)
     )
     tree = book.tree
     assert [n.raw_title for n in tree] == ["第一章 A", "第二章 B"]
     # 被删条目 "第100章 误匹配" 的标题行出现在第一章的正文里
     assert "第100章 误匹配" in tree[0].paragraphs
+
+
+def test_load_toc_reports_missing_file_bad_json_and_non_list(tmp_path):
     with pytest.raises(ValueError, match="无法读取"):
         load_toc(tmp_path / "missing.json")
     bad = tmp_path / "bad.json"

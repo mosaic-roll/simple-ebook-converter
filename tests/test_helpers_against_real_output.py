@@ -7,7 +7,6 @@
 import re
 
 import pytest
-
 from helpers import assert_heading
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
