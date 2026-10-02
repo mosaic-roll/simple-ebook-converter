@@ -125,6 +125,20 @@ def _replace_entry(entry: Any, text: str) -> None:
     entry.insert(0, text)
 
 
+def _initial_out(input_path: str) -> tuple[str | None, str | None]:
+    """输出对话框的起始位置：`(initialdir, initialfile)`，都取自输入路径。
+
+    文件名只取 stem，`.epub` 交给 `defaultextension` 补——输入是 `.txt`、输出是
+    `.epub`，别把输入的扩展名带过去。目录一并给，对话框直接开在输入文件旁边，
+    不用退回上次用过的目录。输入框为空（或只有 `.` 之类没有文件名的内容）时两个都
+    返回 `None`，走系统默认，不猜。
+    """
+    src = Path(input_path.strip())
+    if not src.stem:
+        return None, None
+    return str(src.parent), src.stem
+
+
 def _as_stored(name: str, text: str) -> Any:
     """界面文本 → 落盘值：`int` 字段存成数字，其余存字符串。
 
@@ -386,8 +400,16 @@ class App(ctk.CTk):
         self._on_scan()  # 扫失败弹窗并保留已填的路径
 
     def _pick_output(self) -> None:
+        """选输出文件：默认文件名与目录取自输入文件（见 `_initial_out`）。"""
+        initialdir, initialfile = _initial_out(
+            self.tab_widgets["basic"]["input_entry"].get()
+        )
         path = filedialog.asksaveasfilename(
-            title="选择输出文件", defaultextension=".epub", filetypes=_OUTPUT_TYPES
+            title="选择输出文件",
+            initialdir=initialdir,
+            initialfile=initialfile,
+            defaultextension=".epub",
+            filetypes=_OUTPUT_TYPES,
         )
         if path:
             _replace_entry(self.tab_widgets["basic"]["output_entry"], path)
