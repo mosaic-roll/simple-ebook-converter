@@ -126,6 +126,23 @@ def test_rules_from_json_without_stage_is_raw():
     ]
 
 
+def test_rules_from_json_accepts_empty_list():
+    assert rules_from_json("[]") == []
+
+
+@pytest.mark.parametrize(
+    "text", ['{"pattern": "甲"}', '[{"replace": "乙"}]', "not json", '[{"pattern": 1}]']
+)
+def test_rules_from_json_rejects_invalid_payload(text):
+    with pytest.raises(ValueError):
+        rules_from_json(text)
+
+
+def test_rules_from_json_rejects_an_uncompilable_pattern():
+    with pytest.raises(ValueError, match="第 2 条替换规则正则非法"):
+        rules_from_json('[{"pattern": "甲", "replace": "乙"}, {"pattern": "("}]')
+
+
 def test_rules_from_json_reads_stage():
     rules = rules_from_json(
         json.dumps(

@@ -8,7 +8,6 @@ from simple_ebook_converter.core.levels import (
     check_pattern,
     parse_level_spec,
 )
-from simple_ebook_converter.core.replace import Rule, rules_from_json
 
 
 def test_parse_level_spec():
@@ -84,24 +83,3 @@ def test_build_levels_does_not_share_default_rules():
 def test_build_levels_rejects_invalid_pattern(specs, label):
     with pytest.raises(ValueError, match=re.escape(label)):
         build_levels(specs)
-
-
-def test_rules_from_json():
-    assert rules_from_json('[{"pattern": "甲", "replace": "乙"}]') == [Rule("甲", "乙")]
-
-
-@pytest.mark.parametrize(
-    "text", ['{"pattern": "甲"}', '[{"replace": "乙"}]', "not json", '[{"pattern": 1}]']
-)
-def test_rules_from_json_rejects_invalid(text):
-    with pytest.raises(ValueError):
-        rules_from_json(text)
-
-
-def test_rules_from_json_accepts_empty_list():
-    assert rules_from_json("[]") == []
-
-
-def test_rules_from_json_rejects_invalid_pattern():
-    with pytest.raises(ValueError, match="第 2 条替换规则正则非法"):
-        rules_from_json('[{"pattern": "甲", "replace": "乙"}, {"pattern": "("}]')

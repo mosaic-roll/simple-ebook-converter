@@ -13,7 +13,6 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
-import pytest
 
 #: 外部链接不检查可达：EPUB 里可以有指向站外的 href。
 _EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.I)

@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from helpers import Epub, assert_heading
+from helpers import assert_heading
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 JPEG = b"\xff\xd8\xff" + b"\x00" * 32

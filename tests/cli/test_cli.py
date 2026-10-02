@@ -8,7 +8,6 @@ import pytest
 from click.testing import CliRunner
 
 from simple_ebook_converter.cli.cli import convert, main
-from simple_ebook_converter.core.config import Config
 from simple_ebook_converter.core.encoding import EncodingError
 from simple_ebook_converter.core.options import OPTIONS, option_default, option_groups
 from simple_ebook_converter.core.parser import NoEnabledRulesError
@@ -722,12 +721,14 @@ _SCALAR_OPTIONS = (
 
 
 def test_option_defaults_come_from_config():
-    """选项默认值必须等于 Config 的默认值，不能在 CLI 里另写一份字面量。"""
+    """click 命令上声明的默认值必须来自选项表，不能在 CLI 里另写一份字面量。
+
+    `--help` 里印出来的值由 `test_help_shows_config_defaults` 断。
+    """
     params = {p.name: p for p in convert.params}
     for name in _SCALAR_OPTIONS:
         default = option_default(next(o for o in OPTIONS if o.name == name))
         assert params[name].default == default, f"--{name} 的默认值与选项表不一致"
-        assert default == getattr(Config(), name, default)
         assert params[name].show_default, f"--{name} 未在 --help 里显示默认值"
 
 

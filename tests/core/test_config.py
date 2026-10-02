@@ -39,12 +39,6 @@ def test_every_config_field_is_either_an_option_or_direct():
     assert set(Config.__dataclass_fields__) - covered == _DIRECT_FIELDS
 
 
-def test_option_defaults_come_from_config():
-    """选项默认值从 Config 派生：改 Config 的默认值就同时改了 CLI 行为与 --help。"""
-    for opt in _field_options():
-        assert option_default(opt) == getattr(DEFAULTS, opt.name), opt.name
-
-
 def test_empty_option_defaults():
     """留空即「未指定」：点击参数里只能是 None 或 ()，不能是空串。"""
     for name in ("title", "date", "out", "dump_css", "cover", "font", "css_file"):

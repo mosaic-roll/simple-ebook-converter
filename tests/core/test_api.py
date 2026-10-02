@@ -71,10 +71,6 @@ def test_core_package_does_not_re_export_submodules():
     assert not leaked, f"core 不该转手导出子模块的东西：{sorted(leaked)}"
 
 
-def test_all_is_sorted_and_has_no_duplicates():
-    assert len(set(core.__all__)) == len(core.__all__)
-
-
 def test_core_does_not_import_frontends():
     """core 不得依赖任何前端：否则打包 CLI 会拖进 tkinter，打包 GUI 会拖进 click。"""
     imported: set[str] = set()

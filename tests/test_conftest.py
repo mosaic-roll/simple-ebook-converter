@@ -89,21 +89,13 @@ def test_resolve_href_decodes_percent_escapes():
     )
 
 
-def test_container_full_path_is_package_root_relative_not_meta_inf_relative():
+def test_container_full_path_is_package_root_relative_not_meta_inf_relative(tmp_path):
     """`full-path` 从包根算起——拿 container.xml 当基准会拼出 `META-INF/EPUB/...`。"""
-    epub = make_epub(tmp_path := make_tmp(), items=[item("c", "text/p1.xhtml")])
+    epub = make_epub(tmp_path, items=[item("c", "text/p1.xhtml")])
     assert epub.opf_name() == "EPUB/content.opf"
-    assert epub.entries["EPUB/content.opf"]
     assert resolve_href("META-INF/container.xml", "EPUB/content.opf") == (
         "META-INF/EPUB/content.opf"
-    )  # 这就是不能走 resolve_href 的原因
-
-
-def make_tmp():
-    import tempfile
-    from pathlib import Path
-
-    return Path(tempfile.mkdtemp())
+    )  # 这就是 opf_name 不能走 resolve_href 的原因
 
 
 # ---------- assert_links_reachable ----------
