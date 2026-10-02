@@ -73,6 +73,11 @@ LEVEL_PRESETS = (
 _FALLBACK_TITLE = "未命名"
 
 
+# ══════════════════════════════════════════════════════════════
+# LevelRule：单条层级规则
+# ══════════════════════════════════════════════════════════════
+
+
 @dataclass
 class LevelRule:
     """一个标题层级：级别 1~6 对应 h1~h6，正则为空即不启用。"""
@@ -91,6 +96,11 @@ def default_levels() -> list[LevelRule]:
     return [
         LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS
     ]
+
+
+# ══════════════════════════════════════════════════════════════
+# Config：一次转换的全部参数
+# ══════════════════════════════════════════════════════════════
 
 
 @dataclass
