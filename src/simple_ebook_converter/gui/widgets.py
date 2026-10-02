@@ -54,14 +54,26 @@ def make_field(
     ctx: GuiContext,
     placeholder: str = "",
     col: int = 0,
+    span: int = 1,
 ) -> ctk.CTkEntry:
-    """一行：标签 + 单行输入框。`col` 为 0 或 2（左半区 / 右半区）。"""
+    """一行：标签 + 单行输入框。
+
+    `col` 为 0 或 2（左半区 / 右半区）；`span` 是输入框横向占几列，要占满该行
+    剩余宽度（`col=0` 时即整行）传 3。
+    """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="w", font=font).grid(
         row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
     )
     entry = ctk.CTkEntry(parent, placeholder_text=placeholder, font=font)
-    entry.grid(row=r, column=col + 1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
+    entry.grid(
+        row=r,
+        column=col + 1,
+        columnspan=span,
+        padx=FIELD_PADX,
+        pady=ROW_PADY,
+        sticky="ew",
+    )
     return entry
 
 

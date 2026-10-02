@@ -46,12 +46,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     encoding_menu = make_field_menu(f, 3, "编码", list(ENCODING_LABELS), ctx)
 
     m = make_group(parent, "书籍信息", 1, ctx)
-    book_title = make_field(m, 1, "书名", ctx, "书名", col=0)
-    book_author = make_field(m, 1, "作者", ctx, "作者", col=2)
+    # 书名/作者各占满一整行（span=3 铺到分组右边缘）：这两项最常填长文本，
+    # 挤在半宽的框里既难读也难看清
+    book_title = make_field(m, 1, "书名", ctx, "书名", col=0, span=3)
+    book_author = make_field(m, 2, "作者", ctx, "作者", col=0, span=3)
     # core 的 `DEFAULTS.date` 是 None（不写就省掉 dc:date），所以这里给的是**格式提示**，
     # 不是默认值：留空即「不写」
-    book_date = make_field(m, 2, "出版日期", ctx, "如 1949-10-01", col=0)
-    lang_menu = make_field_combo(m, 2, "语言", LANGUAGES, ctx, col=2)
+    book_date = make_field(m, 3, "出版日期", ctx, "如 1949-10-01", col=0)
+    lang_menu = make_field_combo(m, 3, "语言", LANGUAGES, ctx, col=2)
 
     c = make_group(parent, "封面", 2, ctx)
     cover_entry = make_field_btn(
