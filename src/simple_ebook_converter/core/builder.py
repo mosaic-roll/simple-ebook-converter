@@ -67,12 +67,12 @@ def builtin_css(cfg: Config, font_name: str | None = None) -> str:
         )
     family = f'"{_FONT_FAMILY}", ' if font_name else ""
 
-    css.append(
-        f"""body {{
+    css.append(f"""body {{
   margin: 5%;
   font-size: 1em;
   line-height: {cfg.line_height};
   font-family: {family}sans-serif;
+  text-align: {cfg.body_align};
 }}
 p {{
   margin: 0 0 {cfg.para_spacing} 0;
@@ -86,35 +86,41 @@ h1, h2, h3, h4, h5, h6 {{
 }}
 .chapter {{
   text-align: {cfg.chapter_align};
-}}
-body {{
-  text-align: {cfg.body_align};
-}}"""
-    )
-    # 整本书只有封面页的 body 里直接挂 section，章节页没有，所以这组结构选择器
-    # 只命中封面页。不用 epub|type 属性选择器：各家阅读器对它的支持并不一致；
-    # 加 class="cover" 让 CSS 意图更明确。
-    css.append(
-        """.cover {
+}}""")
+    # 只命中封面页：整本书只有它的 body 里直接挂 section。不用 epub|type 属性选择器，
+    # 各家阅读器对它支持不一致。书名/作者另挂 class，才能从上面那条 `h1~h6` 居中里摘出来。
+    css.append(""".cover {
   margin: 0;
+  text-indent: 0;
   text-align: center;
 }
-.cover h1 {
-  margin: 2em 0 0.5em;
-  font-size: 2em;
+.cover .book-title,
+.cover .author {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;   /* 各自靠右 */
+  margin-right: 0;
+  text-align: left;    /* 块内左对齐 */
   text-indent: 0;
 }
-.cover p {
-  margin: 0;
-  text-indent: 0;
+.cover .book-title {
+  margin-top: 20vh;
+  font-size: 2em;
+}
+.cover .author {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+}
+.cover .author::before {
+  content: "◎";
+  margin-right: 0.5em;
 }
 .cover img {
   display: block;
   margin: 0 auto;
   max-width: 100%;
   max-height: 100vh;
-}"""
-    )
+}""")
     return "\n".join(css)
 
 
@@ -130,13 +136,13 @@ def image_cover_body(image_name: str, alt: str = "封面") -> str:
 def text_cover_body(title: str, author: str = "") -> str:
     """文字封面页的 body 片段：书名 + 作者，没有图片。
 
-    用 `h1` / `p` 而不是自定义 class——这一页的标题层级与署名段落本身就是那个意思。
+    标签用 `h1` / `p`，另挂 class 供样式定位。
     """
     parts = [f'<section class="cover" epub:type="{COVER_SECTION_TYPE}">']
     if title:
-        parts.append(f"  <h1>{escape(title)}</h1>")
+        parts.append(f'  <h1 class="book-title">{escape(title)}</h1>')
     if author:
-        parts.append(f"  <p>{escape(author)}</p>")
+        parts.append(f'  <p class="author">{escape(author)}</p>')
     parts.append("</section>")
     return "\n".join(parts)
 

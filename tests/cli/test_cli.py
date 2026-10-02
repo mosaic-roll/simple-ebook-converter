@@ -191,7 +191,7 @@ def test_no_image_cover_without_explicit(tmp_path):
     assert "cover.png" not in opf
     # text_cover=True（默认），应有文字封面页
     page = _cover_page(tmp_path)
-    assert "<h1>" in page
+    assert '<h1 class="book-title">' in page
 
 
 def test_explicit_cover_is_embedded(tmp_path):
@@ -224,8 +224,8 @@ def test_text_cover_page_generated_by_default(tmp_path):
     assert result.exit_code == 0, result.output
     page = _cover_page(tmp_path)
     assert 'epub:type="cover"' in page
-    assert "<h1>书名</h1>" in page
-    assert "<p>作者</p>" in page
+    assert '<h1 class="book-title">书名</h1>' in page
+    assert '<p class="author">作者</p>' in page
 
 
 def test_no_text_cover_skips_page(tmp_path):
@@ -246,7 +246,7 @@ def test_text_cover_generated_without_explicit_cover(tmp_path):
     result = CliRunner().invoke(convert, [str(src), "--title", "书名"])
     assert result.exit_code == 0, result.output
     page = _cover_page(tmp_path)
-    assert "<h1>" in page
+    assert '<h1 class="book-title">' in page
     assert "<img" not in page
 
 

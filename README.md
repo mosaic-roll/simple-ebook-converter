@@ -104,8 +104,10 @@ JSON 文件（内容是一个有序列表），每条规则可带可选的 `stag
 3. **文字封面页** —— 仍然没有图时（默认开启），在书的最前面插一个只含**书名和作者**
    的封面页。用 `--no-text-cover` 关掉，关掉后整本书就没有封面。
 
-封面页走 EPUB 标准，用 `<section epub:type="cover">` 标语义角色，再挂一个 `class="cover"`
-供 CSS 选用（不用 `epub|type` 属性选择器：各家阅读器对它支持不一致）。有图时图片在 OPF
+封面页走 EPUB 标准，用 `<section class="cover" epub:type="cover">` 标语义角色，`class="cover"`
+供 CSS 选用（不用 `epub|type` 属性选择器：各家阅读器对它支持不一致）。文字封面页里书名与作者
+另挂 `book-title` / `author` 两个 class，好把它们从正文共用的 `h1~h6` 居中规则里摘出来。
+有图时图片在 OPF
 manifest 里带 `properties="cover-image"`，并额外补一条 `<meta name="cover">` 兼容 EPUB2
 时代的阅读器。封面页会链到 `style.css`，内置样式用 `.cover` 这组类选择器排版；
 `--css-append` 追加在内置样式之后，`--css-file` 则是**整份替代**内置样式（两者互斥，

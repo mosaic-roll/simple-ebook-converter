@@ -60,6 +60,30 @@ def _sample_tree():
     return parse(lines, Config().levels, fallback_title="测试书")[0]
 
 
+def _rule(css: str, selector: str) -> str:
+    """CSS 里某个选择器的声明块（出现多次就拼起来）。
+
+    不按整块文本断言，否则加一条声明就误报。`/* */` 注释会粘在上一条的值后面，先剥掉。
+    """
+    blocks = [
+        body
+        for sel, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)
+        if selector in [s.strip() for s in sel.split(",")]
+    ]
+    assert blocks, f"CSS 里没有 {selector} 规则：\n{css}"
+    return re.sub(r"/\*.*?\*/", "", "\n".join(blocks), flags=re.S)
+
+
+def _declarations(css: str, selector: str) -> dict[str, str]:
+    """`_rule()` 的结果 → `{'text-align': 'left', ...}`。"""
+    out = {}
+    for decl in _rule(css, selector).split(";"):
+        if ":" in decl:
+            prop, _, value = decl.partition(":")
+            out[prop.strip()] = value.strip()
+    return out
+
+
 def test_build_css_defaults():
     css = build_css(Config())
     assert "line-height: 1.5" in css
@@ -105,9 +129,17 @@ def test_css_content_applies_settings(tmp_path):
     assert "text-indent: 0em" in css
     assert "line-height: 2" in css
     assert "0.5em" in css
-    assert ".chapter {\n  text-align: left;" in css
-    assert ".volume {\n  text-align: left;" in css
-    assert "body {\n  text-align: left;" in css
+    assert _declarations(css, ".chapter")["text-align"] == "left"
+    assert _declarations(css, ".volume")["text-align"] == "left"
+    assert _declarations(css, "body")["text-align"] == "left"
+
+
+def test_headings_centered_by_default():
+    """h1~h6 默认居中：否则 `--level` 自定义的 h4/h5/h6 会跟着 `body_align` 跑。"""
+    css = build_css(Config())
+    assert _declarations(css, "h4")["text-align"] == "center"
+    # 居中规则要排在 `body` 之后：两者特异性相同，靠源码顺序决胜
+    assert css.index("h1, h2, h3, h4, h5, h6 {") > css.index("body {")
 
 
 def test_build_epub_structure(tmp_path):
@@ -323,8 +355,8 @@ def test_text_cover_page_is_default(tmp_path):
     cfg = Config(input=tmp_path / "novel.txt", title="书名", author="作者")
     page = _cover_xhtml(tmp_path, cfg=cfg)
     assert 'epub:type="cover"' in page
-    assert "<h1>书名</h1>" in page
-    assert "<p>作者</p>" in page
+    assert '<h1 class="book-title">书名</h1>' in page
+    assert '<p class="author">作者</p>' in page
     assert "<img" not in page
 
 
@@ -364,10 +396,8 @@ def test_text_cover_escapes_markup(tmp_path):
 
 
 def test_text_cover_omits_author_when_empty(tmp_path):
-    page = _cover_xhtml(
-        tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名")
-    )
-    assert "<p>" not in page
+    page = _cover_xhtml(tmp_path, cfg=Config(input=tmp_path / "novel.txt", title="书名"))
+    assert "<p" not in page
 
 
 def test_cover_page_links_stylesheet(tmp_path):
@@ -415,15 +445,15 @@ def test_image_cover_wins_over_text_cover(tmp_path):
     """给了封面图就不再生成文字封面，两者互斥。"""
     cfg = Config(input=tmp_path / "novel.txt", title="书名")
     page = _cover_xhtml(tmp_path, cfg=cfg, sources=_cover_sources(tmp_path))
-    assert "<h1>" not in page
+    assert "<h1" not in page
     assert "<img" in page
 
 
 def test_cover_css_rules_present():
+    """封面页仍靠 `.cover` 这组 class 上样式（图片封面与文字封面共用同一个容器）。"""
     css = build_css(Config())
-    assert ".cover" in css
+    assert ".cover {" in css
     assert ".cover img" in css
-    assert ".cover p" in css
 
 
 # ---------- CSS：整份替代 / 追加（内容由 Sources 送来） ----------
@@ -445,7 +475,7 @@ def test_builtin_css_is_unaffected_by_css_text():
 
 def test_css_append_text_adds_to_builtin():
     """`Sources.css_append_text` 加在内置样式之后，所以能覆盖内置规则。"""
-    css = build_css(Config(), Sources(css_append_text=".cover h1 { color: red; }"))
+    css = build_css(Config(), Sources(css_append_text=".cover .book-title { color: red; }"))
     assert css.index("color: red;") > css.index("max-height: 100vh;")  # 追加在内置之后
     assert "text-indent" in css  # 内置正文样式还在
 
@@ -492,15 +522,15 @@ def test_image_body_escapes_src_and_alt():
 def test_text_body_title_and_author():
     body = text_cover_body("书名", "作者")
     assert '<section class="cover" epub:type="cover">' in body
-    assert "<h1>书名</h1>" in body
-    assert "<p>作者</p>" in body
+    assert '<h1 class="book-title">书名</h1>' in body
+    assert '<p class="author">作者</p>' in body
     assert "<img" not in body
     assert 'class="cover"' in body
 
 
 def test_text_body_omits_missing_parts():
-    assert "<p>" not in text_cover_body("书名")
-    assert "<h1>" not in text_cover_body("", "作者")
+    assert "<p" not in text_cover_body("书名")
+    assert "<h1" not in text_cover_body("", "作者")
 
 
 def test_text_body_empty_still_valid_section():
