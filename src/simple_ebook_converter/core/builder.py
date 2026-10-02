@@ -91,27 +91,23 @@ h1, h2, h3, h4, h5, h6 {{
     # 各家阅读器对它支持不一致。书名/作者另挂 class，才能从上面那条 `h1~h6` 居中里摘出来。
     css.append(""".cover {
   margin: 0;
-  text-indent: 0;
-  text-align: center;
 }
 .cover .book-title,
-.cover .author {
-  width: fit-content;
-  max-width: 100%;
-  margin-left: auto;   /* 各自靠右 */
-  margin-right: 0;
-  text-align: left;    /* 块内左对齐 */
-  text-indent: 0;
+.cover .book-author {
+  text-align: right;
 }
 .cover .book-title {
   margin-top: 20vh;
+  margin-bottom: 0;
   font-size: 2em;
 }
-.cover .author {
-  margin-top: 0.5em;
+.cover .book-author {
+  margin-top: 1em;
   margin-bottom: 0;
+  padding-left: 1.5em;  /* 装饰符号宽度 */
+  text-indent: -1.5em;
 }
-.cover .author::before {
+.cover .book-author::before {
   content: "◎";
   margin-right: 0.5em;
 }
@@ -142,7 +138,7 @@ def text_cover_body(title: str, author: str = "") -> str:
     if title:
         parts.append(f'  <h1 class="book-title">{escape(title)}</h1>')
     if author:
-        parts.append(f'  <p class="author">{escape(author)}</p>')
+        parts.append(f'  <p class="book-author">{escape(author)}</p>')
     parts.append("</section>")
     return "\n".join(parts)
 

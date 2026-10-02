@@ -225,7 +225,7 @@ def test_text_cover_page_generated_by_default(tmp_path):
     page = _cover_page(tmp_path)
     assert 'epub:type="cover"' in page
     assert '<h1 class="book-title">书名</h1>' in page
-    assert '<p class="author">作者</p>' in page
+    assert '<p class="book-author">作者</p>' in page
 
 
 def test_no_text_cover_skips_page(tmp_path):

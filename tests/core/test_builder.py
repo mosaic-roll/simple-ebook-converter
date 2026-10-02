@@ -356,7 +356,7 @@ def test_text_cover_page_is_default(tmp_path):
     page = _cover_xhtml(tmp_path, cfg=cfg)
     assert 'epub:type="cover"' in page
     assert '<h1 class="book-title">书名</h1>' in page
-    assert '<p class="author">作者</p>' in page
+    assert '<p class="book-author">作者</p>' in page
     assert "<img" not in page
 
 
@@ -523,7 +523,7 @@ def test_text_body_title_and_author():
     body = text_cover_body("书名", "作者")
     assert '<section class="cover" epub:type="cover">' in body
     assert '<h1 class="book-title">书名</h1>' in body
-    assert '<p class="author">作者</p>' in body
+    assert '<p class="book-author">作者</p>' in body
     assert "<img" not in body
     assert 'class="cover"' in body
 
