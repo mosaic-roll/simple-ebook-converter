@@ -57,7 +57,6 @@ DEFAULT_CHAPTER_RE = (
     rf"^(?:{_CHAPTER_CORES}){_TAIL}"
     r"|^[Cc]hapter.*$"  # 英文：Chapter
     r"|^[Ss]ection.*$"  # Section
-    r"|^[Pp]age.*$"  # Page
     r"|^\d+[、.．].*$"  # 阿拉伯数字编号：1. 标题
     rf"|^{_CN_DIGIT}+[、.．].*$"  # 中文数字编号：一、标题
     r"|^\d{1,4}$"  # 纯数字章节：12

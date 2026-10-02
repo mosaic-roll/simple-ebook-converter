@@ -81,15 +81,13 @@ def test_english_and_numbered_titles_match_chapter():
         "正文一",
         "Section 2",
         "正文二",
-        "Page 3",
-        "正文三",
         "12",
-        "正文四",
+        "正文三",
         "5、",
-        "正文五",
+        "正文四",
     ]
     tree, _ = parse(lines, default_levels(), fallback_title="书名")
-    assert [n.title for n in tree] == ["Chapter 1", "Section 2", "Page 3", "12", "5、"]
+    assert [n.title for n in tree] == ["Chapter 1", "Section 2", "12", "5、"]
 
 
 def test_pian_not_volume():
