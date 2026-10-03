@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from simple_ebook_converter.core.replace import rules_to_list
-from simple_ebook_converter.gui.app import _as_stored, apply_saved, collect_saved
+from simple_ebook_converter.gui.app import apply_saved, collect_saved
 from simple_ebook_converter.gui.constants import ALIGN_LABELS, TOC_DEPTHS
 from simple_ebook_converter.gui.tabs.layout import CSS_MODES
 
@@ -121,35 +121,6 @@ def _apply(ui, saved, config_dir=NOWHERE):
     )
 
 
-# ---------------------------------------------------------------- _as_stored
-
-
-def test_as_stored_turns_an_int_field_into_a_number():
-    """`indent` 存成 4 而不是 "4"——`Config` 那边的类型对不上。"""
-    assert _as_stored("indent", " 4 ") == 4
-    assert isinstance(_as_stored("indent", "4"), int)
-
-
-def test_as_stored_maps_blank_int_field_to_none():
-    """空文本对 int 字段是 None（= 用 core 默认），不是 0 也不是空串。"""
-    assert _as_stored("indent", "   ") is None
-
-
-def test_as_stored_maps_an_unparseable_int_field_to_none():
-    """非法输入和留空同等处理：存 None，用 core 默认。
-
-    关窗保存走的就是这条，`_on_close` 只接 `OSError`，抛出去就存不下了。
-    """
-    assert _as_stored("indent", "abc") is None
-    assert _as_stored("indent", "2.5") is None
-    assert _as_stored("toc_depth", "六") is None
-
-
-def test_as_stored_keeps_a_non_int_field_verbatim():
-    """非 int 字段不 strip、不转类型，原样存。"""
-    assert _as_stored("line_height", " 1.5 ") == " 1.5 "
-
-
 # ------------------------------------------------------------- collect_saved
 
 
@@ -181,6 +152,79 @@ def test_collect_saved_does_not_crash_on_an_invalid_int(ui):
     _apply(ui, first)
     assert ui[0]["layout"]["indent"].get() == ""
     assert _collect(ui)["indent"] is None
+
+
+def test_collect_saved_drops_an_out_of_range_int(ui):
+    """类型对但值域不对的（`-1` 缩进）同样存空。
+
+    存成 `-1` 的话，之后每次生成都会在同一栏报错，而用户可能早就忘了填过它。
+    """
+    ui[0]["layout"]["indent"].insert(0, "-1")
+    assert _collect(ui)["indent"] is None
+    ui[1]["depth_menu"].set("9")
+    assert _collect(ui)["toc_depth"] is None
+
+
+def test_collect_saved_drops_an_invalid_regex(ui):
+    """非法正则存空，而不是把 `(` 写进配置文件。
+
+    这是净化最要紧的一条：卷/章/排除的正则原样落盘的话，用户下次打开就带着一条
+    永远报错的配置，而他自己看不见问题在哪。
+    """
+    entries = ui[0]["rules"]["rule_entries"]
+    entries["卷"].insert(0, "(")
+    entries["章"].insert(0, "(?:")
+    entries["排除"].insert(0, "[")
+    saved = _collect(ui)
+    assert saved["volume"] is None
+    assert saved["chapter"] is None
+    assert saved["exclude"] is None
+
+
+def test_collect_saved_keeps_a_legal_regex(ui):
+    ui[0]["rules"]["rule_entries"]["卷"].insert(0, "^第.+卷")
+    assert _collect(ui)["volume"] == "^第.+卷"
+
+
+def test_collect_saved_drops_a_bad_align(ui):
+    """对齐值来自闭合菜单，但存盘前仍过一遍：手改的 JSON 回填后可能不在集合里。"""
+    ui[0]["layout"]["align_body"].set("中间")
+    assert _collect(ui)["para_align"] is None
+
+
+def test_collect_saved_clears_only_the_regex_of_a_bad_extra_level(ui):
+    """额外层级那行留着的只是空正则，级别与 class 还在。
+
+    整行丢掉等于替用户做决定：空行也是状态，下次打开还得看得见自己加过什么。
+    """
+    add = ui[0]["rules"]["add_extra_row"]
+    add().update()  # 先建一行，再逐个填
+    row = ui[0]["rules"]["extra_rows"][-1]
+    row["level"].set("h5")
+    row["class"].insert(0, "note")
+    row["regex"].insert(0, "(")
+    saved = _collect(ui)
+    assert saved["extra_levels"] == [{"level": "h5", "class": "note", "regex": ""}]
+
+
+def test_collect_saved_keeps_a_good_extra_level(ui):
+    row = ui[0]["rules"]["add_extra_row"]()
+    row["level"].set("h4")
+    row["class"].insert(0, "part")
+    row["regex"].insert(0, "^第.+卷")
+    assert _collect(ui)["extra_levels"] == [
+        {"level": "h4", "class": "part", "regex": "^第.+卷"}
+    ]
+
+
+def test_collect_saved_clears_the_regex_when_the_level_box_is_garbage(ui):
+    """级别框被手改成不是数字：正则也保不住，core 会拒这条规则。"""
+    row = ui[0]["rules"]["add_extra_row"]()
+    row["level"].set("胡说")
+    row["regex"].insert(0, "^Part")
+    assert _collect(ui)["extra_levels"] == [
+        {"level": "胡说", "class": "", "regex": ""}
+    ]
 
 
 def test_collect_saved_translates_align_labels(ui):

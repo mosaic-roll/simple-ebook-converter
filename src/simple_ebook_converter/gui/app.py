@@ -40,7 +40,7 @@ from ..core.pipeline import (
 )
 from ..core.replace import rules_from_list, rules_to_list
 from ..core.sources import Sources, cover_for, font_resource, read_text
-from . import config, settings_dialog, theme
+from . import config, config_check, settings_dialog, theme
 from .constants import (
     ALIGN_LABELS,
     BAR_HEIGHT_BOTTOM,
@@ -137,51 +137,21 @@ def _initial_out(input_path: str) -> tuple[str | None, str | None]:
     return str(src.parent), src.stem
 
 
-def _as_stored(name: str, text: str) -> Any:
-    """界面文本 → 落盘值：`int` 字段存成数字，其余存字符串。
-
-    按 `CONFIG_KINDS`（core 字段类型真源）判断，避免 JSON 里 `"indent": "2"` 这种
-    和 `Config` 类型不一致的写法。
-
-    空文本和非法文本一律 `None`（= 用 core 默认）：用户在缩进框敲了 `abc` 时，
-    关窗保存不该炸在这里——`_on_close` 只接 `OSError`。生成那条路另有提示，
-    `build_config` 会抛「缩进需为整数」给底栏。
-    """
-    if CONFIG_KINDS.get(name) is int:
-        text = text.strip()
-        if not text:
-            return None
-        try:
-            return int(text)
-        except ValueError:
-            return None
-    return text
-
-
 def _extra_level(row: dict) -> LevelRule | None:
-    """一行额外层级 → `LevelRule`；正则留空返回 `None`。
+    """一行额外层级 → `LevelRule`；这一行没填就返 `None`。
 
-    表格本来就是三个输入框（级别 / class / 正则），直接构造 `LevelRule`，不必绕成
+    表格本来就是三个输入框（级别 / class / 正则），直接构造 `LevelRule`，不必绕
     `hN[.class]:正则` 字符串——那是 CLI `--level` 的参数格式，core 不认。
 
-    正则留空即这一行没填，整个行丢掉：空正则会匹配一切，留着等于把所有行都当标题。
+    「没填」有两种：正则留空（留着等于把所有行都当标题），或级别框里不是个数字
+    （手改过配置文件才可能）。两种都整行丢掉——级别填不出来时 `0` 会变成一条永远
+    匹配不上的死规则，core 那边会报错，但那是存盘之后才发现。
     """
     regex = row["regex"].get().strip()
-    if not regex:
+    level = config_check.level_number(row["level"].get())
+    if not regex or level is None:
         return None
-    return LevelRule(
-        _level_number(row["level"].get()),
-        regex,
-        row["class"].get().strip(),
-    )
-
-
-def _level_number(selector: str) -> int:
-    """`h4` / `4` → `4`。用户可能不带 `h`，core 只收数字。"""
-    try:
-        return int(selector.strip().lstrip("hH"))
-    except ValueError:
-        return 0
+    return LevelRule(level, regex, row["class"].get().strip())
 
 
 def _scannable_entries(entries: list[dict]) -> list[dict] | None:
@@ -212,7 +182,9 @@ def collect_saved(
     """收集要落盘的配置子集（其余项每次启动只用默认值）。
 
     字段顺序：GUI 设置 → 基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
-    `int` 字段经 `_as_stored` 转成数字；提示型字段留空会被 `.strip() or None` 过滤掉。
+    落盘值一律经 `config_check.as_stored()`：类型对得上、值域也合法才留，否则存
+    `None`（= 下次启动用 core 默认）。关窗保存不该在这里抛——`_on_close` 只接
+    `OSError`，弹窗拦不出一句「你缩进填错了」；生成那条路另有提示。
 
     模块级函数而非 `App` 方法：只读控件已有的值，不碰 `self`，能用假控件直接测。
     """
@@ -234,31 +206,47 @@ def collect_saved(
         "text_cover": bool(basic_tab["text_cover_var"].get()),
         "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
         # 规则 tab：卷/章/排除正则 + 额外层级行
-        "volume": rule_entries["卷"].get().strip() or None,
-        "chapter": rule_entries["章"].get().strip() or None,
-        "exclude": rule_entries["排除"].get().strip() or None,
+        "volume": config_check.as_stored("volume", rule_entries["卷"].get()),
+        "chapter": config_check.as_stored("chapter", rule_entries["章"].get()),
+        "exclude": config_check.as_stored("exclude", rule_entries["排除"].get()),
+        # 额外层级：空行也是状态，用户刻意加的空行下次还在，所以整行照留，
+        # 只在正则非法时把正则清空（见 `config_check.extra_level`）
         "extra_levels": [
-            {
-                "level": row["level"].get().strip(),
-                "class": row["class"].get().strip(),
-                "regex": row["regex"].get().strip(),
-            }
+            config_check.extra_level(
+                row["level"].get(), row["class"].get(), row["regex"].get()
+            )
             for row in rules_tab["extra_rows"]
         ],
-        # 额外层级：空行也是状态，用户刻意加的空行下次还在
         # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
-        "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
-        "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
-        "para_align": ALIGN_LABELS[layout_tab["align_body"].get()],
-        "indent": _as_stored("indent", layout_tab["indent"].get()),
-        "line_height": layout_tab["line_height"].get().strip() or None,
-        "para_spacing": layout_tab["para_spacing"].get().strip() or None,
+        # 对齐用 `.get` 而不是下标：菜单里的标签是闭合集合，但存盘路径不该因为
+        # 一个不认识的值抛 `KeyError`——`_on_close` 只接 `OSError`，抛出去这一轮
+        # 配置就整个存不下了，比存空更糟。取不到就是 None，交给 core 默认。
+        "volume_align": config_check.as_stored(
+            "volume_align", ALIGN_LABELS.get(layout_tab["align_volume"].get())
+        ),
+        "chapter_align": config_check.as_stored(
+            "chapter_align", ALIGN_LABELS.get(layout_tab["align_chapter"].get())
+        ),
+        "para_align": config_check.as_stored(
+            "para_align", ALIGN_LABELS.get(layout_tab["align_body"].get())
+        ),
+        "indent": config_check.as_stored("indent", layout_tab["indent"].get()),
+        "line_height": config_check.as_stored(
+            "line_height", layout_tab["line_height"].get()
+        ),
+        "para_spacing": config_check.as_stored(
+            "para_spacing", layout_tab["para_spacing"].get()
+        ),
         # `css_path` 不存：文件模式的路径指向用户自己的外部文件，下次启动不该
         # 悄悄沿用一个可能已经换了内容的路径
-        "css_source": layout_tab["css_source"].get(),
-        "css_mode": layout_tab["css_mode"].get(),
+        "css_source": config_check.as_stored(
+            "css_source", layout_tab["css_source"].get()
+        ),
+        "css_mode": config_check.as_stored("css_mode", layout_tab["css_mode"].get()),
         # TOC 面板（底栏右侧）
-        "toc_depth": _as_stored("toc_depth", toc_widgets["depth_menu"].get()),
+        "toc_depth": config_check.as_stored(
+            "toc_depth", toc_widgets["depth_menu"].get()
+        ),
         # 替换 tab：有序规则卡片列表
         "replacements": rules_to_list(
             collect_rules(tab_widgets["replace"]["rule_cards"])
