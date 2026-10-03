@@ -212,8 +212,8 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 def _cover_sources():
     """一份封面图的内容。
 
-    只有测「按字节 sniff / 改扩展名」的那几条才需要真文件——那条路走
-    `cover_resource(path)`。其余的只是「有张封面图」，直接给内容就够。
+    只有测 sniff / 改扩展名的那几条需要真文件（走 `cover_resource(path)`），
+    其余只是「有张封面图」，直接给内容就够。
     """
     return Sources(cover=Resource("cover.png", PNG, "image/png"))
 
@@ -231,8 +231,7 @@ def test_text_cover_page_is_default():
 def test_both_cover_kinds_come_before_the_toc():
     """文字封面和图片封面都得排在 nav 前——阅读器从 spine 第一页开始读。
 
-    只测顺序。`linear` 属性本身不测：`ebooklib` 在 `is_linear` 为真时压根不写
-    这个属性，写出来才说明有人动过。
+    只测顺序：`linear` 属性不测，`ebooklib` 在 `is_linear` 为真时压根不写它。
     """
     cfg = Config(input=Path("novel.txt"), title="书名")
     for sources in (None, _cover_sources()):

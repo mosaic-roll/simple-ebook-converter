@@ -1,16 +1,8 @@
 """`gui.app` 的配置收集与回填：模块级 `collect_saved()` / `apply_saved()`。
 
-这两个函数是「运行时那个 dict」的全部逻辑——`config.save` / `config.load` 只是它的
-持久化。所以测配置结构就该直接测它们，不该绕道文件系统，更不该建一整个 `App`。
-
-用假控件而不是真窗口，有两个好处：
-- **不碰 Tk**：GUI 测试里建/销毁 Tk 根窗口在同一进程里不稳，会把别的模块随机
-  skip 掉（`conftest.tk_root` 写了那个坑）。
-- **没有共享可变状态**：每条测试自己一份控件字典，谁也不会污染谁。测试之间不产生
-  顺序依赖——这条最重要，之前共用一个 `App` 时，「收集→回填→再收集」的往返测试
-  能不能过全看前面那条测试留下了什么 `_saved_settings`。
-
-只有「从 `custom.css` 读回文本」那条真的需要文件系统，其余都是纯内存。
+用假控件而不是真 `App`：`App` 建了 Tk 根窗口就不能销毁（会把别的模块随机 skip
+掉），而跨测试共享一个可变实例又会互相污染。假控件两条都绕开了。
+只有「读回 `custom.css`」那条要真的文件系统。
 """
 
 from pathlib import Path
@@ -28,11 +20,8 @@ NOWHERE = Path("__no_such_config_dir__")
 
 
 class FakeEntry:
-    """单行输入框（`indent` / `font_entry` / 规则正则等）。
-
-    `delete` + `insert` 的两步用法对齐 `_replace_entry`；CSS 文本框是多行控件但
-    用到的 API 完全一样（索引是 `"1.0"` 而非 `0`），所以共用这一个。
-    """
+    """单行输入框。CSS 文本框是多行控件但用到的 API 一样（索引 `"1.0"` 而非 `0`），
+    所以共用这一个。"""
 
     def __init__(self, text: str = "") -> None:
         self.text = text
@@ -81,11 +70,7 @@ class _Recorder:
 
 @pytest.fixture
 def ui():
-    """一套假控件，返回 `(tab_widgets, toc_widgets, fonts)`。
-
-    每次调用新建，所以测试之间不可能互相污染。`add_extra_row` / `clear_extra_rows`
-    挂在 rules 那一坨上，跟真 tab 一样。
-    """
+    """一套假控件，返回 `(tab_widgets, toc_widgets, fonts)`。每次调用新建。"""
     tabs = {
         "basic": {
             "clean_var": FakeVar(True),
@@ -153,8 +138,7 @@ def test_as_stored_maps_blank_int_field_to_none():
 def test_as_stored_maps_an_unparseable_int_field_to_none():
     """非法输入和留空同等处理：存 None，用 core 默认。
 
-    用户在缩进框敲了 `abc`，关窗保存时 `_as_stored` 就在这条路上——它抛出去的话
-    `_on_close` 接不住（只 catch `OSError`），配置静默存不下去。
+    关窗保存走的就是这条，`_on_close` 只接 `OSError`，抛出去就存不下了。
     """
     assert _as_stored("indent", "abc") is None
     assert _as_stored("indent", "2.5") is None
@@ -190,10 +174,7 @@ def test_collect_saved_drops_blank_prompt_fields(ui):
 
 
 def test_collect_saved_does_not_crash_on_an_invalid_int(ui):
-    """填了非法缩进也能存下配置——存成 None，下次启动回填时框被清空、用默认值。
-
-    这是关窗路径：`_on_close` 只接 `OSError`，`ValueError` 会逃进 Tk 回调。
-    """
+    """填了非法缩进也能存下配置：存成 None，回填时框被清空、用默认值。"""
     ui[0]["layout"]["indent"].insert(0, "abc")
     first = _collect(ui)
     assert first["indent"] is None
@@ -203,10 +184,9 @@ def test_collect_saved_does_not_crash_on_an_invalid_int(ui):
 
 
 def test_collect_saved_translates_align_labels(ui):
-    """落盘的是 `ALIGN_LABELS` 的值（CSS `text-align`），不是控件里的中文标签。
+    """落盘的是 `ALIGN_LABELS` 的 CSS 值，不是控件里的中文标签。
 
-    断言具体值而不是「在合法集合里」——后者在 `ALIGN_LABELS[...]` 被写成
-    `ALIGN_LABELS.get(..., "left")` 时照样过，等于没测翻译。
+    断言具体值而非「在合法集合里」：后者在 `ALIGN_LABELS.get(..., "left")` 下照样过。
     """
     tabs = ui[0]
     for key, label in (
@@ -320,7 +300,7 @@ def test_apply_saved_ignores_a_hand_edited_bad_toc_depth(ui):
 def test_apply_saved_reads_the_custom_css_back(ui, tmp_path):
     """文本模式的样式存在 `custom.css` 里，启动时读回文本框。
 
-    这条要真的文件系统——`custom.css` 存不存在是唯一只能靠磁盘回答的问题。
+    唯一一条必须碰磁盘的——文件存不存在只能靠磁盘回答。
     """
     (tmp_path / "custom.css").write_text("body { color: red }", encoding="utf-8")
     _apply(ui, {"css_source": "text"}, config_dir=tmp_path)
@@ -331,11 +311,7 @@ def test_apply_saved_reads_the_custom_css_back(ui, tmp_path):
 
 
 def test_collect_then_apply_is_stable(ui):
-    """收集 → 回填 → 再收集，两个 dict 应该一样。
-
-    这条挡住「存进去的是一种形状、读回来是另一种」的漂移（比如 int 存成字符串后
-    回填进控件，再收集就变了）。
-    """
+    """收集 → 回填 → 再收集，两个 dict 应该一样（挡住 int 存成字符串那种漂移）。"""
     tabs = ui[0]
     tabs["layout"]["indent"].insert(0, "4")
     tabs["layout"]["line_height"].insert(0, "1.5")

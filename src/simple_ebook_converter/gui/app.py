@@ -141,15 +141,11 @@ def _as_stored(name: str, text: str) -> Any:
     """界面文本 → 落盘值：`int` 字段存成数字，其余存字符串。
 
     按 `CONFIG_KINDS`（core 字段类型真源）判断，避免 JSON 里 `"indent": "2"` 这种
-    和 `Config` 类型不一致的写法。空文本对 `int` 字段返回 `None`（调用方跳过不存）。
+    和 `Config` 类型不一致的写法。
 
-    **空文本和非法文本一律返回 `None`**，即「留空 = 用 core 默认」。用户在缩进框里
-    敲了 `abc` 时不该让关窗保存炸掉（`_on_close` 只接 `OSError`），也不该把 `abc`
-    存进配置——下次启动 `_apply_saved` 读到 `None` 会把框清空，自然收敛回默认值。
-    与其在这里猜「用户想输几」，不如统一走默认值这条路。
-
-    生成那条路另有更响的提示：`build_config` 的 `_integer` 会抛
-    「缩进需为整数，收到：'abc'」，由 `_on_generate` 显示到底栏。保存不该比生成更吵。
+    空文本和非法文本一律 `None`（= 用 core 默认）：用户在缩进框敲了 `abc` 时，
+    关窗保存不该炸在这里——`_on_close` 只接 `OSError`。生成那条路另有提示，
+    `build_config` 会抛「缩进需为整数」给底栏。
     """
     if CONFIG_KINDS.get(name) is int:
         text = text.strip()
@@ -203,12 +199,9 @@ def collect_saved(
     """收集要落盘的配置子集（其余项每次启动只用默认值）。
 
     字段顺序：GUI 设置 → 基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
-    `int` 字段经 `_as_stored` 转成数字；提示型字段（`max_title_len` / `preface_title`）
-    留空会被 `.strip() or None` 过滤掉，不会写进 JSON，避免噪音。
+    `int` 字段经 `_as_stored` 转成数字；提示型字段留空会被 `.strip() or None` 过滤掉。
 
-    **模块级函数而不是 `App` 方法**：它只读控件里已有的值，不碰 `self` 的任何行为。
-    抽出来就能用假控件直接测，不必建一整个窗口（建了就得留着，跨测试共享可变实例
-    又会互相污染）。
+    模块级函数而非 `App` 方法：只读控件已有的值，不碰 `self`，能用假控件直接测。
     """
     basic_tab = tab_widgets["basic"]
     layout_tab = tab_widgets["layout"]
@@ -270,13 +263,11 @@ def apply_saved(
 ) -> None:
     """把存档回填到表单。空存档直接返回（首次启动不该清空控件）。
 
-    除 basic/build 里已走 `default_text(saved=...)` 的字段外，其余在这里补：
-    勾选项、排版路径、对齐、CSS 三态、目录深度、额外层级、替换规则。
-    布尔与 int 存的是真值/数字，这里 `bool()` / `str()` 一律转回控件要的形态。
+    除已走 `default_text(saved=...)` 的字段外，其余在这里补：勾选项、排版、对齐、
+    CSS 三态、目录深度、额外层级、替换规则。布尔与 int 一律转回控件要的形态。
 
-    和 `collect_saved` 一样是模块级函数：不碰 `self`，只用传进来的控件字典。
-    剩下两个 `self` 依赖各自显式传进来——`config_dir` 用于读回 `custom.css`，
-    `on_invalid_rules` 用于报告存档里非法的替换规则。
+    和 `collect_saved` 一样不碰 `self`。两个例外显式传参：`config_dir` 用来读回
+    `custom.css`，`on_invalid_rules` 用来报告存档里非法的替换规则。
     """
     if not saved:
         return
