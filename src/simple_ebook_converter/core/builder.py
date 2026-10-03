@@ -77,6 +77,9 @@ h1, h2, h3, h4, h5, h6 {{
 }}
 h2.volume {{
   margin: 1.5em 0 1em 0;
+  padding: 0.5em 0;
+  border-top: 3px double;
+  border-bottom: 3px double;
   text-align: {cfg.volume_align};
   font-size: 2.2em;
 }}
