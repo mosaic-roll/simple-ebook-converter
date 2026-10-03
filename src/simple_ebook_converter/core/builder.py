@@ -68,7 +68,7 @@ def builtin_css(cfg: Config, font_name: str | None = None) -> str:
     family = f'"{_FONT_FAMILY}", ' if font_name else ""
 
     css.append(f"""body {{
-  line-height: {cfg.line_height};
+  line-height: 1.2;
   font-family: {family}sans-serif;
 }}
 h1, h2, h3, h4, h5, h6 {{
@@ -84,7 +84,7 @@ h2.volume {{
   font-size: 2.2em;
 }}
 h3.chapter {{
-  margin: 1em 0 1em 0;
+  margin: 1em 0;
   text-align: {cfg.chapter_align};
   font-size: 1.8em;
 }}
@@ -92,6 +92,7 @@ h3.chapter {{
   margin: 0 0 {cfg.para_spacing} 0;
   text-indent: {cfg.indent}em;
   text-align: {cfg.para_align};
+  line-height: {cfg.line_height};
 }}
 """)
     # 封面容器按 class 命中，不写 body > section：正文页也有 section，结构选择器
