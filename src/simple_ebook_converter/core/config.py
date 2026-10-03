@@ -6,16 +6,10 @@
 
 from __future__ import annotations
 
-import codecs
-import re
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from .encoding import AUTO_ENCODING
-from .mediatypes import cover_media_type, font_media_type
 from .replace import Rule
 
 # ══════════════════════════════════════════════════════════════
@@ -117,135 +111,6 @@ def default_levels() -> list[LevelRule]:
 
 
 # ══════════════════════════════════════════════════════════════
-# 单字段的值域检查
-# ══════════════════════════════════════════════════════════════
-
-# 每个检查是一个纯函数：合法返回 None，非法返回可直接展示的说明。按**约束**拆，
-# 不是按字段拆——三个 align 共用一个构造器，同一条约束不必写三遍。
-#
-# 住在这里是因为值域的真源就在这个模块（`ALIGN_CHOICES` / `FORMATS`）；扩展名的真源在
-# `mediatypes`，那两个只是薄包装。
-
-
-def _check_encoding(value: str) -> str | None:
-    # `auto` 跳过；空串在 `decode` 里也当 auto，所以这里只判 `auto` 本身
-    if not value or value.lower() == AUTO_ENCODING:
-        return None
-    try:
-        codecs.lookup(value)
-    except LookupError:
-        return (
-            f"未知编码：{value}（要填 Python 的 codec 名，如 utf-8 / gb18030 / cp932）"
-        )
-    return None
-
-
-def _check_max_title_len(value: int) -> str | None:
-    return None if value >= 1 else f"标题最大字数需为正整数，收到：{value}"
-
-
-def _check_toc_depth(value: int) -> str | None:
-    return None if 1 <= value <= 6 else f"目录深度需在 1~6 之间，收到：{value}"
-
-
-def _check_toc_format(value: str) -> str | None:
-    if value in FORMATS:
-        return None
-    return f"目录格式只能是 {'/'.join(FORMATS)}，收到：{value}"
-
-
-def _check_indent(value: int) -> str | None:
-    return None if value >= 0 else f"段落缩进字数不能为负，收到：{value}"
-
-
-def _check_exclude(value: str) -> str | None:
-    """`exclude` 是唯一直接躺在 `Config` 上的正则字段。
-
-    卷/章走 `levels.build_rules()`、替换规则走 `replace.replacers_by_stage()`，都在各自
-    的入口编译校验，只有这条曾经没人管——非法正则一路留到 `parser.parse()` 才炸，而
-    `re.error` 不是 `ValueError`，GUI 的 `except ValueError` 接不住。
-    """
-    if not value:
-        return None
-    try:
-        re.compile(value)
-    except re.error as e:
-        return f"排除规则正则非法：{value}（{e}）"
-    return None
-
-
-def _align_check(label: str) -> Callable[[str], str | None]:
-    def check(value: str) -> str | None:
-        if value in ALIGN_CHOICES:
-            return None
-        return f"{label}只能是 {'/'.join(ALIGN_CHOICES)}，收到：{value}"
-
-    return check
-
-
-def _check_date(value: str | None) -> str | None:
-    if not value:
-        return None
-    try:
-        datetime.fromisoformat(value)
-    except ValueError:
-        return f"日期格式错误：{value}（应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM[:SS]）"
-    return None
-
-
-def _media_check(check: Callable[[Path], Any]) -> Callable[[Path | None], str | None]:
-    """`mediatypes` 那两个已经是「非法就抛」的检查，这里只把异常收成消息。"""
-
-    def run(value: Path | None) -> str | None:
-        if not value:
-            return None
-        try:
-            check(Path(value))
-        except ValueError as e:
-            return str(e)
-        return None
-
-    return run
-
-
-#: 字段名 → 单字段校验函数。**插入顺序就是校验顺序**，第一个错先冒出来。
-#:
-#: 这张表是「哪些字段有值域约束」的唯一真源：加字段只需写 `_check_xxx` 再插一条，
-#: `validate()` 不用动。跨字段约束（`css_file` / `css_append` 互斥）不在这里——它
-#: 依赖两个字段同时存在，没有归属的字段，由 `Config.validate()` 单拎。
-_CHECKS: dict[str, Callable[[Any], str | None]] = {
-    "encoding": _check_encoding,
-    "max_title_len": _check_max_title_len,
-    "toc_depth": _check_toc_depth,
-    "toc_format": _check_toc_format,
-    "indent": _check_indent,
-    "exclude": _check_exclude,
-    "chapter_align": _align_check("章对齐"),
-    "volume_align": _align_check("卷对齐"),
-    "para_align": _align_check("正文对齐"),
-    "date": _check_date,
-    # 扩展名只做快检：`sources.font_resource` / `cover_resource` 读字节时还会再调一遍
-    # 同样两个函数。保留它，是因为用户可能想在加载资源、解析输入之前就看到"字体格式
-    # 不对"，而不是先等半天读文件才报同一件事。
-    "font": _media_check(font_media_type),
-    "cover": _media_check(cover_media_type),
-}
-
-
-def field_error(name: str, value: Any) -> str | None:
-    """单个字段的值域是否合法。合法返回 None，否则返回可直接展示的说明。
-
-    `Config.validate()` 遍历 `_CHECKS` 查全部字段；`options.is_valid()` 只查一个——
-    GUI 存盘时手里只有单个字段的原始值，需要的正是这条单字段入口。
-
-    收的是**已类型化**的值（`int` / `Path` / `str`），不是前端原始文本；类型那一层由
-    `options._convert()` 管。两者不重叠。
-    """
-    check = _CHECKS.get(name)
-    return check(value) if check else None
-
-
-# ══════════════════════════════════════════════════════════════
 # Config：一次转换的全部参数
 # ══════════════════════════════════════════════════════════════
 
@@ -326,24 +191,6 @@ class Config:
         if self.title:
             return self.title
         return Path(self.input).stem if self.input else _FALLBACK_TITLE
-
-    def validate(self) -> None:
-        """校验取值范围，非法抛 `ValueError`（消息可直接展示给用户）。
-
-        `resolve()` 会自动调用，正常走 CLI / GUI 都会校验；直接调 `build_epub()`
-        的调用方应自己先过一遍。
-
-        这里只做调度：单字段的值域在 `_CHECKS` 那张表里逐条查，跨字段的（`css_file`
-        与 `css_append` 互斥）单拎在末尾——它没有归属的字段。
-        """
-        for name, check in _CHECKS.items():
-            error = check(getattr(self, name))
-            if error is not None:
-                raise ValueError(error)
-        if self.css_file and self.css_append:
-            raise ValueError(
-                "--css-file 与 --css-append 互斥：前者替代内置样式，后者追加在内置样式之后"
-            )
 
 
 #: 全默认的模板，只用来取参数默认值与选项初值，谁也不许改它

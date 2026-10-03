@@ -57,7 +57,7 @@ def test_empty_sources_fields_are_none():
 
 
 def test_css_replacement_and_append_are_mutually_exclusive():
-    """`Config.validate()` 只管得到 CLI 那侧，GUI 恒为 None，所以互斥靠这里兜住。"""
+    """`validate_config()` 只管得到 CLI 那侧，GUI 恒为 None，所以互斥靠这里兜住。"""
     with pytest.raises(ValueError, match="互斥"):
         Sources(css_text="a{}", css_append_text="b{}")
 
@@ -270,7 +270,7 @@ def test_load_sources_reads_every_path(tmp_path):
     assert sources.css_text == "body{}"
     assert sources.font is not None and sources.font.name == "f.ttf"
     assert sources.cover is not None and sources.cover.name == "mine.png"
-    # `css_file` 与 `css_append` 互斥由 `Config.validate()` 管，这里单独给
+    # `css_file` 与 `css_append` 互斥由 `validate_config()` 管，这里单独给
     assert load_sources(Config(input=cfg.input, css_append=append)).css_append_text == (
         "p{}"
     )

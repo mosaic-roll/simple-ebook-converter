@@ -28,6 +28,7 @@ from .parser import Node, ParseStats, parse, walk
 from .replace import Replacer, Rule, replacers_by_stage
 from .sources import Sources
 from .toc import render, tree_from_json
+from .validation import validate_config
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ def resolve(cfg: Config) -> Config:
     if cfg.input is not None:
         title, author = resolve_metadata(cfg.input, title, author)
     resolved = replace(cfg, title=title, author=author)
-    resolved.validate()
+    validate_config(resolved)
     return resolved
 
 
@@ -237,7 +238,7 @@ def write_css(cfg: Config) -> Path:
     **文件名**——那是样式表里 `@font-face` 的 `src` 片段，用不到字体字节，
     所以这条路径上不加载任何资源。
 
-    **刻意不调 `cfg.validate()`**：`--dump-css` 是排障入口，用户往往就是想拿一份样式表
+    **刻意不调 `validate_config()`**：`--dump-css` 是排障入口，用户往往就是想拿一份样式表
     去对比，此时输入文件、字体、封面都可能根本不存在。校验拦在这里只会让人拿不到模板。
     真正生成那条路（`read_book()` → `resolve()`）才校验。
     """

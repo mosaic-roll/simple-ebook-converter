@@ -169,7 +169,7 @@ def test_read_book_reports_empty_file(tmp_path):
 
 
 def test_read_book_reports_out_of_range_values(tmp_path):
-    """取值范围在读入时就报，消息直接就是 Config.validate() 那句。"""
+    """取值范围在读入时就报，消息直接就是 validate_config() 那句。"""
     with pytest.raises(ValueError, match="目录深度"):
         read_book(_cfg( toc_depth=99))
 

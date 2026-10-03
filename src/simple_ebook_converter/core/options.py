@@ -26,11 +26,11 @@ from .config import (
     LEVEL_PRESETS,
     Config,
     LevelRule,
-    field_error,
 )
 from .encoding import ENCODING_CHOICES
 from .levels import build_rules, is_valid_level
 from .replace import Rule, rules_from_file
+from .validation import field_error
 
 
 def _config_kinds() -> dict[str, type]:
@@ -290,7 +290,7 @@ def build_config(
     """把前端收集到的原始值翻译成 `Config`，出错抛 `ValueError`（消息可直接展示）。
 
     值的语义与 `Config` 字段一致：反面选项（`--no-clean`）收上来时已经是 `False`。
-    留空一律表示「用默认值」，取值范围由 `Config.validate()` 负责。
+    留空一律表示「用默认值」，取值范围由 `validation.validate_config()` 负责。
 
     `replacements` 留给 GUI：它的替换规则来自表格卡片，不经文件。给了就直接收下，
     不再走 `--replace-rules` 那条路——否则 GUI 只能先造 `Config` 再事后改字段。
@@ -318,12 +318,12 @@ def is_valid(name: str, value: Any) -> bool:
     """某个选项的原始值能不能收进 `Config`。
 
     给 GUI 存盘前用：手上有的是**单个字段的原始文本**，需要的是「这一个值合不合法」，
-    而 `Config.validate()` 一次验整份配置。所以这条必须跟生成那条路**用同一套规则**，
+    而 `validate_config()` 一次验整份配置。所以这条必须跟生成那条路**用同一套规则**，
     不能另写一份——否则两边会漂移。
 
     两层，不重叠：`_convert()` 管「能不能转成对的类型」（`"abc"` 转不成 int），
-    `config.field_error()` 管「转成类型之后取值合不合法」（`-1` 是 int 但缩进不能为负）。
-    加新选项不需要在这里登记，`OPTIONS` 与 `config._CHECKS` 各自是真源。
+    `validation.field_error()` 管「转成类型之后取值合不合法」（`-1` 是 int 但缩进不能为负）。
+    加新选项不需要在这里登记，`OPTIONS` 与 `validation._CHECKS` 各自是真源。
     """
     opt = _option(name)
     if opt.preset_level:

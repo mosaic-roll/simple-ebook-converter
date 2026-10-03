@@ -12,6 +12,7 @@ from simple_ebook_converter.core.mediatypes import (
     sniff_font,
     sniff_image,
 )
+from simple_ebook_converter.core.validation import validate_config
 
 
 def test_font_media_type():
@@ -44,16 +45,16 @@ def test_error_message_lists_supported_formats():
 
 def test_validate_rejects_unsupported_font():
     with pytest.raises(ValueError, match="不支持的字体格式"):
-        Config(font="font.ttc").validate()
+        validate_config(Config(font="font.ttc"))
 
 
 def test_validate_rejects_unsupported_cover():
     with pytest.raises(ValueError, match="不支持的封面图格式"):
-        Config(cover="cover.txt").validate()
+        validate_config(Config(cover="cover.txt"))
 
 
 def test_validate_accepts_supported_assets():
-    Config(font="f.ttf", cover="c.png").validate()
+    validate_config(Config(font="f.ttf", cover="c.png"))
 
 
 def test_tables_are_consistent():

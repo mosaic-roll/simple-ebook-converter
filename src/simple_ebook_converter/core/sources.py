@@ -48,7 +48,7 @@ class Sources:
     - `font` / `cover`：内嵌资源的内容
 
     两个 CSS 字段互斥（与 `Config.css_file` / `css_append` 同一约束）。
-    `Config.validate()` 只能管 CLI 那侧（GUI 恒为 `None`，它压根不碰），
+    `validate_config()` 只能管 CLI 那侧（GUI 恒为 `None`，它压根不碰），
     所以互斥在这里由 `__post_init__` 兜住，不靠前端自觉。
     """
 

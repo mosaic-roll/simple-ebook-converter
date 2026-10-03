@@ -246,7 +246,7 @@ def test_convert_dump_css(tmp_path):
 
 
 def test_css_file_and_css_append_conflict(tmp_path):
-    """互斥是 `Config.validate()` 管的，CLI 只负责把它变成 exit 2。"""
+    """互斥是 `validate_config()` 管的，CLI 只负责把它变成 exit 2。"""
     src = _write_sample(tmp_path)
     a, b = tmp_path / "a.css", tmp_path / "b.css"
     a.write_text("body {}", encoding="utf-8")
