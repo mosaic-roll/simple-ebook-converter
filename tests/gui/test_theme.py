@@ -4,7 +4,6 @@
 做（进程 DPI aware 时已含显示器缩放）。所以行高要量字体实际像素高，不能 pt 加常数。
 """
 
-import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
 
@@ -16,26 +15,10 @@ FAMILY = "Microsoft YaHei"
 SIZES = (9, 13, 16, 20, 24)
 
 
-@pytest.fixture(scope="module")
-def root():
-    """整个模块共用一个 Tk 根窗口；无图形环境就跳过。
-
-    用完就 `destroy()` 的话，紧跟着再建 `Tk()` 有时抛 TclError（同一进程里反复
-    销毁/重建根窗口不稳），表现为后面的用例随机 skip。共用一个更省也更稳。
-    """
-    try:
-        window = tk.Tk()
-    except tk.TclError:
-        pytest.skip("没有图形环境")
-    window.withdraw()
-    yield window
-    window.destroy()
-
-
 @pytest.fixture
-def table(root):
+def table(tk_root):
     """目录表格。每个用例建自己一棵，用完销毁。"""
-    tree = ttk.Treeview(root, columns=("a",), show="headings", height=4)
+    tree = ttk.Treeview(tk_root, columns=("a",), show="headings", height=4)
     tree.heading("a", text="标题")
     tree.insert("", "end", values=("第一卷", "第一卷"))
     yield tree

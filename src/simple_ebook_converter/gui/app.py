@@ -18,6 +18,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Any
@@ -178,6 +179,182 @@ _TABS = (
     ("layout", "排版", layout.build),
     ("replace", "替换", replace.build),
 )
+
+
+def collect_saved(
+    tab_widgets: dict[str, Any],
+    toc_widgets: dict[str, Any],
+    fonts: Any,
+    appearance_mode: str,
+) -> dict[str, Any]:
+    """收集要落盘的配置子集（其余项每次启动只用默认值）。
+
+    字段顺序：GUI 设置 → 基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
+    `int` 字段经 `_as_stored` 转成数字；提示型字段（`max_title_len` / `preface_title`）
+    留空会被 `.strip() or None` 过滤掉，不会写进 JSON，避免噪音。
+
+    **模块级函数而不是 `App` 方法**：它只读控件里已有的值，不碰 `self` 的任何行为。
+    抽出来就能用假控件直接测，不必建一整个窗口（建了就得留着，跨测试共享可变实例
+    又会互相污染）。
+    """
+    basic_tab = tab_widgets["basic"]
+    layout_tab = tab_widgets["layout"]
+    rules_tab = tab_widgets["rules"]
+    rule_entries = rules_tab["rule_entries"]
+
+    return {
+        # GUI 设置：收进 `ui`，不与业务配置混在一起
+        "ui": {
+            "theme": appearance_mode.lower(),
+            "font": fonts.family_label,
+            "ui_font_size": fonts.ui_size,
+            "toc_font_size": fonts.toc_size,
+        },
+        # 基础 tab：文件、书籍信息、封面、其他
+        "clean": bool(basic_tab["clean_var"].get()),
+        "text_cover": bool(basic_tab["text_cover_var"].get()),
+        "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
+        # 规则 tab：卷/章/排除正则 + 额外层级行
+        "volume": rule_entries["卷"].get().strip() or None,
+        "chapter": rule_entries["章"].get().strip() or None,
+        "exclude": rule_entries["排除"].get().strip() or None,
+        "extra_levels": [
+            {
+                "level": row["level"].get().strip(),
+                "class": row["class"].get().strip(),
+                "regex": row["regex"].get().strip(),
+            }
+            for row in rules_tab["extra_rows"]
+        ],
+        # 额外层级：空行也是状态，用户刻意加的空行下次还在
+        # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
+        "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
+        "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
+        "para_align": ALIGN_LABELS[layout_tab["align_body"].get()],
+        "indent": _as_stored("indent", layout_tab["indent"].get()),
+        "line_height": layout_tab["line_height"].get().strip() or None,
+        "para_spacing": layout_tab["para_spacing"].get().strip() or None,
+        # `css_path` 不存：文件模式的路径指向用户自己的外部文件，下次启动不该
+        # 悄悄沿用一个可能已经换了内容的路径
+        "css_source": layout_tab["css_source"].get(),
+        "css_mode": layout_tab["css_mode"].get(),
+        # TOC 面板（底栏右侧）
+        "toc_depth": _as_stored("toc_depth", toc_widgets["depth_menu"].get()),
+        # 替换 tab：有序规则卡片列表
+        "replacements": rules_to_list(
+            collect_rules(tab_widgets["replace"]["rule_cards"])
+        ),
+    }
+
+
+def apply_saved(
+    saved: dict[str, Any],
+    tab_widgets: dict[str, Any],
+    toc_widgets: dict[str, Any],
+    *,
+    config_dir: Path,
+    on_invalid_rules: Callable[[str], None],
+) -> None:
+    """把存档回填到表单。空存档直接返回（首次启动不该清空控件）。
+
+    除 basic/build 里已走 `default_text(saved=...)` 的字段外，其余在这里补：
+    勾选项、排版路径、对齐、CSS 三态、目录深度、额外层级、替换规则。
+    布尔与 int 存的是真值/数字，这里 `bool()` / `str()` 一律转回控件要的形态。
+
+    和 `collect_saved` 一样是模块级函数：不碰 `self`，只用传进来的控件字典。
+    剩下两个 `self` 依赖各自显式传进来——`config_dir` 用于读回 `custom.css`，
+    `on_invalid_rules` 用于报告存档里非法的替换规则。
+    """
+    if not saved:
+        return
+    basic_tab = tab_widgets["basic"]
+    layout_tab = tab_widgets["layout"]
+    rules_tab = tab_widgets["rules"]
+    replace_tab = tab_widgets["replace"]
+
+    if "clean" in saved:
+        basic_tab["clean_var"].set(bool(saved["clean"]))
+    if "toc_in_spine" in saved:
+        basic_tab["toc_in_book_var"].set(bool(saved["toc_in_spine"]))
+    if "text_cover" in saved:
+        basic_tab["text_cover_var"].set(bool(saved["text_cover"]))
+
+    # 排版文本：layout.py 里这些值是 placeholder，不是初值，所以得在这里真填进去。
+    # 存档可能被手改：`indent` 是 int 字段，塞进 "abc" 只会等到生成时报错，
+    # 不如当场跳过、让控件留空 (= 用 core 默认)
+    for name, widget in (
+        ("indent", layout_tab["indent"]),
+        ("line_height", layout_tab["line_height"]),
+        ("para_spacing", layout_tab["para_spacing"]),
+        ("font", layout_tab["font_entry"]),
+    ):
+        if name not in saved:
+            continue
+        value = saved[name]
+        if value is None:
+            _replace_entry(widget, "")
+        elif CONFIG_KINDS.get(name) is int:
+            try:
+                _replace_entry(widget, str(int(str(value).strip())))
+            except (TypeError, ValueError):
+                _replace_entry(widget, "")
+        else:
+            _replace_entry(widget, str(value))
+
+    # 对齐：存档非法时 default_align_label 已退回 core 默认，不会让菜单显示空白
+    for name, widget in (
+        ("volume_align", layout_tab["align_volume"]),
+        ("chapter_align", layout_tab["align_chapter"]),
+        ("para_align", layout_tab["align_body"]),
+    ):
+        widget.set(default_align_label(name, saved))
+
+    # CSS 三态：来源 / 模式 / 文本，然后按来源切禁用态。配置文件用户能手改，
+    # 非法值退回控件自己的默认，别让单选框显示一个谁都不认识的值
+    source = saved.get("css_source")
+    if source in (CSS_SOURCE_TEXT, CSS_SOURCE_FILE):
+        layout_tab["css_source"].set(source)
+    mode = saved.get("css_mode")
+    if mode in CSS_MODES:
+        layout_tab["css_mode"].set(mode)
+    layout_tab["on_source_change"]()
+    # 文本模式的样式从 custom.css 读回；文件模式的路径是外部文件，不存档
+    css_file = config.css_path(config_dir)
+    if css_file.is_file():
+        layout_tab["css_text"].delete("1.0", "end")
+        layout_tab["css_text"].insert("1.0", css_file.read_text(encoding="utf-8"))
+
+    for label, opt_name, _mode in rules.BUILTIN_ROWS:
+        if opt_name in saved:
+            _replace_entry(
+                rules_tab["rule_entries"][label], str(saved[opt_name] or "")
+            )
+
+    # 额外层级：先清空 build 里预置的两行，再按存档逐条重建（存档有几行就有几行，
+    # 含用户刻意留的空行）
+    levels = saved.get("extra_levels")
+    if levels:
+        rules_tab["clear_extra_rows"]()
+        for item in levels:
+            row = rules_tab["add_extra_row"]()
+            row["level"].set(str(item.get("level") or "h6"))
+            _replace_entry(row["class"], str(item.get("class") or ""))
+            _replace_entry(row["regex"], str(item.get("regex") or ""))
+
+    # 替换规则批量重建，不逐卡触发（每加一张卡就重算一次替换预览太吵）
+    if saved.get("replacements"):
+        try:
+            fill_rules(
+                replace_tab["rule_cards"],
+                rules_from_list(saved["replacements"]),
+                replace_tab["add_card"],
+                fire=lambda: None,
+            )
+        except ValueError as e:
+            on_invalid_rules(f"配置里的替换规则无效：{e}")
+
+    if "toc_depth" in saved and str(saved["toc_depth"]) in TOC_DEPTHS:
+        toc_widgets["depth_menu"].set(str(saved["toc_depth"]))
 
 
 class App(ctk.CTk):
@@ -744,159 +921,23 @@ class App(ctk.CTk):
     # ------------------------------------------------------------ 配置持久化
 
     def _collect_saved(self) -> dict[str, Any]:
-        """收集要落盘的配置子集（其余项每次启动只用默认值）。
-
-        字段顺序：GUI 设置 → 基础 → 规则 → 排版 → 替换 + TOC，方便用户读配置文件。
-        `int` 字段经 `_as_stored` 转成数字；提示型字段（`max_title_len` / `preface_title`）
-        留空会被 `.strip() or None` 过滤掉，不会写进 JSON，避免噪音。
-        """
-        basic_tab = self.tab_widgets["basic"]
-        layout_tab = self.tab_widgets["layout"]
-        rules_tab = self.tab_widgets["rules"]
-        rule_entries = rules_tab["rule_entries"]
-
-        return {
-            # GUI 设置：收进 `ui`，不与业务配置混在一起
-            "ui": {
-                "theme": ctk.get_appearance_mode().lower(),
-                "font": self.fonts.family_label,
-                "ui_font_size": self.fonts.ui_size,
-                "toc_font_size": self.fonts.toc_size,
-            },
-            # 基础 tab：文件、书籍信息、封面、其他
-            "clean": bool(basic_tab["clean_var"].get()),
-            "text_cover": bool(basic_tab["text_cover_var"].get()),
-            "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
-            # 规则 tab：卷/章/排除正则 + 额外层级行
-            "volume": rule_entries["卷"].get().strip() or None,
-            "chapter": rule_entries["章"].get().strip() or None,
-            "exclude": rule_entries["排除"].get().strip() or None,
-            "extra_levels": [
-                {
-                    "level": row["level"].get().strip(),
-                    "class": row["class"].get().strip(),
-                    "regex": row["regex"].get().strip(),
-                }
-                for row in rules_tab["extra_rows"]
-            ],
-            # 额外层级：空行也是状态，用户刻意加的空行下次还在
-            # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
-            "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
-            "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
-            "para_align": ALIGN_LABELS[layout_tab["align_body"].get()],
-            "indent": _as_stored("indent", layout_tab["indent"].get()),
-            "line_height": layout_tab["line_height"].get().strip() or None,
-            "para_spacing": layout_tab["para_spacing"].get().strip() or None,
-            # `css_path` 不存：文件模式的路径指向用户自己的外部文件，下次启动不该
-            # 悄悄沿用一个可能已经换了内容的路径
-            "css_source": layout_tab["css_source"].get(),
-            "css_mode": layout_tab["css_mode"].get(),
-            # TOC 面板（底栏右侧）
-            "toc_depth": _as_stored("toc_depth", self.toc_widgets["depth_menu"].get()),
-            # 替换 tab：有序规则卡片列表
-            "replacements": rules_to_list(
-                collect_rules(self.tab_widgets["replace"]["rule_cards"])
-            ),
-        }
+        """收集要落盘的配置子集。实现见模块级 `collect_saved()`。"""
+        return collect_saved(
+            self.tab_widgets,
+            self.toc_widgets,
+            self.fonts,
+            ctk.get_appearance_mode(),
+        )
 
     def _apply_saved(self) -> None:
-        """把 `_saved_settings` 回填到表单。
-
-        除 basic/build 里已走 `default_text(saved=...)` 的字段外，其余在这里补：
-        勾选项、排版路径、对齐、CSS 三态、目录深度、额外层级、替换规则。
-        布尔与 int 存的是真值/数字，这里 `bool()` / `str()` 一律转回控件要的形态。
-        """
-        saved = self._saved_settings
-        if not saved:
-            return
-        basic_tab = self.tab_widgets["basic"]
-        layout_tab = self.tab_widgets["layout"]
-        rules_tab = self.tab_widgets["rules"]
-        replace_tab = self.tab_widgets["replace"]
-
-        if "clean" in saved:
-            basic_tab["clean_var"].set(bool(saved["clean"]))
-        if "toc_in_spine" in saved:
-            basic_tab["toc_in_book_var"].set(bool(saved["toc_in_spine"]))
-        if "text_cover" in saved:
-            basic_tab["text_cover_var"].set(bool(saved["text_cover"]))
-
-        # 排版文本：layout.py 里这些值是 placeholder，不是初值，所以得在这里真填进去。
-        # 存档可能被手改：`indent` 是 int 字段，塞进 "abc" 只会等到生成时报错，
-        # 不如当场跳过、让控件留空 (= 用 core 默认)
-        for name, widget in (
-            ("indent", layout_tab["indent"]),
-            ("line_height", layout_tab["line_height"]),
-            ("para_spacing", layout_tab["para_spacing"]),
-            ("font", layout_tab["font_entry"]),
-        ):
-            if name not in saved:
-                continue
-            value = saved[name]
-            if value is None:
-                _replace_entry(widget, "")
-            elif CONFIG_KINDS.get(name) is int:
-                try:
-                    _replace_entry(widget, str(int(str(value).strip())))
-                except (TypeError, ValueError):
-                    _replace_entry(widget, "")
-            else:
-                _replace_entry(widget, str(value))
-
-        # 对齐：存档非法时 default_align_label 已退回 core 默认，不会让菜单显示空白
-        for name, widget in (
-            ("volume_align", layout_tab["align_volume"]),
-            ("chapter_align", layout_tab["align_chapter"]),
-            ("para_align", layout_tab["align_body"]),
-        ):
-            widget.set(default_align_label(name, saved))
-
-        # CSS 三态：来源 / 模式 / 文本，然后按来源切禁用态。配置文件用户能手改，
-        # 非法值退回控件自己的默认，别让单选框显示一个谁都不认识的值
-        source = saved.get("css_source")
-        if source in (CSS_SOURCE_TEXT, CSS_SOURCE_FILE):
-            layout_tab["css_source"].set(source)
-        mode = saved.get("css_mode")
-        if mode in CSS_MODES:
-            layout_tab["css_mode"].set(mode)
-        layout_tab["on_source_change"]()
-        # 文本模式的样式从 custom.css 读回；文件模式的路径是外部文件，不存档
-        css_file = config.css_path(self._config_dir)
-        if css_file.is_file():
-            layout_tab["css_text"].delete("1.0", "end")
-            layout_tab["css_text"].insert("1.0", css_file.read_text(encoding="utf-8"))
-
-        for label, opt_name, _mode in rules.BUILTIN_ROWS:
-            if opt_name in saved:
-                _replace_entry(
-                    rules_tab["rule_entries"][label], str(saved[opt_name] or "")
-                )
-
-        # 额外层级：先清空 build 里预置的两行，再按存档逐条重建（存档有几行就有几行，
-        # 含用户刻意留的空行）
-        levels = saved.get("extra_levels")
-        if levels:
-            rules_tab["clear_extra_rows"]()
-            for item in levels:
-                row = rules_tab["add_extra_row"]()
-                row["level"].set(str(item.get("level") or "h6"))
-                _replace_entry(row["class"], str(item.get("class") or ""))
-                _replace_entry(row["regex"], str(item.get("regex") or ""))
-
-        # 替换规则批量重建，不逐卡触发（每加一张卡就重算一次替换预览太吵）
-        if saved.get("replacements"):
-            try:
-                fill_rules(
-                    replace_tab["rule_cards"],
-                    rules_from_list(saved["replacements"]),
-                    replace_tab["add_card"],
-                    fire=lambda: None,
-                )
-            except ValueError as e:
-                self._set_status(f"配置里的替换规则无效：{e}", "error")
-
-        if "toc_depth" in saved and str(saved["toc_depth"]) in TOC_DEPTHS:
-            self.toc_widgets["depth_menu"].set(str(saved["toc_depth"]))
+        """把 `_saved_settings` 回填到表单。实现见模块级 `apply_saved()`。"""
+        apply_saved(
+            self._saved_settings,
+            self.tab_widgets,
+            self.toc_widgets,
+            config_dir=self._config_dir,
+            on_invalid_rules=lambda msg: self._set_status(msg, "error"),
+        )
 
     def _save_custom_css(self) -> None:
         """把 CSS 文本框内容写进 `custom.css`，供下次启动回填。
