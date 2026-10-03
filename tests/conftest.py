@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from helpers import Epub, assert_heading, parse_css, resolve_href
+from helpers import Epub
 
 
 @pytest.fixture
@@ -32,11 +32,6 @@ def make_config():
 
 
 @pytest.fixture
-def epub_class():
-    return Epub
-
-
-@pytest.fixture
 def build_epub_file(tmp_path: Path):
     """跑一次 `build_epub` 并解开成 `Epub`。`tree` / `sources` / `cfg` / `lines` 可覆盖。"""
 
@@ -56,19 +51,3 @@ def build_epub_file(tmp_path: Path):
         return Epub(path)
 
     return _build
-
-
-@pytest.fixture
-def parse_css_fixture():
-    """给不想写 `usefixtures` 的地方用；多数测试直接 `from helpers import parse_css`。"""
-    return parse_css
-
-
-@pytest.fixture
-def assert_heading_fixture():
-    return assert_heading
-
-
-@pytest.fixture
-def resolve_href_fixture():
-    return resolve_href
