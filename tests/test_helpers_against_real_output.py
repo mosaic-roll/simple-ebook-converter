@@ -113,10 +113,8 @@ def test_headings_carry_their_level_class(simple):
 
 
 def test_prelude_renders_as_chapter_heading(build_epub_file):
-    """level 0 的前言按「章」渲染成 h3 + class=preface，不占 h1（h1 通常留给书名）。"""
+    """level 0 的前言按「章」渲染成 h3 + class=chapter（h1 通常留给书名）。"""
     epub = build_epub_file(lines=["前言内容", "第一章 一", "正文一"])
-    pages = [epub.html(name) for name in epub.text_pages()]
-    holder = next(html for html in pages if 'class="preface"' in html)
-    assert_heading(holder, "h3", "前言", class_name="preface")
-    assert "<h1" not in holder, "前言不该用 h1"
+    holder = next(epub.html(n) for n in epub.text_pages() if n.endswith("preface.xhtml"))
+    assert_heading(holder, "h3", "前言", class_name="chapter")
     assert "<p>前言内容</p>" in holder

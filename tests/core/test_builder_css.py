@@ -14,7 +14,7 @@ from simple_ebook_converter.core.sources import Sources, font_resource
 def test_build_css_defaults():
     rules = parse_css(build_css(Config()))
     assert rules["body"]["line-height"] == "1.5"
-    assert rules["p"]["text-indent"] == "2em"
+    assert rules[".main-content p"]["text-indent"] == "2em"
     assert "h3.chapter" in rules
 
 
@@ -28,12 +28,12 @@ def test_css_content_applies_settings():
         para_align="left",
     )
     rules = parse_css(build_css(cfg))
-    assert rules["p"]["text-indent"] == "0em"
-    assert rules["p"]["margin"] == "0 0 0.5em 0"
+    assert rules[".main-content p"]["text-indent"] == "0em"
+    assert rules[".main-content p"]["margin"] == "0 0 0.5em 0"
     assert rules["body"]["line-height"] == "2"
     assert rules["h3.chapter"]["text-align"] == "left"
     assert rules["h2.volume"]["text-align"] == "left"
-    assert rules["p"]["text-align"] == "left"
+    assert rules[".main-content p"]["text-align"] == "left"
 
 
 def test_headings_centered_by_default():

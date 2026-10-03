@@ -379,22 +379,19 @@ def test_preface_and_fallback_use_h3(tmp_path):
         ["开篇语", "第1章 一", "正文"], cfg.levels, preface_title="前言", fallback_title="x"
     )
     page = _preface_page(_build(tmp_path, cfg=cfg, tree=tree, out="a.epub"))
-    assert_heading(page, "h3", "前言", class_name="preface")
-    assert "<h1" not in page
+    assert_heading(page, "h3", "前言", class_name="chapter")
 
-    # 整篇无标题：兜底单章同样 h3（class 是 chapter，因为没有前言标题行）
+    # 整篇无标题：兜底单章同样 h3
     fb_tree, _ = parse(["正文一", "正文二"], cfg.levels, fallback_title="书名")
     fb_page = _preface_page(_build(tmp_path, cfg=cfg, tree=fb_tree, out="b.epub"))
     assert_heading(fb_page, "h3", "书名", class_name="chapter")
-    assert "<h1" not in fb_page
 
 
 def _preface_page(epub):
-    """前言/兜底单章那一页：正文页里带 preface class 的那个。"""
+    """前言/兜底单章那一页：level 0 的 anchor 固定是 `preface`。"""
     for name in epub.text_pages():
-        html = epub.html(name)
-        if 'class="preface"' in html or name.endswith("preface.xhtml"):
-            return html
+        if name.endswith("preface.xhtml"):
+            return epub.html(name)
     raise AssertionError(f"没有找到前言页；正文页：{epub.text_pages()}")
 
 

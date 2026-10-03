@@ -106,6 +106,9 @@ def tree_from_json(
             raise ValueError(f"{where}的层级不合法：{level!r}")
         if not isinstance(class_name, str):
             raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
+        # level 0 的标题是合成的，class 跟扫描路径一致按章级渲染，不看文件里的值。
+        if level == 0:
+            class_name = "chapter"
         _check_line(e, lines, where)
         kept.append(
             Node(
@@ -123,7 +126,7 @@ def tree_from_json(
             Node(
                 preface_title,
                 0,
-                "preface",
+                "chapter",
                 paragraphs=list(lines),
                 raw_title=preface_title,
                 line=1,
@@ -156,7 +159,7 @@ def tree_from_json(
             Node(
                 preface_title,
                 0,
-                "preface",
+                "chapter",
                 paragraphs=lines[0 : first.line - 1],
                 raw_title=preface_title,
                 line=1,

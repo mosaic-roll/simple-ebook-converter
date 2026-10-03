@@ -170,7 +170,7 @@ def _wrap_preface(
             Node(
                 preface_title,
                 0,
-                "preface",
+                "chapter",
                 paragraphs=paragraphs,
                 raw_title=preface_title,
                 line=first_line,

@@ -105,6 +105,8 @@ def test_tree_from_json_keeps_preface_content():
     restored = tree_from_json(data, lines)
     assert restored[0].paragraphs == ["卷首语", "献给某君"]
     assert restored[1].paragraphs == ["正文"]  # 标题行本身不进正文
+    # level 0 的 class 由程序定，文件里写什么都按章级渲染（与扫描路径一致）
+    assert restored[0].class_name == "chapter"
 
 
 def test_fallback_round_trip_keeps_first_line():
@@ -201,7 +203,7 @@ def test_tree_from_json_deleted_at_front_becomes_preface():
     ]
     tree = tree_from_json(data, lines)
     assert tree[0].level == 0
-    assert tree[0].class_name == "preface"
+    assert tree[0].class_name == "chapter"
     assert tree[0].paragraphs == ["引子", "引言正文"]
     assert tree[1].raw_title == "第一章 A"
     assert tree[1].paragraphs == ["正文 A"]
