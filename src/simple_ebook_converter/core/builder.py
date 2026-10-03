@@ -9,12 +9,12 @@
 
 from __future__ import annotations
 
-import html
 import io
 import uuid
 
 from ebooklib import epub
 
+from .cleaner import escape
 from .config import Config
 from .parser import Node
 from .sources import Resource, Sources
@@ -362,7 +362,3 @@ def _add_cover(
     page.add_link(href="style.css", rel="stylesheet", type="text/css")
     book.add_item(page)
     return page
-
-
-def escape(text: str) -> str:
-    return html.escape(text or "", quote=True)

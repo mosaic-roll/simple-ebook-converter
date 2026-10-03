@@ -19,8 +19,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
-from .builder import build_epub, builtin_css, escape
-from .cleaner import clean_lines
+from .builder import build_epub, builtin_css
+from .cleaner import clean_lines, escape
 from .config import Config
 from .encoding import EncodingError, read_lines
 from .meta import resolve_metadata

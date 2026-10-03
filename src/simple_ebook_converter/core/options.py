@@ -81,8 +81,12 @@ class Option:
         return self.name in CONFIG_KINDS
 
     @property
-    def level(self) -> int:
-        """预设层级 1~6（卷/章/节）；0 表示不是预设层级。"""
+    def preset_level(self) -> int:
+        """预设层级的级别数字（卷=2 / 章=3）；0 = 不是预设层级。
+
+        叫 `preset_level` 而不是 `level`：读代码时 `opt.level` 像是「是不是层级选项」，
+        实际是个数字。多值选项 `--level` 自己不在这里——它的值是一串规则，不是级别。
+        """
         return _LEVEL_BY_NAME.get(self.name, 0)
 
     @property
@@ -261,8 +265,10 @@ def option_groups() -> list[tuple[str, tuple[Option, ...]]]:
 
 def option_default(opt: Option) -> Any:
     """选项的默认值：Config 字段取 `DEFAULTS`，其余按形态给空值。"""
-    if opt.level:
-        return next(rule.pattern for rule in DEFAULTS.levels if rule.level == opt.level)
+    if opt.preset_level:
+        return next(
+            rule.pattern for rule in DEFAULTS.levels if rule.level == opt.preset_level
+        )
     if opt.in_config:
         return getattr(DEFAULTS, opt.name)
     return () if opt.multiple else (False if opt.kind is bool else "")
@@ -320,12 +326,13 @@ def is_valid(name: str, value: Any) -> bool:
     加新选项不需要在这里登记，`OPTIONS` 与 `config._CHECKS` 各自是真源。
     """
     opt = _option(name)
-    if opt.level:
+    if opt.preset_level:
         # 卷/章收进 `Config.levels` 而不是独立字段，正则合法性由 levels 判。
         # `None` 是「没指定」——`_level_rules()` 会填内置正则，与 `build_config()` 一致。
+        level = opt.preset_level
         if value is None:
-            return is_valid_level(LevelRule(opt.level, option_default(opt), opt.name))
-        return is_valid_level(LevelRule(opt.level, value, opt.name))
+            return is_valid_level(LevelRule(level, option_default(opt), opt.name))
+        return is_valid_level(LevelRule(level, value, opt.name))
     if not opt.in_config:
         return True
     try:
@@ -347,12 +354,12 @@ def _level_rules(values: Mapping[str, Any]) -> list[LevelRule]:
     """
     presets = [
         LevelRule(
-            opt.level,
+            opt.preset_level,
             option_default(opt) if values.get(opt.name) is None else values[opt.name],
             opt.name,
         )
         for opt in OPTIONS
-        if opt.level
+        if opt.preset_level
     ]
     return build_rules([*presets, *(values.get("level") or ())])
 

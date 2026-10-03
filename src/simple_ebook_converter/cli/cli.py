@@ -77,7 +77,7 @@ def _click_default(opt: Option):
         return False
     if opt.multiple:
         return ()
-    if opt.level:
+    if opt.preset_level:
         return None
     value = option_default(opt)
     return None if value == "" else value

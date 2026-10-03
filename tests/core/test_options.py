@@ -451,8 +451,8 @@ def test_negative_options_point_at_boolean_fields():
 
 
 def test_level_presets_are_levels_two_to_three():
-    assert [opt.level for opt in OPTIONS if opt.level] == [2, 3]
-    assert [opt.name for opt in OPTIONS if opt.level] == ["volume", "chapter"]
+    assert [opt.preset_level for opt in OPTIONS if opt.preset_level] == [2, 3]
+    assert [opt.name for opt in OPTIONS if opt.preset_level] == ["volume", "chapter"]
 
 
 def test_every_option_is_optional_except_input(tmp_path):
