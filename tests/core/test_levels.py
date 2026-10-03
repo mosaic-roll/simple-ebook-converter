@@ -109,6 +109,31 @@ def test_build_rules_rejects_invalid_pattern(rule, label):
         build_rules([rule])
 
 
+# ------------------------------------------------------------ 级别范围
+
+
+@pytest.mark.parametrize("level", [0, 7, -1, 99])
+def test_build_rules_rejects_a_level_outside_h1_to_h6(level):
+    """结构化入口也要查级别——不能只靠 CLI 的 `parse_level_spec()`。
+
+    GUI 直接构造 `LevelRule`，级别框里填坏了会变成 0；不查的话它不报错，只是变成
+    一条永远匹配不上任何标题的规则，静默不生效。
+    """
+    with pytest.raises(ValueError, match="级别需在 1~6 之间"):
+        build_rules([LevelRule(level, "^标题")])
+
+
+@pytest.mark.parametrize("level", [1, 3, 6])
+def test_build_rules_accepts_the_range_ends(level):
+    assert build_rules([LevelRule(level, "^标题")])[0].level == level
+
+
+def test_build_rules_rejects_a_bad_level_before_looking_at_the_pattern():
+    """级别先查：级别不合法时光看正则挑不出毛病，报错得指向真正的原因。"""
+    with pytest.raises(ValueError, match="级别需在 1~6 之间"):
+        build_rules([LevelRule(9, "(", "note")])
+
+
 # ----------------------------------------------------------- is_valid_level
 
 
@@ -118,3 +143,7 @@ def test_is_valid_level_accepts_a_good_rule():
 
 def test_is_valid_level_rejects_a_bad_pattern():
     assert is_valid_level(LevelRule(4, "(", "part")) is False
+
+
+def test_is_valid_level_rejects_a_bad_level():
+    assert is_valid_level(LevelRule(0, "^标题")) is False
