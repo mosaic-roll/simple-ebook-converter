@@ -95,9 +95,10 @@ def test_main_convert_writes_epub(tmp_path):
     assert (tmp_path / "novel.epub").exists()
 
 
-def test_convert_missing_input():
-    result = CliRunner().invoke(convert, [])
-    assert result.exit_code != 0
+def test_missing_input():
+    """缺输入文件时 CLI 与 TOC 都拒绝。"""
+    assert CliRunner().invoke(convert, []).exit_code != 0
+    assert CliRunner().invoke(convert, ["--toc-only"]).exit_code != 0
 
 
 # ---------- 只输出目录 ----------
@@ -194,11 +195,6 @@ def test_toc_json_depth_pruning(tmp_path):
     assert "§1" not in shallow.output
 
 
-def test_toc_missing_input():
-    result = CliRunner().invoke(convert, ["--toc-only"])
-    assert result.exit_code != 0
-
-
 def test_main_toc_only(tmp_path, capsys):
     src = _write_sample(tmp_path)
     main([str(src), "--toc-only"])
@@ -271,110 +267,81 @@ def test_no_text_cover_in_help():
 # ---------- 错误包装（core 只管抛，这里管怎么呈现） ----------
 
 
-def test_convert_date_invalid(tmp_path):
-    """日期由 core 的 Config.validate() 校验，CLI 与 GUI 用同一条消息。"""
+def test_input_errors(tmp_path):
+    """各类非法输入统一报 exit 2 / exit != 0，不吐 traceback。一次跑完省掉多个 tmp_path。"""
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--date", "not-a-date"])
-    assert result.exit_code == 2, result.output
-    assert "日期格式错误：not-a-date" in result.output
-    assert not isinstance(result.exception, ValueError)
+    runner = CliRunner()
 
+    # 日期格式错误
+    r = runner.invoke(convert, [str(src), "--date", "not-a-date"])
+    assert r.exit_code == 2, r.output
+    assert "日期格式错误：not-a-date" in r.output
+    assert not isinstance(r.exception, ValueError)
 
-def test_convert_unsupported_font(tmp_path):
-    src = _write_sample(tmp_path)
-    bad = tmp_path / "font.ttc"
-    bad.write_bytes(b"\x00\x00\x00\x00tc")
-    result = CliRunner().invoke(convert, [str(src), "--font", str(bad)])
-    assert result.exit_code != 0
-    assert "font.ttc" in result.output
+    # 未知编码名
+    r = runner.invoke(convert, [str(src), "-e", "no-such-encoding"])
+    assert r.exit_code == 2, r.output
+    assert "未知编码：no-such-encoding" in r.output
+    assert "codec" in r.output
 
+    # 手动编码不匹配文件实际编码
+    bad_src = tmp_path / "gb.txt"
+    bad_src.write_bytes("第一章 甲\n正文".encode("gb18030"))
+    r = runner.invoke(convert, [str(bad_src), "-e", "utf-8"])
+    assert r.exit_code == 2, r.output
+    assert "无法用编码 utf-8 解码" in r.output
+    assert not isinstance(r.exception, EncodingError)
 
-def test_unsupported_cover_reports_clean_error(tmp_path):
-    src = _write_sample(tmp_path)
-    bad = tmp_path / "cover.txt"
-    bad.write_text("not an image", encoding="utf-8")
-    result = CliRunner().invoke(convert, [str(src), "--cover", str(bad)])
-    assert result.exit_code != 0
-    assert "不支持的封面图格式" in result.output
+    # 不支持的字体
+    bad_font = tmp_path / "font.ttc"
+    bad_font.write_bytes(b"\x00\x00\x00\x00tc")
+    r = runner.invoke(convert, [str(src), "--font", str(bad_font)])
+    assert r.exit_code != 0
+    assert "font.ttc" in r.output
 
+    # 不支持的封面
+    bad_cover = tmp_path / "cover.txt"
+    bad_cover.write_text("not an image", encoding="utf-8")
+    r = runner.invoke(convert, [str(src), "--cover", str(bad_cover)])
+    assert r.exit_code != 0
+    assert "不支持的封面图格式" in r.output
 
-def test_asset_check_is_mode_independent(tmp_path):
-    """字体/封面格式由 Config.validate() 统一管，`--toc-only` 也要拒。"""
-    src = _write_sample(tmp_path)
-    bad = tmp_path / "font.ttc"
-    bad.write_bytes(b"\x00\x00\x00\x00tc")
-    result = CliRunner().invoke(convert, [str(src), "--toc-only", "--font", str(bad)])
-    assert result.exit_code != 0
-    assert "font.ttc" in result.output
+    # 字体检查与输出模式无关（--toc-only 也要拒）
+    r = runner.invoke(convert, [str(src), "--toc-only", "--font", str(bad_font)])
+    assert r.exit_code != 0
+    assert "font.ttc" in r.output
 
+    # 非法正则：卷 / 章 / 自定义层级
+    for args in (["--chapter", "("], ["--volume", "["], ["--level", "h2:("]):
+        r = runner.invoke(convert, [str(src), *args])
+        assert r.exit_code == 2, r.output
+        assert "正则非法" in r.output
+        assert not isinstance(r.exception, re.error)
 
-def test_replace_rejects_unknown_stage(tmp_path):
-    src = _write_sample(tmp_path)
-    rules = _write_rules(tmp_path, [{"pattern": "a", "stage": "chapter"}])
-    result = CliRunner().invoke(convert, [str(src), "--replace-rules", str(rules)])
-    assert result.exit_code != 0
-    assert "阶段只能是" in result.output
+    # 替换规则阶段非法
+    rules_bad = _write_rules(tmp_path, [{"pattern": "a", "stage": "chapter"}])
+    r = runner.invoke(convert, [str(src), "--replace-rules", str(rules_bad)])
+    assert r.exit_code != 0
+    assert "阶段只能是" in r.output
 
+    # 替换规则文件不存在
+    r = runner.invoke(convert, [str(src), "--replace-rules", str(tmp_path / "nope.json")])
+    assert r.exit_code != 0
+    assert "nope.json" in r.output
 
-def test_replace_rules_file_not_found(tmp_path):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(
-        convert, [str(src), "--replace-rules", str(tmp_path / "nope.json")]
-    )
-    assert result.exit_code != 0
-    assert "nope.json" in result.output
+    # 替换规则正则非法
+    rules_regex = tmp_path / "rules.json"
+    rules_regex.write_text('[{"pattern": "("}]', encoding="utf-8")
+    r = runner.invoke(convert, [str(src), "--replace-rules", str(rules_regex)])
+    assert r.exit_code == 2, r.output
+    assert "替换规则正则非法" in r.output
+    assert not isinstance(r.exception, re.error)
 
-
-@pytest.mark.parametrize(
-    "args",
-    [
-        ["--chapter", "("],
-        ["--volume", "["],
-        ["--level", "h2:("],
-    ],
-)
-def test_invalid_level_regex_reports_clean_error(tmp_path, args):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), *args])
-    assert result.exit_code == 2, result.output
-    assert "正则非法" in result.output
-    assert not isinstance(result.exception, re.error)
-
-
-def test_wrong_manual_encoding_reports_clean_error(tmp_path):
-    src = tmp_path / "gb.txt"
-    src.write_bytes("第一章 甲\n正文".encode("gb18030"))
-    result = CliRunner().invoke(convert, [str(src), "-e", "utf-8"])
-    assert result.exit_code == 2, result.output
-    assert "无法用编码 utf-8 解码" in result.output
-    assert not isinstance(result.exception, EncodingError)
-
-
-def test_unknown_encoding_name_reports_clean_error(tmp_path):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "-e", "no-such-encoding"])
-    assert result.exit_code == 2, result.output
-    # Config.validate() 就拦下了：不用等读文件，且告诉用户要填 codec 名
-    assert "未知编码：no-such-encoding" in result.output
-    assert "codec" in result.output
-
-
-def test_invalid_replace_regex_reports_clean_error(tmp_path):
-    src = _write_sample(tmp_path)
-    rules = tmp_path / "rules.json"
-    rules.write_text('[{"pattern": "("}]', encoding="utf-8")
-    result = CliRunner().invoke(convert, [str(src), "--replace-rules", str(rules)])
-    assert result.exit_code == 2, result.output
-    assert "替换规则正则非法" in result.output
-    assert not isinstance(result.exception, re.error)
-
-
-def test_all_levels_disabled_reports_clean_error(tmp_path):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--volume", "", "--chapter", ""])
-    assert result.exit_code == 2, result.output
-    assert "没有启用的标题规则" in result.output
-    assert not isinstance(result.exception, NoEnabledRulesError)
+    # 所有层级规则都关闭
+    r = runner.invoke(convert, [str(src), "--volume", "", "--chapter", ""])
+    assert r.exit_code == 2, r.output
+    assert "没有启用的标题规则" in r.output
+    assert not isinstance(r.exception, NoEnabledRulesError)
 
 
 def test_main_error_clean(tmp_path, capsys):
