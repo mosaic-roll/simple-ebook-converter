@@ -142,10 +142,23 @@ def _as_stored(name: str, text: str) -> Any:
 
     按 `CONFIG_KINDS`（core 字段类型真源）判断，避免 JSON 里 `"indent": "2"` 这种
     和 `Config` 类型不一致的写法。空文本对 `int` 字段返回 `None`（调用方跳过不存）。
+
+    **空文本和非法文本一律返回 `None`**，即「留空 = 用 core 默认」。用户在缩进框里
+    敲了 `abc` 时不该让关窗保存炸掉（`_on_close` 只接 `OSError`），也不该把 `abc`
+    存进配置——下次启动 `_apply_saved` 读到 `None` 会把框清空，自然收敛回默认值。
+    与其在这里猜「用户想输几」，不如统一走默认值这条路。
+
+    生成那条路另有更响的提示：`build_config` 的 `_integer` 会抛
+    「缩进需为整数，收到：'abc'」，由 `_on_generate` 显示到底栏。保存不该比生成更吵。
     """
     if CONFIG_KINDS.get(name) is int:
         text = text.strip()
-        return int(text) if text else None
+        if not text:
+            return None
+        try:
+            return int(text)
+        except ValueError:
+            return None
     return text
 
 

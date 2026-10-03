@@ -150,6 +150,17 @@ def test_as_stored_maps_blank_int_field_to_none():
     assert _as_stored("indent", "   ") is None
 
 
+def test_as_stored_maps_an_unparseable_int_field_to_none():
+    """非法输入和留空同等处理：存 None，用 core 默认。
+
+    用户在缩进框敲了 `abc`，关窗保存时 `_as_stored` 就在这条路上——它抛出去的话
+    `_on_close` 接不住（只 catch `OSError`），配置静默存不下去。
+    """
+    assert _as_stored("indent", "abc") is None
+    assert _as_stored("indent", "2.5") is None
+    assert _as_stored("toc_depth", "六") is None
+
+
 def test_as_stored_keeps_a_non_int_field_verbatim():
     """非 int 字段不 strip、不转类型，原样存。"""
     assert _as_stored("line_height", " 1.5 ") == " 1.5 "
@@ -176,6 +187,19 @@ def test_collect_saved_drops_blank_prompt_fields(ui):
     assert saved["para_spacing"] is None
     for name in ("volume", "chapter", "exclude"):
         assert saved[name] is None
+
+
+def test_collect_saved_does_not_crash_on_an_invalid_int(ui):
+    """填了非法缩进也能存下配置——存成 None，下次启动回填时框被清空、用默认值。
+
+    这是关窗路径：`_on_close` 只接 `OSError`，`ValueError` 会逃进 Tk 回调。
+    """
+    ui[0]["layout"]["indent"].insert(0, "abc")
+    first = _collect(ui)
+    assert first["indent"] is None
+    _apply(ui, first)
+    assert ui[0]["layout"]["indent"].get() == ""
+    assert _collect(ui)["indent"] is None
 
 
 def test_collect_saved_translates_align_labels(ui):
