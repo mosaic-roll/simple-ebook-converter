@@ -72,11 +72,11 @@ def builtin_css(cfg: Config, font_name: str | None = None) -> str:
   font-size: 1em;
   line-height: {cfg.line_height};
   font-family: {family}sans-serif;
-  text-align: {cfg.body_align};
 }}
 p {{
   margin: 0 0 {cfg.para_spacing} 0;
   text-indent: {cfg.indent}em;
+  text-align: {cfg.para_align};
 }}
 h1, h2, h3, h4, h5, h6 {{
   text-align: center;
@@ -87,8 +87,8 @@ h2.volume {{
 h3.chapter {{
   text-align: {cfg.chapter_align};
 }}""")
-    # 只命中封面页：整本书只有它的 body 里直接挂 section。不用 epub|type 属性选择器，
-    # 各家阅读器对它支持不一致。书名/作者另挂 class，才能从上面那条 `h1~h6` 居中里摘出来。
+    # 封面容器按 class 命中，不写 body > section：正文页也有 section，结构选择器
+    # 各家阅读器支持还不一致。书名/作者另挂 class，好从上面 `h1~h6` 的居中里摘出来。
     css.append(""".cover {
   margin: 0;
 }
@@ -239,7 +239,11 @@ def _page_owner_by_anchor(roots: list[Node]) -> dict[str, str]:
 
 
 def _render_page(root: Node) -> str:
-    """一页的正文：根标题与段落，再递归并入所有不成页的后代（带 `id` 供片段链接）。"""
+    """一页的正文：根标题与段落，再递归并入所有不成页的后代（带 `id` 供片段链接）。
+
+    整页装进 `<section class="main-content">`，卷页/章页/前言页同壳：正文段落一律是
+    `p`，要单独上样式挂 `.main-content p` 即可，标题仍由 `h2.volume` 等规则管。
+    """
     blocks: list[str] = []
 
     def render(node: Node, is_root: bool) -> None:
@@ -250,7 +254,7 @@ def _render_page(root: Node) -> str:
                 render(child, False)
 
     render(root, True)
-    return "\n".join(blocks)
+    return '<section class="main-content">\n' + "\n".join(blocks) + "\n</section>"
 
 
 def _heading(node: Node, *, with_id: bool) -> str:

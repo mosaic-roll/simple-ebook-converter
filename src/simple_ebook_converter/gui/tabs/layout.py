@@ -76,7 +76,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "正文",
         list(ALIGN_LABELS),
         ctx,
-        default=default_align_label("body_align", ctx.saved),
+        default=default_align_label("para_align", ctx.saved),
         col=0,
     )
 

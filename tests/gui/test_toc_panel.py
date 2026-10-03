@@ -33,7 +33,15 @@ def test_plain_rows_show_unescaped_title():
 def test_html_hit_shows_the_markup_source():
     """命中 html 规则时结果列取 `title_html`（那段 HTML 源码），整行可染蓝。"""
     entries = entries_from_preview(
-        _preview([Rule(pattern=r"第(.)章", replace=r'第<span class="n">\1</span>章', stage="html")])
+        _preview(
+            [
+                Rule(
+                    pattern=r"第(.)章",
+                    replace=r'第<span class="n">\1</span>章',
+                    stage="html",
+                )
+            ]
+        )
     )
     assert entries[0]["html_hit"] is True
     assert '第<span class="n">一</span>章' in entries[0]["result"]

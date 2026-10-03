@@ -162,7 +162,7 @@ class Config:
     para_spacing: str = "1em"
     chapter_align: str = "center"
     volume_align: str = "center"
-    body_align: str = "justify"
+    para_align: str = "justify"
     font: Path | None = None
     #: 整份替代内置样式（与 `css_append` 互斥）
     css_file: Path | None = None
@@ -222,7 +222,7 @@ class Config:
         for name, label in (
             ("chapter_align", "章对齐"),
             ("volume_align", "卷对齐"),
-            ("body_align", "正文对齐"),
+            ("para_align", "正文对齐"),
         ):
             value = getattr(self, name)
             if value not in ALIGN_CHOICES:

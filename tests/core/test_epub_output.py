@@ -124,6 +124,35 @@ def test_toc_nav_in_spine_by_default(tmp_path):
 # ---------- 分页：只 h1~h3 单独成页 ----------
 
 
+def test_every_text_page_wraps_its_content_in_main_content(tmp_path):
+    """卷页/章页/前言页一律套同一个壳，正文段落好按 `.main-content p` 定位。"""
+    epub = _build(tmp_path)
+    pages = epub.text_pages()
+    assert pages
+    for name in pages:
+        html = epub.html(name)
+        assert '<section class="main-content">' in html, name
+        assert html.count("<section") == 1, f"{name} 里不该有别的 section"
+
+
+def test_main_content_wraps_the_heading_too(tmp_path):
+    """壳包整页含根标题，不只包段落。"""
+    epub = _build(tmp_path)
+    html = epub.html(epub.text_pages()[0])
+    section = re.search(
+        r'<section class="main-content">(.*)</section>', html, re.DOTALL
+    ).group(1)
+    assert_heading(section, "h3", "第一章 一", class_name="chapter")
+    assert "<p>正文一</p>" in section
+
+
+def test_cover_page_keeps_its_own_section(tmp_path):
+    """封面页容器仍是 `.cover`，不被正文的壳波及。"""
+    page = _cover_xhtml(tmp_path)
+    assert '<section class="cover"' in page
+    assert "main-content" not in page
+
+
 def test_deep_headings_share_the_ancestor_page(tmp_path):
     """h4 并入章的页，带 id 供片段链接，不再单独建文件。"""
     epub = _build(tmp_path, tree=_section_tree())

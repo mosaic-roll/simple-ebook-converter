@@ -549,7 +549,7 @@ class App(ctk.CTk):
             "para_spacing": layout_tab["para_spacing"].get() or None,
             "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
             "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
-            "body_align": ALIGN_LABELS[layout_tab["align_body"].get()],
+            "para_align": ALIGN_LABELS[layout_tab["align_body"].get()],
             # 章节识别
             "volume": rules_tab["rule_entries"]["卷"].get(),
             "chapter": rules_tab["rule_entries"]["章"].get(),
@@ -638,7 +638,7 @@ class App(ctk.CTk):
                 para_spacing=layout_tab["para_spacing"].get() or DEFAULTS.para_spacing,
                 volume_align=ALIGN_LABELS[layout_tab["align_volume"].get()],
                 chapter_align=ALIGN_LABELS[layout_tab["align_chapter"].get()],
-                body_align=ALIGN_LABELS[layout_tab["align_body"].get()],
+                para_align=ALIGN_LABELS[layout_tab["align_body"].get()],
             ),
             Path(font).name if font else None,
         )
@@ -783,7 +783,7 @@ class App(ctk.CTk):
             # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
             "volume_align": ALIGN_LABELS[layout_tab["align_volume"].get()],
             "chapter_align": ALIGN_LABELS[layout_tab["align_chapter"].get()],
-            "body_align": ALIGN_LABELS[layout_tab["align_body"].get()],
+            "para_align": ALIGN_LABELS[layout_tab["align_body"].get()],
             "indent": _as_stored("indent", layout_tab["indent"].get()),
             "line_height": layout_tab["line_height"].get().strip() or None,
             "para_spacing": layout_tab["para_spacing"].get().strip() or None,
@@ -847,7 +847,7 @@ class App(ctk.CTk):
         for name, widget in (
             ("volume_align", layout_tab["align_volume"]),
             ("chapter_align", layout_tab["align_chapter"]),
-            ("body_align", layout_tab["align_body"]),
+            ("para_align", layout_tab["align_body"]),
         ):
             widget.set(default_align_label(name, saved))
 

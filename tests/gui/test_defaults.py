@@ -35,7 +35,7 @@ def test_level_regex_defaults_follow_config():
 
 def test_align_defaults_map_back_to_config():
     """对齐菜单的默认中文标签能换回 `Config` 的取值。"""
-    for name in ("volume_align", "chapter_align", "body_align"):
+    for name in ("volume_align", "chapter_align", "para_align"):
         label = default_align_label(name)
         assert label in ALIGN_LABELS, f"{name} 的标签 {label!r} 不在 ALIGN_LABELS 里"
         assert ALIGN_LABELS[label] == getattr(DEFAULTS, name)
@@ -75,11 +75,11 @@ def test_saved_none_becomes_empty():
 
 
 def test_saved_align_label_maps_back():
-    assert default_align_label("body_align", {"body_align": "left"}) == "左对齐"
+    assert default_align_label("para_align", {"para_align": "left"}) == "左对齐"
 
 
 def test_invalid_saved_align_falls_back_to_core_default():
     """配置文件可手改，非法对齐值不该让启动崩掉。"""
     assert default_align_label(
-        "body_align", {"body_align": "没有这个值"}
-    ) == default_align_label("body_align")
+        "para_align", {"para_align": "没有这个值"}
+    ) == default_align_label("para_align")

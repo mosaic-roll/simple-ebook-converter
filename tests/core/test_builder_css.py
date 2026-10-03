@@ -25,7 +25,7 @@ def test_css_content_applies_settings():
         para_spacing="0.5em",
         chapter_align="left",
         volume_align="left",
-        body_align="left",
+        para_align="left",
     )
     rules = parse_css(build_css(cfg))
     assert rules["p"]["text-indent"] == "0em"
@@ -33,16 +33,14 @@ def test_css_content_applies_settings():
     assert rules["body"]["line-height"] == "2"
     assert rules["h3.chapter"]["text-align"] == "left"
     assert rules["h2.volume"]["text-align"] == "left"
-    assert rules["body"]["text-align"] == "left"
+    assert rules["p"]["text-align"] == "left"
 
 
 def test_headings_centered_by_default():
-    """h1~h6 默认居中：否则 `--level` 自定义的 h4/h5/h6 会跟着 `body_align` 跑。"""
+    """h1~h6 默认居中：否则 `--level` 自定义的 h4/h5/h6 会跟着段落走。"""
     css = build_css(Config())
     assert parse_css(css)["h4"]["text-align"] == "center"
-    # 顺序是层叠契约：`body` 与这条 `h1..h6` 特异性相同（都是 0,0,1），靠源码顺序决胜。
-    # body 排到后面就会把 `--body-align` 套到所有标题上，h4/h5/h6 全废。
-    assert css.index("h1, h2, h3, h4, h5, h6 {") > css.index("body {")
+    assert parse_css(css)["h3"]["text-align"] == "center"
 
 
 def test_cover_css_rules_present():
