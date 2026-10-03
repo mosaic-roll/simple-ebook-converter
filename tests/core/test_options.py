@@ -17,9 +17,11 @@ from simple_ebook_converter.core.options import (
     OPTIONS,
     Option,
     build_config,
+    is_valid,
     option_default,
     option_groups,
 )
+from simple_ebook_converter.core.pipeline import resolve
 from simple_ebook_converter.core.replace import Rule
 
 
@@ -458,3 +460,80 @@ def test_every_option_is_optional_except_input(tmp_path):
     src = tmp_path / "a.txt"
     src.write_text("正文", encoding="utf-8")
     assert build_config({"input": str(src)}) == Config(input=src)
+
+
+# ------------------------------------------------------------------ is_valid
+
+#: (字段, 合法值, 非法值)。空值一律合法——留空就是「用默认值」，没有第三种意思。
+VALIDITY = [
+    ("toc_depth", 3, 99),
+    ("indent", 2, -1),
+    ("max_title_len", 35, 0),
+    ("volume_align", "center", "中间"),
+    ("chapter_align", "justify", "中间"),
+    ("para_align", "left", "中间"),
+    ("volume", "第.{1,10}卷", "("),
+    ("chapter", "第.{1,10}章", "["),
+    ("exclude", "目录", "(?"),
+    ("date", "2024-05-13", "瞎写"),
+]
+
+
+@pytest.mark.parametrize(("name", "good", "bad"), VALIDITY)
+def test_is_valid_accepts_a_good_value(name, good, bad):
+    assert is_valid(name, good) is True
+
+
+@pytest.mark.parametrize(("name", "good", "bad"), VALIDITY)
+def test_is_valid_rejects_a_bad_value(name, good, bad):
+    assert is_valid(name, bad) is False
+
+
+@pytest.mark.parametrize("name", [name for name, _, _ in VALIDITY])
+def test_is_valid_treats_none_as_the_default(name):
+    """空就是「用默认值」，合法。"""
+    assert is_valid(name, None) is True
+
+
+def test_is_valid_uses_the_builtin_pattern_for_an_unset_level_option():
+    """层级选项给 `None` 要按内置正则判，不能拿 `None` 当正则去编译。
+
+    `_level_rules()` 遇到没指定会用内置正则填上，所以「没指定」必然合法——
+    直接 `re.compile(None)` 会误报成非法。
+    """
+    assert is_valid("volume", None) is True
+    assert is_valid("chapter", None) is True
+
+
+@pytest.mark.parametrize(("name", "good", "bad"), VALIDITY)
+def test_is_valid_agrees_with_resolve(name, good, bad, tmp_path):
+    """同一个值，`is_valid` 与 `resolve` 必须给同一个结论。
+
+    存盘和生成对同一个值看法不一致是最坏的组合：配置存下了却生成不了，或反过来。
+    这条断言把「同一套规则」钉住——不是比对硬编码的期望值，而是比对两条真实路径。
+
+    比的是 `resolve()` 而不是 `build_config()`：后者只做翻译，不取值域校验
+    （那是 `pipeline.resolve()` 的职责），拿它当基准会把 `toc_depth=99` 误判成放行。
+    """
+    for value, expected in ((good, True), (bad, False)):
+        assert is_valid(name, value) is expected
+        try:
+            resolve(build_config({"input": _any_input(tmp_path), name: value}))
+        except ValueError:
+            assert expected is False, f"{name}={value!r} 被 is_valid 放行却被 resolve 拒"
+        else:
+            assert expected is True, f"{name}={value!r} 被 resolve 放行却被 is_valid 拒"
+
+
+def test_is_valid_ignores_a_non_config_option():
+    """不进 `Config` 的选项没有字段级约束，恒为合法。
+
+    多值项 `--level` 不归它管——那是一条规则一条校验，走 `levels.is_valid_level()`。
+    """
+    assert is_valid("replace_rules", "任意路径") is True
+
+
+def _any_input(tmp_path: Path) -> str:
+    src = tmp_path / "in.txt"
+    src.write_text("正文", encoding="utf-8")
+    return str(src)

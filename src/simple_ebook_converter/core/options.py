@@ -19,9 +19,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, LEVEL_PRESETS, Config, LevelRule
+from .config import (
+    ALIGN_CHOICES,
+    DEFAULTS,
+    FORMATS,
+    LEVEL_PRESETS,
+    Config,
+    LevelRule,
+    field_error,
+)
 from .encoding import ENCODING_CHOICES
-from .levels import build_rules
+from .levels import build_rules, is_valid_level
 from .replace import Rule, rules_from_file
 
 
@@ -298,6 +306,33 @@ def build_config(
             if opt.in_config
         },
     )
+
+
+def is_valid(name: str, value: Any) -> bool:
+    """某个选项的原始值能不能收进 `Config`。
+
+    给 GUI 存盘前用：手上有的是**单个字段的原始文本**，需要的是「这一个值合不合法」，
+    而 `Config.validate()` 一次验整份配置。所以这条必须跟生成那条路**用同一套规则**，
+    不能另写一份——否则两边会漂移。
+
+    两层，不重叠：`_convert()` 管「能不能转成对的类型」（`"abc"` 转不成 int），
+    `config.field_error()` 管「转成类型之后取值合不合法」（`-1` 是 int 但缩进不能为负）。
+    加新选项不需要在这里登记，`OPTIONS` 与 `config._CHECKS` 各自是真源。
+    """
+    opt = _option(name)
+    if opt.level:
+        # 卷/章收进 `Config.levels` 而不是独立字段，正则合法性由 levels 判。
+        # `None` 是「没指定」——`_level_rules()` 会填内置正则，与 `build_config()` 一致。
+        if value is None:
+            return is_valid_level(LevelRule(opt.level, option_default(opt), opt.name))
+        return is_valid_level(LevelRule(opt.level, value, opt.name))
+    if not opt.in_config:
+        return True
+    try:
+        typed = _convert(opt, value)
+    except ValueError:
+        return False
+    return field_error(name, typed) is None
 
 
 def _level_rules(values: Mapping[str, Any]) -> list[LevelRule]:
