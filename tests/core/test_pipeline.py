@@ -1,7 +1,6 @@
 """`core.pipeline`：两个前端共用的「读文件 → 切分 → 写产物」那一层。"""
 
 import json
-import zipfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -139,13 +138,6 @@ def test_read_book_keeps_the_sources_it_got(cfg):
     assert read_book(cfg, sources).sources is sources
 
 
-def test_read_book_with_entries_matches_regex_result(cfg):
-    """目录条目走一圈回来的结果，与直接正则解析一致（往返一致）。"""
-    lines = LINES.splitlines()
-    entries = to_json(scan_toc(lines, resolve(cfg))[0])
-    assert read_book(cfg, Sources(toc_entries=entries)).tree == read_book(cfg).tree
-
-
 def test_read_book_fills_metadata_on_its_own_config(cfg):
     assert (cfg.title, cfg.author) == (None, "")
     assert (read_book(cfg).cfg.title, read_book(cfg).cfg.author) == ("测试书", "某人")
@@ -194,14 +186,17 @@ def test_build_book_assembles_without_touching_disk():
 
 
 def test_build_book_reads_toc_entries_from_sources():
-    entries = to_json(scan_toc(LINES.splitlines(), Config())[0])
-    book = build_book(Config(), LINES.splitlines(), "utf-8", Sources(toc_entries=entries))
-    assert book.tree == build_book(Config(), LINES.splitlines(), "utf-8", Sources()).tree
+    """目录条目走一圈回来的结果，与直接正则解析一致（往返一致）。"""
+    lines = LINES.splitlines()
+    entries = to_json(scan_toc(lines, Config())[0])
+    with_entries = build_book(Config(), lines, "utf-8", Sources(toc_entries=entries))
+    assert with_entries.tree == build_book(Config(), lines, "utf-8", Sources()).tree
 
 
 def test_build_book_reports_empty_content_by_input_name():
+    cfg = Config(input=Path("novel.txt"))
     with pytest.raises(ValueError, match="没有可生成的内容：.*novel"):
-        build_book(Config(input=Path("novel.txt")), ["", "  "], "utf-8", Sources())
+        build_book(cfg, ["", "  "], "utf-8", Sources())
 
 
 def test_build_book_falls_back_to_book_title_when_there_is_no_input():
@@ -505,14 +500,13 @@ def test_write_toc_without_out_refuses_to_write_a_file_named_none(cfg):
 # ---------- EPUB ----------
 
 
-def test_write_epub_writes_zip(cfg, tmp_path):
+def test_write_epub_writes_a_readable_epub(cfg, tmp_path):
+    """`write_epub` 只管把可解开的 zip 放到 `cfg.out`；包结构归 `build_epub` 那层测。
+
+    「是 zip」不用另断言：`Epub` 一上来就 `zipfile.ZipFile(...)`，不是 zip 会抛。
+    """
     out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
-    assert zipfile.is_zipfile(out)
-    epub = Epub(out.read_bytes())
-    assert epub.entries["mimetype"] == b"application/epub+zip"
-    assert epub.has_entry("META-INF/container.xml")
-    assert epub.has_entry(epub.opf_name())
-    assert epub.text_pages()
+    assert Epub(out.read_bytes()).text_pages()
 
 
 def test_end_to_end_book_is_reachable_and_self_consistent(cfg, tmp_path):
@@ -556,7 +550,7 @@ def test_write_epub_can_overwrite(cfg, tmp_path):
     out = tmp_path / "a.epub"
     out.write_bytes(b"x")
     book = read_book(replace(cfg, out=out, overwrite=True))
-    assert zipfile.is_zipfile(write_epub(book))
+    assert Epub(write_epub(book).read_bytes()).text_pages()
 
 
 def _blocked_out(tmp_path):
@@ -573,7 +567,9 @@ def test_write_epub_reports_failure_with_context(cfg, tmp_path):
         write_epub(book)
 
 
-def test_write_epub_assembly_error_is_not_blamed_on_the_path(cfg, tmp_path, monkeypatch):
+def test_write_epub_assembly_error_is_not_blamed_on_the_path(
+    cfg, tmp_path, monkeypatch
+):
     """组装期的错跟「往哪写」无关，不该被套上「无法生成 EPUB」这个写入阶段的标签。"""
     monkeypatch.setattr(
         "simple_ebook_converter.core.pipeline.build_epub",

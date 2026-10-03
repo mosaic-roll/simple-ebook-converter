@@ -70,10 +70,6 @@ def test_build_epub_lets_write_errors_surface(monkeypatch):
     assert captured["options"]["raise_exceptions"] is True
 
 
-def test_build_epub_returns_a_zip():
-    assert build_epub(DEFAULTS, [], Sources())[:2] == b"PK"
-
-
 # ---------- 包结构 ----------
 
 
