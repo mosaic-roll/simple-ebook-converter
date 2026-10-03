@@ -16,7 +16,6 @@ from simple_ebook_converter.core.options import (
     OPTIONS,
     Option,
     option_default,
-    option_groups,
 )
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.toc import to_json, to_text
@@ -43,25 +42,6 @@ def test_empty_option_defaults():
     """留空即「未指定」：点击参数里只能是 None 或 ()，不能是空串。"""
     for name in ("title", "date", "out", "dump_css", "cover", "font", "css_file"):
         assert option_default(_option(name)) is None, name
-
-
-def test_negative_flags_default_to_the_positive_field():
-    """反面选项（--no-xxx）默认关掉，等价于正面字段取默认。"""
-    for opt in _field_options():
-        if opt.negative:
-            assert getattr(DEFAULTS, opt.name) is True, opt.name
-
-
-def test_option_groups_keep_declaration_order():
-    groups = [name for name, _items in option_groups()]
-    assert groups == list(dict.fromkeys(groups))
-    assert set(groups) == {opt.group for opt in OPTIONS}
-
-
-def test_option_flags_are_derived_from_name():
-    assert _option("encoding").flags == ("-e", "--encoding")
-    assert _option("overwrite").flags == ("--no-overwrite",)
-    assert _option("line_height").flags == ("--line-height",)
 
 
 def test_library_defaults_come_from_config():

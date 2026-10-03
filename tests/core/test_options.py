@@ -17,6 +17,7 @@ from simple_ebook_converter.core.options import (
     Option,
     build_config,
     option_default,
+    option_groups,
 )
 from simple_ebook_converter.core.replace import Rule
 
@@ -33,6 +34,29 @@ def _config(tmp_path, **overrides) -> Config:
 
 def _option(name: str) -> Option:
     return next(opt for opt in OPTIONS if opt.name == name)
+
+
+def _field_options() -> list[Option]:
+    return [opt for opt in OPTIONS if opt.in_config]
+
+
+def test_negative_flags_default_to_the_positive_field():
+    """反面选项（--no-xxx）默认关掉，等价于正面字段取默认。"""
+    for opt in _field_options():
+        if opt.negative:
+            assert getattr(DEFAULTS, opt.name) is True, opt.name
+
+
+def test_option_groups_keep_declaration_order():
+    groups = [name for name, _items in option_groups()]
+    assert groups == list(dict.fromkeys(groups))
+    assert set(groups) == {opt.group for opt in OPTIONS}
+
+
+def test_option_flags_are_derived_from_name():
+    assert _option("encoding").flags == ("-e", "--encoding")
+    assert _option("overwrite").flags == ("--no-overwrite",)
+    assert _option("line_height").flags == ("--line-height",)
 
 
 # ---------- 默认 ----------
