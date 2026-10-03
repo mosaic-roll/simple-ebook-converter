@@ -73,7 +73,7 @@ def builtin_css(cfg: Config, font_name: str | None = None) -> str:
   line-height: {cfg.line_height};
   font-family: {family}sans-serif;
 }}
-p {{
+.main-content p {{
   margin: 0 0 {cfg.para_spacing} 0;
   text-indent: {cfg.indent}em;
   text-align: {cfg.para_align};
