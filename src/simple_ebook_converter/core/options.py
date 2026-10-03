@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args, get_type_hints
 
-from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, LEVEL_PRESETS, Config
+from .config import ALIGN_CHOICES, DEFAULTS, FORMATS, LEVEL_PRESETS, Config, LevelRule
 from .encoding import ENCODING_CHOICES
-from .levels import build_levels
+from .levels import build_rules
 from .replace import Rule, rules_from_file
 
 
@@ -290,7 +290,7 @@ def build_config(
             _path(_option("replace_rules"), values.get("replace_rules"))
         )
     return Config(
-        levels=build_levels(_level_specs(values)),
+        levels=_level_rules(values),
         replacements=replacements,
         **{
             opt.name: _convert(opt, values.get(opt.name))
@@ -300,20 +300,26 @@ def build_config(
     )
 
 
-def _level_specs(values: Mapping[str, Any]) -> list[str]:
-    """层级规格：卷/章/节三条预设与 `--level` 统一成 `hN[.class]:正则`。
+def _level_rules(values: Mapping[str, Any]) -> list[LevelRule]:
+    """卷/章/节三条预设 + 前端给的额外层级 → 校验排序后的 `Config.levels`。
 
     预设未给用内置正则，显式空串表示不识别该层级；class 名就是选项名。预设三条排在
-    `--level` 前面——这就是同级的优先级（`build_levels()` 后 `parse()` 照此试）。
+    额外层级前面——这就是同级的优先级（`parse()` 照此试）。
+
+    `values["level"]` 里已经是 `LevelRule`：GUI 从三个输入框直接构造，CLI 把
+    `--level hN[.class]:正则` 交给 `parse_level_spec()` 拆好再传进来。core 不再
+    经手那个字符串——它是命令行参数格式，不是内部表示。
     """
-    specs: list[str] = []
-    for opt in OPTIONS:
-        if not opt.level:
-            continue
-        value = values.get(opt.name)
-        pattern = option_default(opt) if value is None else value
-        specs.append(f"h{opt.level}.{opt.name}:{pattern}")
-    return specs + list(_lines(values.get("level") or ()))
+    presets = [
+        LevelRule(
+            opt.level,
+            option_default(opt) if values.get(opt.name) is None else values[opt.name],
+            opt.name,
+        )
+        for opt in OPTIONS
+        if opt.level
+    ]
+    return build_rules([*presets, *(values.get("level") or ())])
 
 
 def _convert(opt: Option, value: Any) -> Any:
@@ -338,12 +344,6 @@ def _text(value: Any) -> str | None:
     """字符串选项的值；未给或只填了空白都视同未给。"""
     text = "" if value is None else str(value).strip()
     return text or None
-
-
-def _lines(value: Any) -> tuple[str, ...]:
-    """多值选项（`--level`）：GUI 给多行文本，CLI 给元组，都收成去掉空行的元组。"""
-    items = value.splitlines() if isinstance(value, str) else value or ()
-    return tuple(str(item).strip() for item in items if str(item).strip())
 
 
 def _integer(opt: Option, value: Any) -> int:

@@ -9,8 +9,13 @@ from simple_ebook_converter.core.builder import (
     image_cover_body,
     text_cover_body,
 )
-from simple_ebook_converter.core.config import DEFAULTS, Config, default_levels
-from simple_ebook_converter.core.levels import build_levels
+from simple_ebook_converter.core.config import (
+    DEFAULTS,
+    Config,
+    LevelRule,
+    default_levels,
+)
+from simple_ebook_converter.core.levels import build_rules
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.sources import (
     Resource,
@@ -31,12 +36,12 @@ def _default_tree():
 def _section_tree():
     """章(h3) 下带两个节(h4)：节应该并入章的页，而不是各建一个文件。"""
     lines = ["第一章 开端", "※清晨", "正文甲", "※黄昏", "正文乙"]
-    return parse(lines, _with_defaults("h4.section:^※"), fallback_title="测试书")[0]
+    return parse(lines, _with_defaults(LevelRule(4, "^※", "section")), fallback_title="测试书")[0]
 
 
-def _with_defaults(*extra: str):
-    """内置卷/章 + 额外层级规格，顺序同前端 `_level_specs()`。"""
-    return [*default_levels(), *build_levels(list(extra))]
+def _with_defaults(*extra: LevelRule):
+    """内置卷/章 + 额外层级规则，顺序同前端 `_level_rules()`。"""
+    return [*default_levels(), *build_rules(extra)]
 
 
 def _build(cfg=None, tree=None, sources=None):
@@ -189,7 +194,9 @@ def test_toc_depth_hides_deep_headings():
 def test_deep_only_tree_still_gets_a_page():
     """只启用 h4 当层级时它没有成页的祖先，也得自己成页，正文才不至于无家可归。"""
     tree = parse(
-        ["※清晨", "正文甲"], build_levels(["h4.section:^※"]), fallback_title="测试书"
+        ["※清晨", "正文甲"],
+        build_rules([LevelRule(4, "^※", "section")]),
+        fallback_title="测试书",
     )[0]
     epub = _build(tree=tree)
     html = epub.html(epub.text_pages()[0])

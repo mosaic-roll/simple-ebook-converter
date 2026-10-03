@@ -6,7 +6,7 @@ from simple_ebook_converter.core.config import (
     LevelRule,
     default_levels,
 )
-from simple_ebook_converter.core.levels import build_levels
+from simple_ebook_converter.core.levels import build_rules
 from simple_ebook_converter.core.parser import NoEnabledRulesError, parse, walk
 
 
@@ -145,7 +145,9 @@ def test_custom_level_hierarchy():
 
 def test_no_volume_flag_ignores_volume():
     lines = ["第一卷 甲", "第一章 a", "正文"]
-    levels = build_levels(["h2.volume:", f"h3.chapter:{DEFAULT_CHAPTER_RE}"])
+    levels = build_rules(
+        [LevelRule(2, "", "volume"), LevelRule(3, DEFAULT_CHAPTER_RE, "chapter")]
+    )
     tree, _ = parse(lines, levels, fallback_title="书名")
     assert [n.title for n in tree] == ["前言", "第一章 a"]
     assert tree[0].paragraphs == ["第一卷 甲"]
@@ -154,18 +156,18 @@ def test_no_volume_flag_ignores_volume():
 
 def test_level_wins_over_priority():
     """先比级别：h1 的额外层级比卷（h2）级别低，所以仍先被试。"""
-    levels = build_levels(["h1.part:^第一卷"])
+    levels = build_rules([LevelRule(1, "^第一卷", "part")])
     tree, _ = parse(["第一卷 甲", "正文"], levels, fallback_title="书名")
     assert [(n.level, n.class_name) for n in tree] == [(1, "part")]
 
 
 def test_builtin_wins_within_one_level():
     """同级比优先级：内置卷的 class 赢过用户写的 h2 规则。"""
-    levels = build_levels(
+    levels = build_rules(
         [
-            f"h2.volume:{DEFAULT_VOLUME_RE}",
-            "h2.part:^第一卷",
-            f"h3.chapter:{DEFAULT_CHAPTER_RE}",
+            LevelRule(2, DEFAULT_VOLUME_RE, "volume"),
+            LevelRule(2, "^第一卷", "part"),
+            LevelRule(3, DEFAULT_CHAPTER_RE, "chapter"),
         ]
     )
     tree, _ = parse(["第一卷 甲", "第一章 a"], levels, fallback_title="书名")
@@ -177,14 +179,14 @@ def test_builtin_wins_within_one_level():
 
 def test_first_written_wins_within_one_level():
     """同级里写在前面的先试，命中后同一行不再试后面的规则。"""
-    levels = build_levels(["h5.note:^※", "h5.scene:^※"])
+    levels = build_rules([LevelRule(5, "^※", "note"), LevelRule(5, "^※", "scene")])
     tree, _ = parse(["※甲", "正文"], levels, fallback_title="书名")
     assert [(n.level, n.class_name) for n in tree] == [(5, "note")]
 
 
 def test_same_class_specs_work_as_an_ordered_set():
     """同 class 拆成多条：第一条没命中的行交给下一条，内置那条已经让位。"""
-    levels = build_levels(["h2.volume:^第一卷", "h2.volume:^第.+部"])
+    levels = build_rules([LevelRule(2, "^第一卷", "volume"), LevelRule(2, "^第.+部", "volume")])
     tree, _ = parse(
         ["第一卷 甲", "第二卷 乙", "第一部 丙"], levels, fallback_title="书名"
     )
@@ -245,7 +247,7 @@ def test_paragraphs_follow_the_nearest_heading():
 def test_classless_level_has_empty_class_name():
     """`--level h1:…` 不带 class，节点就不带 class（落到 hN 标签选择器）。"""
     tree, _ = parse(
-        ["Part 1", "正文"], build_levels(["h1:^Part"]), fallback_title="书名"
+        ["Part 1", "正文"], build_rules([LevelRule(1, "^Part")]), fallback_title="书名"
     )
     assert tree[0].level == 1
     assert tree[0].class_name == ""
@@ -253,7 +255,7 @@ def test_classless_level_has_empty_class_name():
 
 def test_exclude_blocks_a_title_that_matches_levels():
     """排除规则命中时，行降级为正文而不是标题。"""
-    levels = build_levels(["h3.chapter:^第.章"])
+    levels = build_rules([LevelRule(3, "^第.章", "chapter")])
     tree, _ = parse(
         ["第一章 开端", "排除这条", "第二章 发展"],
         levels,

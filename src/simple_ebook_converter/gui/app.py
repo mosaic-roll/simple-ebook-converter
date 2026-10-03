@@ -26,7 +26,7 @@ from typing import Any
 import customtkinter as ctk
 
 from ..core.builder import builtin_css
-from ..core.config import DEFAULTS, Config
+from ..core.config import DEFAULTS, Config, LevelRule
 from ..core.encoding import EncodingError, read_lines
 from ..core.mediatypes import COVER_TYPES, FONT_TYPES, find_cover
 from ..core.meta import resolve_metadata
@@ -158,17 +158,30 @@ def _as_stored(name: str, text: str) -> Any:
     return text
 
 
-def _extra_level_spec(row: dict) -> str:
-    """一行额外层级 → `hN[.class]:正则` 规格（`core.levels.build_levels()` 的入参）。
+def _extra_level(row: dict) -> LevelRule | None:
+    """一行额外层级 → `LevelRule`；正则留空返回 `None`。
 
-    正则留空表示这一行没填，返回空串让收集阶段过滤掉——空正则会匹配一切，
-    留着等于把所有行都当标题。
+    表格本来就是三个输入框（级别 / class / 正则），直接构造 `LevelRule`，不必绕成
+    `hN[.class]:正则` 字符串——那是 CLI `--level` 的参数格式，core 不认。
+
+    正则留空即这一行没填，整个行丢掉：空正则会匹配一切，留着等于把所有行都当标题。
     """
     regex = row["regex"].get().strip()
     if not regex:
-        return ""
-    cls = row["class"].get().strip()
-    return f"{row['level'].get().strip()}{'.' + cls if cls else ''}:{regex}"
+        return None
+    return LevelRule(
+        _level_number(row["level"].get()),
+        regex,
+        row["class"].get().strip(),
+    )
+
+
+def _level_number(selector: str) -> int:
+    """`h4` / `4` → `4`。用户可能不带 `h`，core 只收数字。"""
+    try:
+        return int(selector.strip().lstrip("hH"))
+    except ValueError:
+        return 0
 
 
 def _scannable_entries(entries: list[dict]) -> list[dict] | None:
@@ -738,9 +751,7 @@ class App(ctk.CTk):
             "max_title_len": rules_tab["rule_entries"]["字数上限"].get() or None,
             "preface_title": rules_tab["rule_entries"]["无标题章节"].get() or None,
             "level": [
-                spec
-                for spec in (_extra_level_spec(r) for r in rules_tab["extra_rows"])
-                if spec
+                rule for rule in map(_extra_level, rules_tab["extra_rows"]) if rule
             ],
             # 产出
             "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),

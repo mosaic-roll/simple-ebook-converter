@@ -11,6 +11,7 @@ from simple_ebook_converter.core.config import (
     Config,
     LevelRule,
 )
+from simple_ebook_converter.core.levels import parse_level_spec
 from simple_ebook_converter.core.options import (
     CONFIG_KINDS,
     OPTIONS,
@@ -192,9 +193,16 @@ def test_blank_preset_disables_level(tmp_path):
     assert [r.active for r in cfg.levels] == [False, False]
 
 
-def test_extra_levels_from_one_line_per_spec(tmp_path):
-    specs = "h1.part:^Part\\s+\\d+\nh5.scene:^\\*\\*\\*\n\n  \nh6.note:^>>\\s"
-    cfg = _config(tmp_path, level=specs)
+def test_extra_levels_are_all_kept_in_order(tmp_path):
+    """额外层级给多少条就收多少条，按级别排、同级按给的顺序。"""
+    cfg = _config(
+        tmp_path,
+        level=[
+            LevelRule(1, r"^Part\s+\d+", "part"),
+            LevelRule(5, r"^\*\*\*", "scene"),
+            LevelRule(6, r"^>>\s", "note"),
+        ],
+    )
     assert [(r.level, r.class_name) for r in cfg.levels] == [
         (1, "part"),
         (2, "volume"),
@@ -205,19 +213,20 @@ def test_extra_levels_from_one_line_per_spec(tmp_path):
 
 
 def test_extra_levels_accept_a_tuple(tmp_path):
-    """CLI 那边 --level 重复给 click 的就是元组。"""
-    cfg = _config(tmp_path, level=("h5.note:^注解",))
+    """CLI 那边 `--level` 重复给 click 的就是元组，拆完传进来还是元组。"""
+    rules = tuple(parse_level_spec(s) for s in ("h5.note:^注解",))
+    cfg = _config(tmp_path, level=rules)
     assert next(r for r in cfg.levels if r.level == 5).class_name == "note"
 
 
 def test_extra_level_without_class_has_no_class(tmp_path):
-    cfg = _config(tmp_path, level="h1:^第[0-9]+部")
+    cfg = _config(tmp_path, level=[parse_level_spec("h1:^第[0-9]+部")])
     assert next(r for r in cfg.levels if r.level == 1).class_name == ""
 
 
 def test_extra_level_at_preset_level_appends_behind_it(tmp_path):
-    """`--level h2:…` 不再顶掉卷，而是同级排在卷后面（内置优先）。"""
-    cfg = _config(tmp_path, volume="^甲", level="h2:^乙")
+    """额外层级写在 h2 不顶掉卷，而是同级排在卷后面（内置优先）。"""
+    cfg = _config(tmp_path, volume="^甲", level=[parse_level_spec("h2:^乙")])
     assert [(r.class_name, r.pattern) for r in cfg.levels if r.level == 2] == [
         ("volume", "^甲"),
         ("", "^乙"),
@@ -225,22 +234,25 @@ def test_extra_level_at_preset_level_appends_behind_it(tmp_path):
 
 
 def test_extra_level_with_preset_class_joins_the_preset_rule(tmp_path):
-    """`--level h2.volume:…` 只新增一条：内置那条已经被 `--volume` 的值顶掉了。"""
-    cfg = _config(tmp_path, volume="^甲", level="h2.volume:^丙")
+    """class 撞上预设的也只新增一条：内置那条已经被 `--volume` 的值顶掉了。"""
+    cfg = _config(
+        tmp_path, volume="^甲", level=[parse_level_spec("h2.volume:^丙")]
+    )
     assert [(r.class_name, r.pattern) for r in cfg.levels if r.level == 2] == [
         ("volume", "^甲"),
         ("volume", "^丙"),
     ]
 
 
+def test_bad_extra_level_is_rejected(tmp_path):
+    """层级正则在 `build_rules()` 就拦下，不留到 `parse()`。"""
+    with pytest.raises(ValueError, match="额外层级"):
+        _config(tmp_path, level=[LevelRule(4, "(", "part")])
+
+
 def test_bad_preset_regex_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="卷标题正则非法"):
         _config(tmp_path, volume="(")
-
-
-def test_bad_extra_level_is_rejected(tmp_path):
-    with pytest.raises(ValueError, match="额外层级"):
-        _config(tmp_path, level="h9:^x")
 
 
 def test_levels_default_to_level_rules():
