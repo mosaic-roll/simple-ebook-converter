@@ -4,6 +4,7 @@ helper 是用来抓回归的，它自己坏了就等于回归没拦——所以�
 "确实坏掉"的产物验一遍：能报出预期信息，才说明它在真坏时也会报。
 """
 
+import io
 import zipfile
 
 import pytest
@@ -35,7 +36,7 @@ WOFF = b"wOFF" + b"\x00" * 16
 XHTML = "application/xhtml+xml"
 
 
-def make_epub(tmp_path, items=(), refs=(), name="o.epub", opf="EPUB/content.opf"):
+def make_epub(items=(), refs=(), opf="EPUB/content.opf"):
     """拼一本最小 EPUB。
 
     `items` 是 `(id, href, media-type, 内容)`；内容为 `None` 表示空文件。
@@ -49,7 +50,8 @@ def make_epub(tmp_path, items=(), refs=(), name="o.epub", opf="EPUB/content.opf"
         )
         for item_id, href, media, _, props in items
     )
-    with zipfile.ZipFile(tmp_path / name, "w") as z:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
         z.writestr("mimetype", "application/epub+zip")
         z.writestr("META-INF/container.xml", CONTAINER.format(opf=opf))
         z.writestr(opf, OPF_HEAD + manifest + OPF_TAIL % "".join(
@@ -57,7 +59,7 @@ def make_epub(tmp_path, items=(), refs=(), name="o.epub", opf="EPUB/content.opf"
         ))
         for _, href, _, content, _ in items:
             z.writestr(f"EPUB/{href}", b"" if content is None else content)
-    return Epub(tmp_path / name)
+    return Epub(buf.getvalue())
 
 
 def item(item_id, href, media=XHTML, content=None, props=""):
@@ -88,9 +90,9 @@ def test_resolve_href_decodes_percent_escapes():
     )
 
 
-def test_container_full_path_is_package_root_relative_not_meta_inf_relative(tmp_path):
+def test_container_full_path_is_package_root_relative_not_meta_inf_relative():
     """`full-path` 从包根算起——拿 container.xml 当基准会拼出 `META-INF/EPUB/...`。"""
-    epub = make_epub(tmp_path, items=[item("c", "text/p1.xhtml")])
+    epub = make_epub(items=[item("c", "text/p1.xhtml")])
     assert epub.opf_name() == "EPUB/content.opf"
     assert resolve_href("META-INF/container.xml", "EPUB/content.opf") == (
         "META-INF/EPUB/content.opf"
@@ -100,9 +102,8 @@ def test_container_full_path_is_package_root_relative_not_meta_inf_relative(tmp_
 # ---------- assert_links_reachable ----------
 
 
-def test_links_reachable_passes_on_a_consistent_book(tmp_path):
+def test_links_reachable_passes_on_a_consistent_book():
     epub = make_epub(
-        tmp_path,
         items=[
             item("chapter_0", "text/p0001.xhtml",
                  content='<h4 id="p0002">※清晨</h4><link href="../style.css"/>'),
@@ -115,9 +116,8 @@ def test_links_reachable_passes_on_a_consistent_book(tmp_path):
     epub.assert_links_reachable()
 
 
-def test_links_reachable_catches_a_dangling_page(tmp_path):
+def test_links_reachable_catches_a_dangling_page():
     epub = make_epub(
-        tmp_path,
         items=[item("nav", "nav.xhtml", content='<a href="text/p0009.xhtml">目录</a>',
                     props="nav")],
         refs=["nav"],
@@ -126,10 +126,9 @@ def test_links_reachable_catches_a_dangling_page(tmp_path):
         epub.assert_links_reachable()
 
 
-def test_links_reachable_catches_a_dangling_fragment(tmp_path):
+def test_links_reachable_catches_a_dangling_fragment():
     """nav 指的片段在目标页里没有 id——重命名 anchor 就会踩到。"""
     epub = make_epub(
-        tmp_path,
         items=[
             item("chapter_0", "text/p0001.xhtml", content="<h4>清晨</h4>"),
             item("nav", "nav.xhtml",
@@ -141,9 +140,8 @@ def test_links_reachable_catches_a_dangling_fragment(tmp_path):
         epub.assert_links_reachable()
 
 
-def test_links_reachable_catches_a_missing_stylesheet(tmp_path):
+def test_links_reachable_catches_a_missing_stylesheet():
     epub = make_epub(
-        tmp_path,
         items=[item("chapter_0", "text/p0001.xhtml", content='<link href="../style.css"/>')],
         refs=["chapter_0"],
     )
@@ -151,9 +149,8 @@ def test_links_reachable_catches_a_missing_stylesheet(tmp_path):
         epub.assert_links_reachable()
 
 
-def test_links_reachable_skips_external_and_same_page(tmp_path):
+def test_links_reachable_skips_external_and_same_page():
     epub = make_epub(
-        tmp_path,
         items=[item("chapter_0", "text/p0001.xhtml",
                     content='<a href="https://example.com">站外</a><a href="#p0001">本页</a>')],
         refs=["chapter_0"],
@@ -161,9 +158,8 @@ def test_links_reachable_skips_external_and_same_page(tmp_path):
     epub.assert_links_reachable()
 
 
-def test_links_reachable_reads_single_quoted_attributes(tmp_path):
+def test_links_reachable_reads_single_quoted_attributes():
     epub = make_epub(
-        tmp_path,
         items=[item("chapter_0", "text/p0001.xhtml", content="<a href='p0002.xhtml'>相邻</a>")],
         refs=["chapter_0"],
     )
@@ -171,9 +167,9 @@ def test_links_reachable_reads_single_quoted_attributes(tmp_path):
         epub.assert_links_reachable()  # 单引号不认的话这条就是假绿
 
 
-def test_links_reachable_checks_manifest_hrefs_too(tmp_path):
+def test_links_reachable_checks_manifest_hrefs_too():
     """manifest 的 href 也要核：包内文件被删了就是死链。"""
-    epub = make_epub(tmp_path, items=[item("ghost", "text/gone.xhtml")], refs=[])
+    epub = make_epub(items=[item("ghost", "text/gone.xhtml")], refs=[])
     del epub.entries["EPUB/text/gone.xhtml"]
     with pytest.raises(AssertionError, match="指向不存在的条目"):
         epub.assert_links_reachable()
@@ -182,9 +178,8 @@ def test_links_reachable_checks_manifest_hrefs_too(tmp_path):
 # ---------- assert_manifest_media_types_match_bytes ----------
 
 
-def test_manifest_media_types_accepts_truthful_declarations(tmp_path):
+def test_manifest_media_types_accepts_truthful_declarations():
     epub = make_epub(
-        tmp_path,
         items=[
             item("cover", "images/cover.png", "image/png", PNG),
             item("font", "fonts/f.otf", "font/otf", OTF),
@@ -204,23 +199,22 @@ def test_manifest_media_types_accepts_truthful_declarations(tmp_path):
         ("image/png", OTF, "font/otf"),
     ],
 )
-def test_manifest_media_types_catches_a_lying_declaration(tmp_path, declared, data, actual):
+def test_manifest_media_types_catches_a_lying_declaration(declared, data, actual):
     """扩展名和声明各自合法、互相撒谎——OPF-029 / PKG-022 就是这么报的。"""
-    epub = make_epub(tmp_path, items=[item("x", "images/cover.png", declared, data)])
+    epub = make_epub(items=[item("x", "images/cover.png", declared, data)])
     with pytest.raises(AssertionError, match=f"声明 '{declared}'，实际字节是 '{actual}'"):
         epub.assert_manifest_media_types_match_bytes()
 
 
-def test_manifest_media_types_fails_loudly_on_an_unknown_image(tmp_path):
+def test_manifest_media_types_fails_loudly_on_an_unknown_image():
     """声明成图片却认不出字节 = 有格式没实现，跳过就等于在这类回归前静默。"""
-    epub = make_epub(tmp_path, items=[item("x", "images/c.xyz", "image/x-weird", b"?????")])
+    epub = make_epub(items=[item("x", "images/c.xyz", "image/x-weird", b"?????")])
     with pytest.raises(AssertionError, match="字节头认不出格式"):
         epub.assert_manifest_media_types_match_bytes()
 
 
-def test_manifest_media_types_ignores_non_binary_types(tmp_path):
+def test_manifest_media_types_ignores_non_binary_types():
     epub = make_epub(
-        tmp_path,
         items=[
             item("css", "style.css", "text/css", b"body { color: red }"),
             item("c", "text/p1.xhtml", XHTML, b"<p>x</p>"),
@@ -318,21 +312,18 @@ def test_assert_heading_class_may_be_one_of_several():
 # ---------- Epub 的定位辅助 ----------
 
 
-def test_opf_name_follows_container_instead_of_guessing(tmp_path):
+def test_opf_name_follows_container_instead_of_guessing():
     epub = make_epub(
-        tmp_path,
         items=[item("c", "text/p1.xhtml")],
         opf="EPUB/pkg.opf",
-        name="renamed.epub",
     )
     assert epub.opf_name() == "EPUB/pkg.opf"
     assert epub.manifest_items()[0]["href"] == "text/p1.xhtml"
     assert not epub.has_entry("EPUB/content.opf")
 
 
-def test_spine_ids_and_itemref_target(tmp_path):
+def test_spine_ids_and_itemref_target():
     epub = make_epub(
-        tmp_path,
         items=[
             item("cover", "cover.xhtml"),
             item("nav", "nav.xhtml", props="nav"),
@@ -345,21 +336,20 @@ def test_spine_ids_and_itemref_target(tmp_path):
     assert epub.itemref_target("chapter_0") == "EPUB/text/p0001.xhtml"
 
 
-def test_itemref_target_rejects_an_idref_with_no_manifest_item(tmp_path):
-    epub = make_epub(tmp_path, items=[item("nav", "nav.xhtml")], refs=["nav"])
+def test_itemref_target_rejects_an_idref_with_no_manifest_item():
+    epub = make_epub(items=[item("nav", "nav.xhtml")], refs=["nav"])
     with pytest.raises(AssertionError, match="在 manifest 里没有对应 item"):
         epub.itemref_target("chapter_9")
 
 
-def test_spine_items_defaults_to_linear(tmp_path):
+def test_spine_items_defaults_to_linear():
     """`linear="no"` 才是非线性；缺省属性按 yes 算。"""
-    epub = make_epub(tmp_path, items=[item("nav", "nav.xhtml")], refs=["nav"])
+    epub = make_epub(items=[item("nav", "nav.xhtml")], refs=["nav"])
     assert epub.spine_items() == [("nav", True)]
 
 
-def test_spine_items_reads_an_explicit_linear_no(tmp_path):
+def test_spine_items_reads_an_explicit_linear_no():
     epub = make_epub(
-        tmp_path,
         items=[item("cover", "cover.xhtml"), item("nav", "nav.xhtml")],
         refs=["cover", "nav"],
     )
@@ -369,17 +359,15 @@ def test_spine_items_reads_an_explicit_linear_no(tmp_path):
     assert epub.spine_items() == [("cover", False), ("nav", True)]
 
 
-def test_manifest_item_selects_by_property(tmp_path):
+def test_manifest_item_selects_by_property():
     epub = make_epub(
-        tmp_path,
         items=[item("cover", "images/cover.png", "image/png", PNG, props="cover-image")],
     )
     assert epub.manifest_item(prop="cover-image")["href"] == "images/cover.png"
 
 
-def test_manifest_item_complains_when_the_match_is_not_unique(tmp_path):
+def test_manifest_item_complains_when_the_match_is_not_unique():
     epub = make_epub(
-        tmp_path,
         items=[item("a", "images/a.png", "image/png", PNG, props="cover-image"),
                item("b", "images/b.png", "image/png", PNG, props="cover-image")],
     )
@@ -387,17 +375,15 @@ def test_manifest_item_complains_when_the_match_is_not_unique(tmp_path):
         epub.manifest_item(prop="cover-image")
 
 
-def test_text_pages_lists_sorted(tmp_path):
+def test_text_pages_lists_sorted():
     epub = make_epub(
-        tmp_path,
         items=[item("b", "text/p0002.xhtml"), item("a", "text/p0001.xhtml")],
     )
     assert epub.text_pages() == ["EPUB/text/p0001.xhtml", "EPUB/text/p0002.xhtml"]
 
 
-def test_nav_finds_the_item_marked_as_nav(tmp_path):
+def test_nav_finds_the_item_marked_as_nav():
     epub = make_epub(
-        tmp_path,
         items=[item("nav", "nav.xhtml", content="<nav/>", props="nav"),
                item("c", "text/p1.xhtml", content="<p/>")],
     )

@@ -32,22 +32,20 @@ def make_config():
 
 
 @pytest.fixture
-def build_epub_file(tmp_path: Path):
+def build_epub_file():
     """跑一次 `build_epub` 并解开成 `Epub`。`tree` / `sources` / `cfg` / `lines` 可覆盖。"""
 
-    def _build(*, tree=None, sources=None, cfg=None, lines=None, out="out.epub"):
+    def _build(*, tree=None, sources=None, cfg=None, lines=None):
         from simple_ebook_converter.core.builder import build_epub
         from simple_ebook_converter.core.config import Config, default_levels
         from simple_ebook_converter.core.parser import parse
 
         if cfg is None:
-            cfg = Config(input=tmp_path / "novel.txt")
+            cfg = Config()
         if tree is None:
             if lines is None:
                 lines = ["第一章 一", "正文一", "第二章 二", "正文二"]
             tree = parse(lines, default_levels(), fallback_title="测试书")[0]
-        path = tmp_path / out
-        build_epub(cfg, tree, sources, path)
-        return Epub(path)
+        return Epub(build_epub(cfg, tree, sources))
 
     return _build

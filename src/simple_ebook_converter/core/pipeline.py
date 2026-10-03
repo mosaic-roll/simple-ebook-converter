@@ -167,13 +167,25 @@ def read_book(cfg: Config, sources: Sources | None = None) -> Book:
     """
     if cfg.input is None:
         raise ValueError("缺少输入文件")
-    sources = sources or Sources()
     resolved = resolve(cfg)
     lines, used = read_input(resolved)
-    tree, stats = process(lines, resolved, sources.toc_entries)
+    return build_book(resolved, lines, used, sources or Sources())
+
+
+def build_book(
+    cfg: Config, lines: list[str], encoding: str, sources: Sources
+) -> Book:
+    """从已经读好的行组装 `Book`。不读文件，也不校验 `cfg`。
+
+    `cfg` 应当是 `resolve()` 过的（`read_book()` 负责），这里只做切分和「有没有正文」
+    这道检查——空正文是内容问题，在读文件那层分不出来。调用方直接喂内存里的行时
+    （预览、测试）也走这条路。
+    """
+    tree, stats = process(lines, cfg, sources.toc_entries)
     if not any(node.paragraphs for node in walk(tree)):
-        raise ValueError(f"文件里没有可生成的内容：{resolved.input.name}")
-    return Book(resolved, tree, stats, used, sources)
+        where = cfg.input.name if cfg.input else cfg.book_title
+        raise ValueError(f"文件里没有可生成的内容：{where}")
+    return Book(cfg, tree, stats, encoding, sources)
 
 
 def read_input(cfg: Config) -> tuple[list[str], str]:
@@ -202,13 +214,18 @@ def write_toc(book: Book) -> Path:
 
 
 def write_epub(book: Book) -> Path:
-    """组装并写出 EPUB，路径取 `cfg.out`，留空则与输入同名。返回落盘路径。"""
+    """组装并写出 EPUB，路径取 `cfg.out`，留空则与输入同名。返回落盘路径。
+
+    组装在落盘之前跑完，所以失败时目标文件不会被创建或截断。「无法生成 EPUB」
+    这个上下文只包住写入阶段——路径不可写、磁盘满这类错误才需要知道在往哪写。
+    """
     target = _epub_path(book.cfg)
     _guard_overwrite(target, book.cfg.overwrite)
+    data = build_epub(book.cfg, book.tree, book.sources)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
-        build_epub(book.cfg, book.tree, book.sources, target)
-    except (OSError, ValueError) as e:
+        target.write_bytes(data)
+    except OSError as e:
         raise ValueError(f"无法生成 EPUB：{e}") from e
     return target
 

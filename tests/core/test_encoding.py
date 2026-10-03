@@ -1,6 +1,11 @@
 import pytest
 
-from simple_ebook_converter.core.encoding import EncodingError, decode, read_lines
+from simple_ebook_converter.core.encoding import (
+    EncodingError,
+    decode,
+    lines_from_bytes,
+    read_lines,
+)
 
 
 def test_bom_utf8():
@@ -64,3 +69,17 @@ def test_read_lines(tmp_path):
     lines, enc = read_lines(p)
     assert lines == ["行一", "行二", "行三"]
     assert enc == "utf-8"
+
+
+def test_lines_from_bytes_splits_like_read_lines(tmp_path):
+    """同一个字节，两条路给同一个结果——`read_lines` 只是多读一次文件。"""
+    raw = "行一\r\n行二\r\n行三".encode()
+    p = tmp_path / "a.txt"
+    p.write_bytes(raw)
+    assert lines_from_bytes(raw) == read_lines(p)
+
+
+def test_lines_from_bytes_detects_encoding_without_a_file():
+    """stdin、GUI 预览缓冲拿到的都是字节，探测编码不该先落盘。"""
+    lines, enc = lines_from_bytes("中文".encode("gb18030"))
+    assert (lines, enc) == (["中文"], "gb18030")

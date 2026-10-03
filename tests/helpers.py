@@ -6,12 +6,12 @@
 
 from __future__ import annotations
 
+import io
 import posixpath
 import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 import zipfile
-from pathlib import Path
 
 #: 外部链接不检查可达：EPUB 里可以有指向站外的 href。
 _EXTERNAL = re.compile(r"^(?:[a-z][a-z0-9+.-]*:|//)", re.IGNORECASE)
@@ -43,9 +43,8 @@ class Epub:
     `media-type` 与实际字节是否一致、链接是否可达才是对外承诺。
     """
 
-    def __init__(self, path: Path):
-        self.path = path
-        with zipfile.ZipFile(path) as z:
+    def __init__(self, data: bytes):
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
             self.entries = {n: z.read(n) for n in z.namelist()}
 
     def has_entry(self, name: str) -> bool:

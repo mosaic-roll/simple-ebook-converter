@@ -60,9 +60,16 @@ def _canonical(encoding: str) -> str:
         return encoding
 
 
+def lines_from_bytes(
+    raw: bytes, encoding: str = AUTO_ENCODING
+) -> tuple[list[str], str]:
+    """把字节解码并按行切分，返回 (行, 实际编码名)。`read_lines()` 的纯孪生。"""
+    text, used = decode(raw, encoding)
+    return text.splitlines(), used
+
+
 def read_lines(
     path: Path | str, encoding: str = AUTO_ENCODING
 ) -> tuple[list[str], str]:
     """读取文本文件并按行切分，返回 (行, 实际编码名)。"""
-    text, used = decode(Path(path).read_bytes(), encoding)
-    return text.splitlines(), used
+    return lines_from_bytes(Path(path).read_bytes(), encoding)

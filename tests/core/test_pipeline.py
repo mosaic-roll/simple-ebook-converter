@@ -11,6 +11,7 @@ from helpers import Epub
 from simple_ebook_converter.core.config import Config, LevelRule, default_levels
 from simple_ebook_converter.core.parser import Node, NoEnabledRulesError, walk
 from simple_ebook_converter.core.pipeline import (
+    build_book,
     preview_titles,
     process,
     read_book,
@@ -179,6 +180,34 @@ def test_read_book_reports_out_of_range_values(tmp_path):
     """取值范围在读入时就报，消息直接就是 Config.validate() 那句。"""
     with pytest.raises(ValueError, match="目录深度"):
         read_book(_cfg( toc_depth=99))
+
+
+# ---------- build_book：从已有的行组装 ----------
+
+
+def test_build_book_assembles_without_touching_disk():
+    """内存里的行直接能组装，`Book` 不要求先有个输入文件。"""
+    book = build_book(Config(), LINES.splitlines(), "utf-8", Sources())
+    assert [node.title for node in book.tree] == ["第一卷 风起"]
+    assert [c.title for c in book.tree[0].children] == ["第一章 初遇", "第二章 离别"]
+    assert book.encoding == "utf-8"
+
+
+def test_build_book_reads_toc_entries_from_sources():
+    entries = to_json(scan_toc(LINES.splitlines(), Config())[0])
+    book = build_book(Config(), LINES.splitlines(), "utf-8", Sources(toc_entries=entries))
+    assert book.tree == build_book(Config(), LINES.splitlines(), "utf-8", Sources()).tree
+
+
+def test_build_book_reports_empty_content_by_input_name():
+    with pytest.raises(ValueError, match="没有可生成的内容：.*novel"):
+        build_book(Config(input=Path("novel.txt")), ["", "  "], "utf-8", Sources())
+
+
+def test_build_book_falls_back_to_book_title_when_there_is_no_input():
+    """`cfg.input` 可以是 None（预览、stdin），报错时别抛 AttributeError。"""
+    with pytest.raises(ValueError, match="没有可生成的内容：未命名"):
+        build_book(Config(), ["", "  "], "utf-8", Sources())
 
 
 # ---------- process：切分 → 清理 → 替换 ----------
@@ -479,7 +508,7 @@ def test_write_toc_without_out_refuses_to_write_a_file_named_none(cfg):
 def test_write_epub_writes_zip(cfg, tmp_path):
     out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
     assert zipfile.is_zipfile(out)
-    epub = Epub(out)
+    epub = Epub(out.read_bytes())
     assert epub.entries["mimetype"] == b"application/epub+zip"
     assert epub.has_entry("META-INF/container.xml")
     assert epub.has_entry(epub.opf_name())
@@ -489,7 +518,7 @@ def test_write_epub_writes_zip(cfg, tmp_path):
 def test_end_to_end_book_is_reachable_and_self_consistent(cfg, tmp_path):
     """整条真实路径：txt → read_book → write_epub → 解包，链接可达且 media-type 与字节一致。"""
     out = write_epub(read_book(replace(cfg, out=tmp_path / "out.epub")))
-    epub = Epub(out)
+    epub = Epub(out.read_bytes())
     epub.assert_links_reachable()
     epub.assert_manifest_media_types_match_bytes()
     assert epub.spine_ids()[0] == "cover"
@@ -544,13 +573,15 @@ def test_write_epub_reports_failure_with_context(cfg, tmp_path):
         write_epub(book)
 
 
-def test_write_epub_leaves_no_partial_file(cfg, tmp_path):
-    """失败时不该留下半个 EPUB。"""
-    out = _blocked_out(tmp_path)
-    book = read_book(replace(cfg, out=out))
-    with pytest.raises(ValueError):
+def test_write_epub_assembly_error_is_not_blamed_on_the_path(cfg, tmp_path, monkeypatch):
+    """组装期的错跟「往哪写」无关，不该被套上「无法生成 EPUB」这个写入阶段的标签。"""
+    monkeypatch.setattr(
+        "simple_ebook_converter.core.pipeline.build_epub",
+        lambda *a: (_ for _ in ()).throw(ValueError("boom")),
+    )
+    book = read_book(replace(cfg, out=tmp_path / "x.epub"))
+    with pytest.raises(ValueError, match="^boom$"):
         write_epub(book)
-    assert not out.exists()
 
 
 # ---------- CSS ----------

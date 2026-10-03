@@ -10,8 +10,8 @@
 from __future__ import annotations
 
 import html
+import io
 import uuid
-from pathlib import Path
 
 from ebooklib import epub
 
@@ -151,9 +151,13 @@ def text_cover_body(title: str, author: str = "") -> str:
 
 
 def build_epub(
-    cfg: Config, nodes: list[Node], sources: Sources | None, output: Path
-) -> None:
-    """把 `nodes` 写成 EPUB 文件。CSS、字体、封面都从 `sources` 取，不读文件。"""
+    cfg: Config, nodes: list[Node], sources: Sources | None
+) -> bytes:
+    """把 `nodes` 组装成 EPUB 字节。CSS、字体、封面都从 `sources` 取，不读也不写文件。
+
+    返回字节而不是收 sink，是为了让「组装」完整跑完再落盘：写盘失败或组装失败都
+    不会留下半个 EPUB。落盘的事交给 `pipeline.write_epub`。
+    """
     sources = sources or Sources()
     css = build_css(cfg, sources)
     book = epub.EpubBook()
@@ -204,12 +208,14 @@ def build_epub(
         + (["nav"] if cfg.toc_in_spine else [])
         + pages
     )
+    buf = io.BytesIO()
     # `raise_exceptions` 是改 `ebooklib` 的默认行为：它默认自己 `except OSError`、
-    # `warnings.warn` 后返回 False，写盘失败（磁盘满、权限）会被静默吞掉，调用方
-    # 只会看到「生成成功」却拿不到文件。
+    # `warnings.warn` 后返回 False，写盘失败会被静默吞掉，调用方只会看到
+    # 「生成成功」却拿不到东西。
     epub.write_epub(
-        output, book, options={"compresslevel": 9, "raise_exceptions": True}
+        buf, book, options={"compresslevel": 9, "raise_exceptions": True}
     )
+    return buf.getvalue()
 
 
 def _is_page_root(node: Node, has_page_ancestor: bool) -> bool:
