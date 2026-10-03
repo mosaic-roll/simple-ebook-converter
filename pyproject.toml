@@ -25,7 +25,6 @@ simple-ebook-converter-cli = "simple_ebook_converter.cli.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "pytest-cov>=7.1.0",
 ]
 
 [build-system]

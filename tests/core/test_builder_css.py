@@ -8,7 +8,7 @@ from helpers import parse_css
 
 from simple_ebook_converter.core.builder import build_css, builtin_css
 from simple_ebook_converter.core.config import Config
-from simple_ebook_converter.core.sources import Sources, font_resource
+from simple_ebook_converter.core.sources import Resource, Sources
 
 
 def test_build_css_defaults():
@@ -78,11 +78,12 @@ def test_css_append_text_adds_to_builtin():
     assert parse_css(css)[".cover .book-title"]["color"] == "red"
 
 
-def test_css_append_text_keeps_font_face(tmp_path):
+def test_css_append_text_keeps_font_face():
     """追加不影响 `@font-face`（那是内置样式的一部分）。"""
-    font = tmp_path / "f.ttf"
-    font.write_bytes(b"\x00\x01\x00\x00")
-    sources = Sources(font=font_resource(font), css_append_text="body { color: red; }")
+    sources = Sources(
+        font=Resource(name="f.ttf", data=b"\x00\x01\x00\x00", media_type="font/ttf"),
+        css_append_text="body { color: red; }",
+    )
     assert "@font-face" in parse_css(build_css(Config(), sources))
 
 

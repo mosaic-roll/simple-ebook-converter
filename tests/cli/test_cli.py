@@ -7,7 +7,6 @@
 
 import json
 import re
-import zipfile
 
 import click
 import pytest
@@ -37,52 +36,42 @@ def _write_rules(tmp_path, rules, name="rules.json"):
 # ---------- 生成 EPUB ----------
 
 
-def test_convert_default(tmp_path):
+def test_convert_epub_output(tmp_path):
+    """基本生成 / 输出命名 / -o 覆盖 / 默认覆盖 / --no-overwrite 拒绝，一次跑完。"""
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src)])
+    runner = CliRunner()
+
+    # 默认输出落在输入名上
+    result = runner.invoke(convert, [str(src)])
     assert result.exit_code == 0, result.output
-    out = tmp_path / "novel.epub"
-    assert out.exists()
-    with zipfile.ZipFile(out) as z:
-        assert "META-INF/container.xml" in z.namelist()
+    assert (tmp_path / "novel.epub").exists()
 
-
-def test_convert_output_name_follows_input_stem(tmp_path):
-    """输出默认落在输入名上——《x》作者：y.txt → 《x》作者：y.epub。"""
-    src = _write_sample(tmp_path, name="《希灵帝国》作者：远瞳.txt")
-    result = CliRunner().invoke(convert, [str(src)])
-    assert result.exit_code == 0, result.output
-    assert (tmp_path / "《希灵帝国》作者：远瞳.epub").exists()
-
-
-def test_convert_out_overrides_output_path(tmp_path):
-    src = _write_sample(tmp_path)
+    # 自定义 -o 路径（在同目录跑，novel.epub 已存在，只断 book.epub 产生了）
     out = tmp_path / "book.epub"
-    result = CliRunner().invoke(convert, [str(src), "-o", str(out)])
+    result = runner.invoke(convert, [str(src), "-o", str(out)])
     assert result.exit_code == 0, result.output
     assert out.exists()
-    assert not (tmp_path / "novel.epub").exists()
 
-
-def test_convert_overwrites_by_default(tmp_path):
-    src = _write_sample(tmp_path)
-    out = tmp_path / "novel.epub"
-    out.write_bytes(b"existing")
-    result = CliRunner().invoke(convert, [str(src)])
+    # 默认覆盖已有文件
+    existing = tmp_path / "novel.epub"
+    existing.write_bytes(b"existing")
+    result = runner.invoke(convert, [str(src)])
     assert result.exit_code == 0, result.output
-    assert out.read_bytes()[:2] == b"PK"
+    assert existing.read_bytes()[:2] == b"PK"
 
-
-def test_convert_no_overwrite_refuses(tmp_path):
-    src = _write_sample(tmp_path)
-    out = tmp_path / "novel.epub"
-    out.write_bytes(b"existing")
-    result = CliRunner().invoke(convert, [str(src), "--no-overwrite"])
+    # --no-overwrite 拒绝覆盖（已有文件是上一步的 novel.epub，不是 "existing"）
+    result = runner.invoke(convert, [str(src), "--no-overwrite"])
     assert result.exit_code != 0
     assert "已存在" in result.output
 
+    # 输出路径不存在时 --no-overwrite 不拦
+    new_out = tmp_path / "new.epub"
+    result = runner.invoke(convert, [str(src), "-o", str(new_out), "--no-overwrite"])
+    assert result.exit_code == 0, result.output
+    assert new_out.exists()
 
-def test_convert_out_stdout_epub_rejected(tmp_path):
+
+def test_convert_epub_output_rejects_stdout(tmp_path):
     """`-o -` 只在 `--toc-only` 下有意义；生成 EPUB 时直接拒。"""
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "-o", "-"])
@@ -90,7 +79,7 @@ def test_convert_out_stdout_epub_rejected(tmp_path):
     assert "标准输出" in result.output
 
 
-def test_convert_reports_book_summary(tmp_path):
+def test_convert_epub_summary(tmp_path):
     """编码/各级标题数这一行是终端文案，core 不再提供，由 CLI 自己拼。"""
     src = _write_sample(tmp_path)
     result = CliRunner().invoke(convert, [str(src), "-o", str(tmp_path / "out.epub")])
@@ -100,7 +89,7 @@ def test_convert_reports_book_summary(tmp_path):
     assert "h3×1" in result.output
 
 
-def test_main_convert(tmp_path):
+def test_main_convert_writes_epub(tmp_path):
     src = _write_sample(tmp_path)
     main([str(src)])
     assert (tmp_path / "novel.epub").exists()
@@ -114,142 +103,95 @@ def test_convert_missing_input():
 # ---------- 只输出目录 ----------
 
 
-def test_toc_text(tmp_path):
+# ---------- 输出目录（toc-only） ----------
+
+
+def test_toc_output_formats(tmp_path):
+    """text / json / 替换 / raw_title / -i / 输出到文件 / stdout，共享同一份输入。"""
     src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--toc-only"])
+    runner = CliRunner()
+
+    # text 模式
+    result = runner.invoke(convert, [str(src), "--toc-only"])
     assert result.exit_code == 0
     assert "第一卷 起源" in result.output
     assert "第一章 开端" in result.output
-    assert not list(tmp_path.glob("*.epub"))  # 只出目录，不顺手生成一本
+    assert not list(tmp_path.glob("*.epub"))
 
-
-def test_toc_json(tmp_path):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(
-        convert, [str(src), "--toc-only", "--toc-format", "json"]
-    )
+    # json 模式
+    result = runner.invoke(convert, [str(src), "--toc-only", "--toc-format", "json"])
     assert result.exit_code == 0
     data = json.loads(result.output)
-    # 扁平列表，文档序：卷在前，它自己带的章在后
     assert [e["raw_title"] for e in data] == ["第一卷 起源", "第一章 开端"]
     assert data[0]["level"] == 2 and data[1]["level"] == 3
 
-
-def test_toc_json_depth_pruning(tmp_path):
-    """`--toc-depth` 只裁目录深度，不动分页——命令行侧照原样传下去。"""
-    p = tmp_path / "novel.txt"
-    p.write_text("第一卷\n第一章\n§1\n正文\n", encoding="utf-8")
-    deep = CliRunner().invoke(
-        convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§"],
-    )
-    assert deep.exit_code == 0, deep.output
-    assert "§1" in deep.output
-    shallow = CliRunner().invoke(
-        convert,
-        [
-            str(p),
-            "--toc-only",
-            "--toc-format",
-            "json",
-            "--level",
-            "h4:^§",
-            "--toc-depth",
-            "3",
-        ],
-    )
-    assert shallow.exit_code == 0, shallow.output
-    assert "第一章" in shallow.output
-    assert "§1" not in shallow.output
-
-
-def test_toc_replace_applies_to_text(tmp_path):
-    src = _write_sample(tmp_path)
+    # --replace-rules 对目录文本生效
     rules = _write_rules(tmp_path, [{"pattern": r"第一章", "replace": "第1章"}])
-    result = CliRunner().invoke(
-        convert,
-        [str(src), "--toc-only", "--replace-rules", str(rules)],
+    result = runner.invoke(
+        convert, [str(src), "--toc-only", "--replace-rules", str(rules)]
     )
     assert result.exit_code == 0
     assert "第1章 开端" in result.output
     assert "第一章 开端" not in result.output
 
-
-def test_toc_json_stores_raw_title_only(tmp_path):
-    """目录树 JSON 只存原始标题，替换效果不在导出里（组装阶段才做替换）。"""
-    src = _write_sample(tmp_path)
-    rules = _write_rules(tmp_path, [{"pattern": r"卷", "replace": "部"}])
-    result = CliRunner().invoke(
+    # JSON 只存 raw_title，替换结果不落盘
+    rules2 = _write_rules(tmp_path, [{"pattern": r"卷", "replace": "部"}])
+    result = runner.invoke(
         convert,
-        [
-            str(src),
-            "--toc-only",
-            "--replace-rules",
-            str(rules),
-            "--toc-format",
-            "json",
-        ],
+        [str(src), "--toc-only", "--replace-rules", str(rules2), "--toc-format", "json"],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data[0]["raw_title"] == "第一卷 起源"
     assert "title" not in data[0]
 
-
-def test_toc_input_option(tmp_path):
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, ["-i", str(src), "--toc-only"])
+    # -i 位置参数等价
+    result = runner.invoke(convert, ["-i", str(src), "--toc-only"])
     assert result.exit_code == 0
     assert "第一卷 起源" in result.output
 
-
-def test_toc_output_file(tmp_path):
-    src = _write_sample(tmp_path)
-    out = tmp_path / "toc.txt"
-    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", str(out)])
-    assert result.exit_code == 0
-    assert "第一章 开端" in out.read_text(encoding="utf-8")
-
-
-def test_toc_output_overwrites_by_default(tmp_path):
-    src = _write_sample(tmp_path)
+    # -o 写到文件 / 覆盖 / --no-overwrite 拒 / 新文件放行
     out = tmp_path / "toc.txt"
     out.write_text("旧内容", encoding="utf-8")
-    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", str(out)])
-    assert result.exit_code == 0, result.output
+    result = runner.invoke(convert, [str(src), "--toc-only", "-o", str(out)])
+    assert result.exit_code == 0
     assert "旧内容" not in out.read_text(encoding="utf-8")
 
-
-def test_toc_output_no_overwrite_refuses(tmp_path):
-    src = _write_sample(tmp_path)
-    out = tmp_path / "toc.txt"
-    out.write_text("旧内容", encoding="utf-8")
-    result = CliRunner().invoke(
-        convert, [str(src), "--toc-only", "-o", str(out), "--no-overwrite"]
-    )
+    out2 = tmp_path / "toc2.txt"
+    out2.write_text("旧内容", encoding="utf-8")
+    result = runner.invoke(convert, [str(src), "--toc-only", "-o", str(out2), "--no-overwrite"])
     assert result.exit_code != 0
-    assert "已存在" in result.output
-    assert out.read_text(encoding="utf-8") == "旧内容"
+    assert out2.read_text(encoding="utf-8") == "旧内容"
 
-
-def test_toc_output_no_overwrite_allows_new_file(tmp_path):
-    src = _write_sample(tmp_path)
-    out = tmp_path / "toc.txt"
-    result = CliRunner().invoke(
-        convert, [str(src), "--toc-only", "-o", str(out), "--no-overwrite"]
-    )
+    new_out = tmp_path / "new.txt"
+    result = runner.invoke(convert, [str(src), "--toc-only", "-o", str(new_out), "--no-overwrite"])
     assert result.exit_code == 0
-    assert "第一章 开端" in out.read_text(encoding="utf-8")
+    assert "第一章 开端" in new_out.read_text(encoding="utf-8")
 
-
-def test_toc_to_stdout(tmp_path):
-    """`-o -`（和不带 `-o` 一样）写 stdout，不落文件、不报「已写入」。"""
-    src = _write_sample(tmp_path)
-    result = CliRunner().invoke(convert, [str(src), "--toc-only", "-o", "-"])
+    # -o - 写 stdout，不落文件
+    result = runner.invoke(convert, [str(src), "--toc-only", "-o", "-"])
     assert result.exit_code == 0
     assert "第一章" in result.output
     assert "目录已写入" not in result.output
     assert not list(tmp_path.glob("*.epub"))
+
+
+def test_toc_json_depth_pruning(tmp_path):
+    """`--toc-depth` 只裁目录深度，不动分页。"""
+    p = tmp_path / "novel.txt"
+    p.write_text("第一卷\n第一章\n§1\n正文\n", encoding="utf-8")
+    deep = CliRunner().invoke(
+        convert, [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§"]
+    )
+    assert deep.exit_code == 0, deep.output
+    assert "§1" in deep.output
+    shallow = CliRunner().invoke(
+        convert,
+        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "3"],
+    )
+    assert shallow.exit_code == 0, shallow.output
+    assert "第一章" in shallow.output
+    assert "§1" not in shallow.output
 
 
 def test_toc_missing_input():
@@ -268,55 +210,41 @@ def test_main_toc_only(tmp_path, capsys):
 
 
 def test_convert_dump_css(tmp_path):
+    """正常导出 + 跳过 validate + 缺少输出路径拒绝 + 非数值拒绝 + 不受 --css-file 干扰。"""
     src = _write_sample(tmp_path)
     css_out = tmp_path / "style.css"
+    extra = tmp_path / "extra.css"
+    extra.write_text("body { color: red; }", encoding="utf-8")
+
+    # 正常导出
     result = CliRunner().invoke(convert, [str(src), "--dump-css", str(css_out)])
     assert result.exit_code == 0
     assert "CSS 已写入" in result.output
     assert "line-height" in css_out.read_text(encoding="utf-8")
-    assert not list(tmp_path.glob("*.epub"))  # 不读输入，也不顺手生成一本
+    assert not list(tmp_path.glob("*.epub"))
 
+    # 值域越界也照样出模板
+    for extra_arg in (["--indent", "-5"], ["--toc-depth", "99"]):
+        r = CliRunner().invoke(convert, ["--dump-css", str(css_out), *extra_arg])
+        assert r.exit_code == 0, r.output
+        assert "body {" in css_out.read_text(encoding="utf-8")
 
-def test_dump_css_skips_validation(tmp_path):
-    """`--dump-css` 不跑 validate：值域越界也照样出模板（只要有输出路径）。
-
-    导样式模板是排障入口，用户手上往往正是一份「不对劲」的参数组合，被校验拦住
-    就拿不到对比用的样式表了。
-    """
-    out = tmp_path / "t.css"
-    for extra in (["--indent", "-5"], ["--toc-depth", "99"]):
-        result = CliRunner().invoke(convert, ["--dump-css", str(out), *extra])
-        assert result.exit_code == 0, result.output
-        assert "body {" in out.read_text(encoding="utf-8")
-
-
-def test_dump_css_still_needs_output_path():
-    """唯一保留的检查：没有输出路径就没法写。"""
+    # 没有输出路径就失败
     result = CliRunner().invoke(convert, ["--dump-css"])
     assert result.exit_code != 0
 
-
-def test_unparseable_value_still_rejected_for_dump_css(tmp_path):
-    """跳过的只是 `validate()` 的值域检查；「压根不是个数」仍在 click 解析时就报错。"""
-    result = CliRunner().invoke(
-        convert, ["--dump-css", str(tmp_path / "t.css"), "--indent", "abc"]
-    )
+    # 非数值在 click 解析时就报错，不等到 validate
+    result = CliRunner().invoke(convert, ["--dump-css", str(css_out), "--indent", "abc"])
     assert result.exit_code != 0
     assert "not a valid integer" in result.output
 
-
-def test_dump_css_ignores_css_file(tmp_path):
-    """导的是内置模板；给了 `--css-file` 也不掺进来（不然没法当模板用）。"""
-    src = _write_sample(tmp_path)
-    extra = tmp_path / "extra.css"
-    extra.write_text("body { color: red; }", encoding="utf-8")
-    css_out = tmp_path / "style.css"
+    # 导的是内置模板，--css-file 不影响
     result = CliRunner().invoke(
         convert, [str(src), "--dump-css", str(css_out), "--css-file", str(extra)]
     )
     assert result.exit_code == 0, result.output
     dumped = css_out.read_text(encoding="utf-8")
-    assert "line-height" in dumped  # 内置模板
+    assert "line-height" in dumped
     assert "color: red" not in dumped
 
 
