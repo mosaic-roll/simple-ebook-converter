@@ -1,5 +1,6 @@
 import inspect
 import re
+from pathlib import Path
 
 import pytest
 
@@ -155,9 +156,9 @@ def test_volume_align_defaults_to_center():
     assert DEFAULTS.chapter_align == "center"
 
 
-def test_book_title_falls_back_to_stem_then_constant(tmp_path):
-    assert Config(title="书名", input=tmp_path / "x.txt").book_title == "书名"
-    assert Config(input=tmp_path / "我的小说.txt").book_title == "我的小说"
+def test_book_title_falls_back_to_stem_then_constant():
+    assert Config(title="书名", input=Path("x.txt")).book_title == "书名"
+    assert Config(input=Path("我的小说.txt")).book_title == "我的小说"
     assert Config().book_title == "未命名"
 
 

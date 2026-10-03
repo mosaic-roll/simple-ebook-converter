@@ -45,8 +45,8 @@ def cfg(tmp_path):
     return Config(input=src)
 
 
-def _cfg(tmp_path: Path, **kwargs) -> Config:
-    return Config(input=tmp_path / "《测试书》作者：某人.txt", **kwargs)
+def _cfg(**kwargs) -> Config:
+    return Config(input=Path("《测试书》作者：某人.txt"), **kwargs)
 
 
 # ---------- resolve：解析前把参数补全 ----------
@@ -59,14 +59,15 @@ def test_resolve_guesses_metadata():
     assert (resolve(cfg).title, resolve(cfg).author) == ("测试书", "某人")
 
 
-def test_resolve_keeps_explicit_metadata(tmp_path):
-    cfg = _cfg(tmp_path, title="手写书名", author="手写作")
+def test_resolve_keeps_explicit_metadata():
+    """书名/作者按文件名猜好，两个前端不必各自实现。"""
+    cfg = _cfg(title="手写书名", author="手写作")
     assert (resolve(cfg).title, resolve(cfg).author) == ("手写书名", "手写作")
 
 
-def test_resolve_does_not_touch_the_given_config(tmp_path):
+def test_resolve_does_not_touch_the_given_config():
     """core 无状态：补全结果写进新的一份，传进来的那个原样不动。"""
-    cfg = _cfg(tmp_path)
+    cfg = _cfg()
     resolved = resolve(cfg)
     assert (cfg.title, cfg.author) == (None, "")
     assert resolved is not cfg
@@ -77,10 +78,10 @@ def test_resolve_without_input_leaves_metadata_alone():
     assert (resolve(Config()).title, resolve(Config()).author) == (None, "")
 
 
-def test_resolve_validates_config(tmp_path):
+def test_resolve_validates_config():
     """取值范围在这一步兜住，不必指望每个前端记得调 validate()。"""
     with pytest.raises(ValueError, match="目录深度"):
-        resolve(_cfg(tmp_path, toc_depth=99))
+        resolve(_cfg(toc_depth=99))
 
 
 # ---------- cover_for：显式路径优先，无显式路径返回 None ----------
@@ -89,14 +90,14 @@ def test_resolve_validates_config(tmp_path):
 def test_resolve_no_longer_discovers_cover(tmp_path):
     """`resolve()` 只补元数据，不碰文件系统资源。"""
     (tmp_path / "cover.png").write_bytes(b"\x89PNG")
-    assert resolve(_cfg(tmp_path)).cover is None
+    assert resolve(_cfg()).cover is None
 
 
 def test_cover_for_returns_none_when_no_explicit(tmp_path):
     """自动发现由打开文件时填路径负责，生成阶段不找封面。"""
     cover = tmp_path / "cover.png"
     cover.write_bytes(b"\x89PNG")
-    cfg = _cfg(tmp_path)
+    cfg = _cfg()
     assert cfg.cover is None
     assert cover_for(None, cfg.input) is None
 
@@ -105,11 +106,11 @@ def test_cover_for_keeps_explicit_cover(tmp_path):
     (tmp_path / "cover.png").write_bytes(b"\x89PNG")
     explicit = tmp_path / "mine.jpg"
     explicit.write_bytes(b"\xff\xd8")
-    assert cover_for(explicit, _cfg(tmp_path).input).name == "mine.jpg"
+    assert cover_for(explicit, _cfg().input).name == "mine.jpg"
 
 
-def test_cover_for_returns_none_when_absent(tmp_path):
-    assert cover_for(None, _cfg(tmp_path).input) is None
+def test_cover_for_returns_none_when_absent():
+    assert cover_for(None, _cfg().input) is None
 
 
 def test_cover_for_returns_none_without_input():
@@ -177,21 +178,21 @@ def test_read_book_reports_empty_file(tmp_path):
 def test_read_book_reports_out_of_range_values(tmp_path):
     """取值范围在读入时就报，消息直接就是 Config.validate() 那句。"""
     with pytest.raises(ValueError, match="目录深度"):
-        read_book(_cfg(tmp_path, toc_depth=99))
+        read_book(_cfg( toc_depth=99))
 
 
 # ---------- process：切分 → 清理 → 替换 ----------
 
 
-def test_process_reports_disabled_levels(tmp_path):
+def test_process_reports_disabled_levels():
     with pytest.raises(NoEnabledRulesError):
-        process(SAMPLE, _cfg(tmp_path, levels=[LevelRule(2, "", "volume")]))
+        process(SAMPLE, _cfg( levels=[LevelRule(2, "", "volume")]))
 
 
-def test_process_falls_back_to_book_title(tmp_path):
+def test_process_falls_back_to_book_title():
     """没有标题命中时，整篇归到一章，标题取书名。"""
     tree, stats = process(
-        ["没有标题的一行", "另一行"], Config(input=tmp_path / "我的小说.txt")
+        ["没有标题的一行", "另一行"], Config(input=Path("我的小说.txt"))
     )
     assert stats.has_preface is False
     assert len(tree) == 1
@@ -199,24 +200,24 @@ def test_process_falls_back_to_book_title(tmp_path):
     assert tree[0].paragraphs == ["没有标题的一行", "另一行"]
 
 
-def test_process_uses_resolved_title_as_fallback(tmp_path):
+def test_process_uses_resolved_title_as_fallback():
     """书名是猜出来的也能当兜底章节名。"""
-    tree, _ = process(["没有标题"], resolve(_cfg(tmp_path)))
+    tree, _ = process(["没有标题"], resolve(_cfg()))
     assert tree[0].title == "测试书"
 
 
-def test_process_cleans_by_default(tmp_path):
-    tree, _ = process(["　　正文一　", "", "  ", "正文二"], _cfg(tmp_path))
+def test_process_cleans_by_default():
+    tree, _ = process(["　　正文一　", "", "  ", "正文二"], _cfg())
     assert tree[0].paragraphs == ["正文一", "正文二"]
 
 
-def test_process_keeps_blank_lines_when_not_cleaning(tmp_path):
-    tree, _ = process(["正文一", "", "正文二"], _cfg(tmp_path, clean=False))
+def test_process_keeps_blank_lines_when_not_cleaning():
+    tree, _ = process(["正文一", "", "正文二"], _cfg( clean=False))
     assert tree[0].paragraphs == ["正文一", "", "正文二"]
 
 
-def test_process_replaces_titles_keeping_raw(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule(r"^第", "第X")])
+def test_process_replaces_titles_keeping_raw():
+    cfg = _cfg( replacements=[Rule(r"^第", "第X")])
     tree, _ = process(SAMPLE, cfg)
     volume = tree[1]
     assert volume.title == "第X一卷 风起"
@@ -225,18 +226,18 @@ def test_process_replaces_titles_keeping_raw(tmp_path):
     assert volume.children[0].raw_title == "第一章 初遇"
 
 
-def test_process_returns_stats(tmp_path):
-    _, stats = process(SAMPLE, _cfg(tmp_path))
+def test_process_returns_stats():
+    _, stats = process(SAMPLE, _cfg())
     assert stats.level_counts == {2: 1, 3: 2}
     assert stats.max_level == 3
     assert stats.has_preface is True
     assert stats.total_lines == len(SAMPLE)
 
 
-def test_levels_are_not_shared_between_configs(tmp_path):
+def test_levels_are_not_shared_between_configs():
     """两次调用不能互相污染 default_levels()。"""
-    a = _cfg(tmp_path)
-    b = _cfg(tmp_path, levels=[*default_levels()])
+    a = _cfg()
+    b = _cfg( levels=[*default_levels()])
     process(SAMPLE, a)
     process(SAMPLE, b)
     assert [r.level for r in b.levels] == [r.level for r in default_levels()]
@@ -245,32 +246,31 @@ def test_levels_are_not_shared_between_configs(tmp_path):
 # ---------- 替换：只作用于标题，raw / html 两个阶段 ----------
 
 
-def test_replacement_never_touches_paragraphs(tmp_path):
+def test_replacement_never_touches_paragraphs():
     """替换只作用于标题；改正文请直接改源文件。"""
-    cfg = _cfg(tmp_path, replacements=[Rule("正文一", "改了")])
+    cfg = _cfg( replacements=[Rule("正文一", "改了")])
     tree, _ = process(SAMPLE, cfg)
     assert tree[1].children[0].paragraphs == ["正文一字"]
     assert tree[1].title == "第一卷 风起"
 
 
-def test_raw_stage_replaces_the_plain_title(tmp_path):
-    cfg = _cfg(tmp_path, replacements=[Rule("风起", "起风")])
+def test_raw_stage_replaces_the_plain_title():
+    cfg = _cfg( replacements=[Rule("风起", "起风")])
     tree, _ = process(SAMPLE, cfg)
     assert tree[1].title == "第一卷 起风"
     assert tree[1].raw_title == "第一卷 风起"
 
 
-def test_raw_stage_result_is_escaped_for_the_page(tmp_path):
+def test_raw_stage_result_is_escaped_for_the_page():
     """raw 阶段塞进来的 `<` 当文本转义，不会变成标签。"""
-    node = process(SAMPLE, _cfg(tmp_path, replacements=[Rule("第一卷", "<b>")]))[0][1]
+    node = process(SAMPLE, _cfg( replacements=[Rule("第一卷", "<b>")]))[0][1]
     assert node.title == "<b> 风起"
     assert node.title_html == "&lt;b&gt; 风起"
 
 
-def test_html_stage_injects_markup_into_the_heading(tmp_path):
+def test_html_stage_injects_markup_into_the_heading():
     """html 阶段在转义之后匹配，替换结果原样进书页标题（纯文本标题不受影响）。"""
     cfg = _cfg(
-        tmp_path,
         replacements=[Rule(r"第(.+)章", r'第<span class="num">\1</span>章', "html")],
     )
     node = process(SAMPLE, cfg)[0][1].children[0]
@@ -278,10 +278,9 @@ def test_html_stage_injects_markup_into_the_heading(tmp_path):
     assert node.title_html == '第<span class="num">一</span>章 初遇'
 
 
-def test_raw_runs_before_html(tmp_path):
+def test_raw_runs_before_html():
     """两个阶段一前一后：raw 改完再转义，html 在转义结果上接着改。"""
     cfg = _cfg(
-        tmp_path,
         replacements=[Rule("初遇", "重逢"), Rule("重逢", "<i>重逢</i>", "html")],
     )
     node = process(SAMPLE, cfg)[0][1].children[0]
@@ -289,9 +288,8 @@ def test_raw_runs_before_html(tmp_path):
     assert node.title_html == "第一章 <i>重逢</i>"
 
 
-def test_stages_apply_independently_in_one_pass(tmp_path):
+def test_stages_apply_independently_in_one_pass():
     cfg = _cfg(
-        tmp_path,
         replacements=[Rule("风起", "起风", "raw"), Rule("离别", "别离", "html")],
     )
     volume = process(SAMPLE, cfg)[0][1]
@@ -368,16 +366,16 @@ def test_preview_reads_raw_title_not_current_title():
     assert result.title == "第X一章"  # 若读 title 会二次叠加成「第XX一章」
 
 
-def test_preview_agrees_with_what_process_writes(tmp_path):
+def test_preview_agrees_with_what_process_writes():
     """预览与生成走同一条链，同一份规则下结果必须一致。"""
     replacements = [Rule("风起", "起风"), Rule("离别", "<i>别离</i>", "html")]
-    tree, _ = process(SAMPLE, _cfg(tmp_path, replacements=replacements))
+    tree, _ = process(SAMPLE, _cfg( replacements=replacements))
     results = preview_titles(scan_toc(SAMPLE, Config())[0], replacements)
     for node, result in zip(walk(tree), results):
         assert (result.title, result.title_html) == (node.title, node.title_html)
 
 
-def test_title_replacement_is_idempotent(tmp_path):
+def test_title_replacement_is_idempotent():
     """对已 process 过的同一棵树再预览，title / title_html 不再变化。
 
     raw 阶段读 `raw_title`（原文），重复跑只作用一次。这里特意选「换完仍匹配」的
@@ -385,7 +383,7 @@ def test_title_replacement_is_idempotent(tmp_path):
     这条测试立刻失败。
     """
     replacements = [Rule("第", "第X"), Rule("初遇", "<i>初遇</i>", "html")]
-    tree, _ = process(SAMPLE, _cfg(tmp_path, replacements=replacements))
+    tree, _ = process(SAMPLE, _cfg( replacements=replacements))
     results = preview_titles(tree, replacements)  # 注意：传入的是已处理的树
     for node, result in zip(walk(tree), results):
         assert (result.title, result.title_html) == (node.title, node.title_html)
