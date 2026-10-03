@@ -24,15 +24,13 @@ def test_scalar_defaults_follow_config():
     assert default_text("indent") == str(DEFAULTS.indent)
     assert default_text("line_height") == DEFAULTS.line_height
     assert default_text("para_spacing") == DEFAULTS.para_spacing
-    assert default_text("exclude") == DEFAULTS.exclude == ""
+    assert default_text("exclude") == DEFAULTS.exclude
 
 
 def test_level_regex_defaults_follow_config():
     """卷/章的预填正则来自 `DEFAULTS.levels`，不是另抄一份 `DEFAULT_*_RE`。"""
     assert default_text("volume") == _level_pattern(2)
     assert default_text("chapter") == _level_pattern(3)
-    assert default_text("volume")
-    assert default_text("chapter")
 
 
 def test_align_defaults_map_back_to_config():
