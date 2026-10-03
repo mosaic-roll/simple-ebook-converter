@@ -57,7 +57,8 @@ def test_convert_epub_output(tmp_path):
     existing.write_bytes(b"existing")
     result = runner.invoke(convert, [str(src)])
     assert result.exit_code == 0, result.output
-    assert existing.read_bytes()[:2] == b"PK"
+    # 覆盖的判据是「内容变了」，不是 zip 魔数——后者只是碰巧成立
+    assert existing.read_bytes() != b"existing"
 
     # --no-overwrite 拒绝覆盖（已有文件是上一步的 novel.epub，不是 "existing"）
     result = runner.invoke(convert, [str(src), "--no-overwrite"])

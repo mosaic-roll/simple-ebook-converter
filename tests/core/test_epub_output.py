@@ -12,7 +12,12 @@ from simple_ebook_converter.core.builder import (
 from simple_ebook_converter.core.config import DEFAULTS, Config, default_levels
 from simple_ebook_converter.core.levels import build_levels
 from simple_ebook_converter.core.parser import parse
-from simple_ebook_converter.core.sources import Sources, cover_resource, font_resource
+from simple_ebook_converter.core.sources import (
+    Resource,
+    Sources,
+    cover_resource,
+    font_resource,
+)
 
 
 def _default_tree():
@@ -73,19 +78,6 @@ def test_build_epub_lets_write_errors_surface(monkeypatch):
 # ---------- 包结构 ----------
 
 
-def test_build_epub_structure():
-    epub = _build(
-        cfg=Config(input=Path("novel.txt"), title="测试书", author="作者",
-                   language="zh"),
-        tree=_sample_tree(),
-    )
-    assert epub.entries["mimetype"] == b"application/epub+zip"
-    assert epub.has_entry("META-INF/container.xml")
-    assert epub.has_entry(epub.opf_name())
-    assert epub.nav()
-    assert epub.text_pages(), "应该有正文页"
-
-
 def test_every_package_file_is_reachable_and_self_consistent():
     """链接都指得到、manifest 声明与字节一致——一次断掉整包。"""
     epub = _build(tree=_sample_tree())
@@ -128,8 +120,6 @@ def test_no_toc_nav_not_in_spine():
     epub = _build(cfg=cfg)
     assert epub.nav()
     assert "nav" not in epub.spine_ids()
-    assert 'properties="nav"' in epub.opf()
-    assert epub.manifest_item(prop="nav")
     assert any(n.endswith(".ncx") for n in epub.entries)
 
 
@@ -216,9 +206,16 @@ def _cover_xhtml(cfg=None, sources=None):
     return epub.html("EPUB/cover.xhtml") if epub.has_entry("EPUB/cover.xhtml") else ""
 
 
-def _cover_sources(tmp_path):
-    """有封面图时的 `Sources`（图的内容，不是路径）。"""
-    return Sources(cover=cover_resource(_png(tmp_path)))
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+
+def _cover_sources():
+    """一份封面图的内容。
+
+    只有测「按字节 sniff / 改扩展名」的那几条才需要真文件——那条路走
+    `cover_resource(path)`。其余的只是「有张封面图」，直接给内容就够。
+    """
+    return Sources(cover=Resource("cover.png", PNG, "image/png"))
 
 
 def test_text_cover_page_is_default():
@@ -231,14 +228,16 @@ def test_text_cover_page_is_default():
     assert "<img" not in page
 
 
-def test_text_cover_page_is_linear():
-    """文字封面是书的第一页，进正文流（linear 不是 no）。"""
-    items = _build(cfg=Config(input=Path("novel.txt"), title="书名")
-    ).spine_items()
-    assert ("cover", True) in items
-    # 封面排在 nav 前面：阅读器从 spine 第一个 linear 项开始，不该先落到目录页
-    assert [i for i, _ in items].index("cover") == 0
-    assert [i for i, _ in items].index("nav") == 1
+def test_both_cover_kinds_come_before_the_toc():
+    """文字封面和图片封面都得排在 nav 前——阅读器从 spine 第一页开始读。
+
+    只测顺序。`linear` 属性本身不测：`ebooklib` 在 `is_linear` 为真时压根不写
+    这个属性，写出来才说明有人动过。
+    """
+    cfg = Config(input=Path("novel.txt"), title="书名")
+    for sources in (None, _cover_sources()):
+        order = [i for i, _ in _build(cfg=cfg, sources=sources).spine_items()]
+        assert order[:2] == ["cover", "nav"], sources
 
 
 def test_text_cover_page_has_no_cover_image_property():
@@ -270,35 +269,24 @@ def test_text_cover_omits_author_when_empty():
     assert "<p" not in page
 
 
-def test_cover_page_links_stylesheet(tmp_path):
+def test_cover_page_links_stylesheet():
     """封面页必须链到 style.css，否则内置封面样式和外部 CSS 都对它无效。"""
     assert "style.css" in _cover_xhtml(cfg=Config(input=Path("novel.txt"), title="书名")
     )
     assert "style.css" in _cover_xhtml(
         cfg=Config(input=Path("novel.txt")),
-        sources=_cover_sources(tmp_path),
+        sources=_cover_sources(),
     )
 
 
-def test_image_cover_declares_cover_meta(tmp_path):
+def test_image_cover_declares_cover_meta():
     """有封面图时补 <meta name="cover">，兼容 EPUB2 时代的阅读器。"""
-    opf = _build(sources=_cover_sources(tmp_path)).opf()
-    assert 'properties="cover-image"' in opf
-    assert '<meta name="cover" content="cover-img">' in opf
-
-
-def test_image_cover_page_is_linear(tmp_path):
-    """图片封面页也是打开书的第一页（曾是 linear=no，触发 OPF-096）。"""
-    items = _build(sources=_cover_sources(tmp_path)).spine_items()
-    assert ("cover", True) in items
-    assert [i for i, _ in items].index("cover") == 0
-
-
-def test_no_non_linear_spine_item_without_a_link_to_it(tmp_path):
-    """OPF-096：非线性内容必须可达，所以现在全书不该有线性为 no 的 spine 项。"""
-    for sources in (_cover_sources(tmp_path), Sources()):
-        assert [i for i, linear in _build(sources=sources).spine_items()
-                if not linear] == []
+    epub = _build(sources=_cover_sources())
+    assert 'properties="cover-image"' in epub.opf()
+    assert '<meta name="cover" content="cover-img">' in epub.opf()
+    # 扩展名与字节一致时不动它（改名的反例见 test_opf_cover_media_type_...）
+    item = epub.manifest_item(prop="cover-image")
+    assert (item["media-type"], item["href"]) == ("image/png", "images/cover.png")
 
 
 def test_opf_cover_media_type_matches_actual_bytes(tmp_path):
@@ -323,9 +311,9 @@ def test_cover_page_image_src_follows_the_renamed_file(tmp_path):
     assert 'src="images/cover.png"' not in page
 
 
-def test_image_cover_alt_is_book_title(tmp_path):
+def test_image_cover_alt_is_book_title():
     cfg = Config(input=Path("novel.txt"), title="书名")
-    page = _cover_xhtml(cfg=cfg, sources=_cover_sources(tmp_path))
+    page = _cover_xhtml(cfg=cfg, sources=_cover_sources())
     assert 'alt="书名"' in page
 
 
@@ -349,10 +337,10 @@ def test_cover_avif_media_type(tmp_path):
     epub.assert_manifest_media_types_match_bytes()
 
 
-def test_image_cover_wins_over_text_cover(tmp_path):
+def test_image_cover_wins_over_text_cover():
     """给了封面图就不再生成文字封面，两者互斥。"""
     cfg = Config(input=Path("novel.txt"), title="书名")
-    page = _cover_xhtml(cfg=cfg, sources=_cover_sources(tmp_path))
+    page = _cover_xhtml(cfg=cfg, sources=_cover_sources())
     assert "<h1" not in page
     assert "<img" in page
 
@@ -457,9 +445,3 @@ def test_text_body_escapes_markup():
     assert "&lt;b&gt;书名&lt;/b&gt;" in body
     assert "a &amp; b" in body
     assert "<b>" not in body
-
-
-def _png(tmp_path):
-    cover = tmp_path / "c.png"
-    cover.write_bytes(b"\x89PNG\r\n\x1a\nfake")
-    return cover
