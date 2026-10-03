@@ -81,10 +81,10 @@ p {{
 h1, h2, h3, h4, h5, h6 {{
   text-align: center;
 }}
-h2.volume {{ /* 卷标题：默认正则匹配 */
+h2.volume {{
   text-align: {cfg.volume_align};
 }}
-h3.chapter {{ /* 章标题：默认正则匹配 */
+h3.chapter {{
   text-align: {cfg.chapter_align};
 }}""")
     # 只命中封面页：整本书只有它的 body 里直接挂 section。不用 epub|type 属性选择器，
