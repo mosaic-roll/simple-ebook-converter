@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from helpers import Epub, assert_heading
 
@@ -8,7 +9,7 @@ from simple_ebook_converter.core.builder import (
     image_cover_body,
     text_cover_body,
 )
-from simple_ebook_converter.core.config import Config, default_levels
+from simple_ebook_converter.core.config import DEFAULTS, Config, default_levels
 from simple_ebook_converter.core.levels import build_levels
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.sources import Sources, cover_resource, font_resource
@@ -51,6 +52,24 @@ def _sample_tree():
         "第二段内容",
     ]
     return parse(lines, Config().levels, fallback_title="测试书")[0]
+
+
+# ---------- 写入 ebooklib ----------
+
+
+def test_build_epub_lets_write_errors_surface(monkeypatch):
+    """`ebooklib` 默认把 OSError 吞掉只 warn；不显式打开它，写盘失败就静默了。"""
+    captured = {}
+
+    def fake_write_epub(name, book, options=None):
+        captured["options"] = options
+        return True
+
+    monkeypatch.setattr(
+        "simple_ebook_converter.core.builder.epub.write_epub", fake_write_epub
+    )
+    build_epub(DEFAULTS, [], Sources(), Path("x.epub"))
+    assert captured["options"]["raise_exceptions"] is True
 
 
 # ---------- 包结构 ----------

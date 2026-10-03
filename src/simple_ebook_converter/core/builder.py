@@ -204,7 +204,12 @@ def build_epub(
         + (["nav"] if cfg.toc_in_spine else [])
         + pages
     )
-    epub.write_epub(output, book, options={"compresslevel": 9})
+    # `raise_exceptions` 是改 `ebooklib` 的默认行为：它默认自己 `except OSError`、
+    # `warnings.warn` 后返回 False，写盘失败（磁盘满、权限）会被静默吞掉，调用方
+    # 只会看到「生成成功」却拿不到文件。
+    epub.write_epub(
+        output, book, options={"compresslevel": 9, "raise_exceptions": True}
+    )
 
 
 def _is_page_root(node: Node, has_page_ancestor: bool) -> bool:
