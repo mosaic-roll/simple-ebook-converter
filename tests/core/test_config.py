@@ -108,10 +108,27 @@ def test_validate_rejects_out_of_range():
         ({"para_align": "mid"}, "正文对齐"),
         ({"date": "2024/13/05"}, "日期格式错误"),
         ({"date": "not-a-date"}, "日期格式错误"),
+        ({"exclude": "(?"}, "排除规则正则非法"),
     ]
     for kwargs, message in cases:
         with pytest.raises(ValueError, match=message):
             Config(**kwargs).validate()
+
+
+def test_validate_accepts_a_legal_exclude_regex():
+    """`exclude` 走的是同一套正则合法性，合法就放行。"""
+    Config(exclude="^第\\d+卷").validate()
+    Config(exclude="").validate()
+
+
+def test_exclude_error_is_a_value_error_not_a_re_error():
+    """报错必须是 `ValueError`。
+
+    `re.error` 不继承 `ValueError`，两个前端的 `except ValueError` 都接不住，
+    非法正则就会以裸栈的形式从回调里飞出去。
+    """
+    with pytest.raises(ValueError):
+        Config(exclude="(").validate()
 
 
 def test_validate_accepts_edge_values():

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import codecs
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -219,6 +220,15 @@ class Config:
             )
         if self.indent < 0:
             raise ValueError(f"段落缩进字数不能为负，收到：{self.indent}")
+        # `exclude` 是唯一直接躺在 `Config` 上的正则字段：卷/章走 `levels.build_rules()`、
+        # 替换规则走 `replace.replacers_by_stage()`，都在各自的入口编译校验，只有这条没人管。
+        # 不在这里查，它会一路留到 `parser.parse()` 才炸——而 `re.error` 不是
+        # `ValueError`，GUI 的 `except ValueError` 接不住，表现为 Tk 回调里一个裸栈。
+        if self.exclude:
+            try:
+                re.compile(self.exclude)
+            except re.error as e:
+                raise ValueError(f"排除规则正则非法：{self.exclude}（{e}）") from e
         for name, label in (
             ("chapter_align", "章对齐"),
             ("volume_align", "卷对齐"),
