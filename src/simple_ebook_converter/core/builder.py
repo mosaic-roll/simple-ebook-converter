@@ -68,38 +68,39 @@ def builtin_css(cfg: Config, font_name: str | None = None) -> str:
     family = f'"{_FONT_FAMILY}", ' if font_name else ""
 
     css.append(f"""body {{
-  margin: 5%;
-  font-size: 1em;
   line-height: {cfg.line_height};
   font-family: {family}sans-serif;
+}}
+h1, h2, h3, h4, h5, h6 {{
+  text-align: center;
+  font-weight: bold;
+}}
+h2.volume {{
+  margin: 1.5em 0 1em 0;
+  text-align: {cfg.volume_align};
+  font-size: 2.2em;
+}}
+h3.chapter {{
+  margin: 1em 0 1em 0;
+  text-align: {cfg.chapter_align};
+  font-size: 1.8em;
 }}
 .main-content p {{
   margin: 0 0 {cfg.para_spacing} 0;
   text-indent: {cfg.indent}em;
   text-align: {cfg.para_align};
 }}
-h1, h2, h3, h4, h5, h6 {{
-  text-align: center;
-}}
-h2.volume {{
-  text-align: {cfg.volume_align};
-}}
-h3.chapter {{
-  text-align: {cfg.chapter_align};
-}}""")
+""")
     # 封面容器按 class 命中，不写 body > section：正文页也有 section，结构选择器
     # 各家阅读器支持还不一致。书名/作者另挂 class，好从上面 `h1~h6` 的居中里摘出来。
     css.append(""".cover {
   margin: 0;
 }
-.cover .book-title,
-.cover .book-author {
-  text-align: center;
-}
 .cover .book-title {
   margin-top: 2em;
   margin-bottom: 0;
   font-size: 3em;
+  text-align: center;
 }
 .cover .book-author {
   margin-top: 1em;
@@ -107,6 +108,7 @@ h3.chapter {{
   padding-left: 1.5em;  /* 装饰符号宽度 */
   text-indent: -1.5em;
   font-size: 1.5em;
+  text-align: center;
 }
 .cover .book-author::before {
   content: "◎";
