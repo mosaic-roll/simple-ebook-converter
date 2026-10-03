@@ -132,7 +132,7 @@ OPTIONS: tuple[Option, ...] = (
     Option(
         "cover",
         "封面图",
-        "留空则先找输入同目录的 cover.*，再退回文字封面页",
+        "留空则用文字封面页（同目录的 cover.* 只由 GUI 预填）",
         "书籍信息",
     ),
     Option(
