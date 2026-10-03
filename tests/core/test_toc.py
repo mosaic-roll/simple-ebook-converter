@@ -322,6 +322,26 @@ def test_tree_from_json_rejects_bad_entries():
         tree_from_json(["不是字典"], lines)
 
 
+def test_tree_from_json_trailing_lines_still_valid():
+    """文档承诺：文件末尾增删行不影响已导出条目；只有中途插/删行会让 line 错位。"""
+    lines = ["第一卷", "第一章 一", "正文甲", "第二章 二", "正文二"]
+    data = [
+        {"raw_title": "第一卷", "level": 2, "line": 1},
+        {"raw_title": "第一章 一", "level": 3, "line": 2},
+        {"raw_title": "第二章 二", "level": 3, "line": 4},
+    ]
+    extended = [*lines, "新增结尾一行", "又一行"]
+    restored = tree_from_json(data, extended)
+    assert [restored[0].raw_title, restored[0].children[0].raw_title, restored[0].children[1].raw_title] == [
+        "第一卷",
+        "第一章 一",
+        "第二章 二",
+    ]
+    # 末尾多出来的行并入最后一个保留条目
+    assert "新增结尾一行" in restored[0].children[-1].paragraphs
+    assert "又一行" in restored[0].children[-1].paragraphs
+
+
 def test_tree_from_json_rejects_multiple_level_zero():
     """多个 level 0（前言）会撞 anchor='preface'、生成重名 xhtml，直接拒绝。"""
     lines = ["前言一", "前言二", "第一章", "正文"]
