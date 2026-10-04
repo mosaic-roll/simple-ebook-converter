@@ -117,6 +117,29 @@ def test_replacers_by_stage_on_empty():
     assert raw.rules == () and html.rules == ()
 
 
+def test_replacers_by_stage_skips_disabled():
+    raw, _html = replacers_by_stage([Rule("a", "1", enabled=False), Rule("b", "2")])
+    assert [r.pattern for r in raw.rules] == ["b"]
+
+
+def test_replacers_by_stage_skips_empty_pattern():
+    """空 pattern 不是「没填完」，是没有可匹配的东西：`re.compile("")` 匹配每个位置，
+    放行等于把替换文本插到标题的每个字符之间（"第一卷" → "X第X一X卷X"）。"""
+    raw, _html = replacers_by_stage([Rule("", "X", enabled=True), Rule("卷", "Y")])
+    assert [r.pattern for r in raw.rules] == ["卷"]
+    assert raw.apply("第一卷") == ("第一Y", True)
+
+
+def test_replacers_by_stage_guards_a_hand_edited_config():
+    """配置文件可手改，一条空 pattern 的启用规则就能毁掉全书标题——所以在 core 拦。
+
+    GUI 那边（collect_rules）照样原样保存空卡片，这里拦的是「作用到文本上」这一步。
+    """
+    saved = [{"pattern": "", "replace": "X", "stage": "raw", "enabled": True}]
+    raw, _html = replacers_by_stage(rules_from_list(saved))
+    assert raw.apply("第一卷") == ("第一卷", False)
+
+
 # ---------- 解析 ----------
 
 

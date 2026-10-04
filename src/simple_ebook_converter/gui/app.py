@@ -205,10 +205,13 @@ def collect_saved(
         "clean": bool(basic_tab["clean_var"].get()),
         "text_cover": bool(basic_tab["text_cover_var"].get()),
         "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
-        # 规则 tab：卷/章/排除正则 + 额外层级行
-        "volume": config_check.as_stored("volume", rule_entries["卷"].get()),
-        "chapter": config_check.as_stored("chapter", rule_entries["章"].get()),
-        "exclude": config_check.as_stored("exclude", rule_entries["排除"].get()),
+        # 规则 tab 的预置行：驱动自 `rules.BUILTIN_ROWS`，不在这里再抄一份字段名单。
+        # 抄过的那份漏了「字数上限」和「无标题章节」，两个框里的值存不进配置——
+        # `apply_saved()` 那边的回填是走同一张表的，所以只补这一边就通了。
+        **{
+            opt_name: config_check.as_stored(opt_name, rule_entries[label].get())
+            for label, opt_name, _mode in rules.BUILTIN_ROWS
+        },
         # 额外层级：空行也是状态，用户刻意加的空行下次还在，所以整行照留，
         # 只在正则非法时把正则清空（见 `config_check.extra_level`）
         "extra_levels": [
@@ -219,7 +222,7 @@ def collect_saved(
         ],
         # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
 # 对齐用 `.get`：`_on_close` 只接 `OSError`，一个不认识的值抛 `KeyError` 会让整轮
-    # 配置存不下，比存空更糟。取不到就是 None，交给 core 默认。
+        # 配置存不下，比存空更糟。取不到就是 None，交给 core 默认。
         "volume_align": config_check.as_stored(
             "volume_align", ALIGN_LABELS.get(layout_tab["align_volume"].get())
         ),

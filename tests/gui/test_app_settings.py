@@ -12,6 +12,7 @@ import pytest
 from simple_ebook_converter.core.replace import rules_to_list
 from simple_ebook_converter.gui.app import apply_saved, collect_saved
 from simple_ebook_converter.gui.constants import ALIGN_LABELS, TOC_DEPTHS
+from simple_ebook_converter.gui.tabs import rules as RULES
 from simple_ebook_converter.gui.tabs.layout import CSS_MODES
 
 # `apply_saved` 只有一个地方碰磁盘：`config_dir` 下有没有 `custom.css`。测「没有」
@@ -91,7 +92,11 @@ def ui():
             "on_source_change": _Recorder(),
         },
         "rules": {
-            "rule_entries": {label: FakeEntry("") for label in ("卷", "章", "排除")},
+            # 键集与 `rules.BUILTIN_ROWS` 一致：collect_saved 驱动自那张表，
+            # 少一个键就会 KeyError（真实 UI 里五个框都在）。
+            "rule_entries": {
+                label: FakeEntry("") for label, _opt, _mode in RULES.BUILTIN_ROWS
+            },
             "extra_rows": [],
         },
         "replace": {"rule_cards": [], "add_card": lambda: None},
@@ -184,6 +189,40 @@ def test_collect_saved_drops_an_invalid_regex(ui):
 def test_collect_saved_keeps_a_legal_regex(ui):
     ui[0]["rules"]["rule_entries"]["卷"].insert(0, "^第.+卷")
     assert _collect(ui)["volume"] == "^第.+卷"
+
+
+def test_collect_saved_covers_every_builtin_row(ui):
+    """规则页的每一个预置框都要落盘——曾经漏了「字数上限」和「无标题章节」。
+
+    这条按 `BUILTIN_ROWS` 遍历而不是逐个点名：以后加一行预置框而忘了加进存档，
+    这里会直接 KeyError 提醒，而不是让那个框静默地存不进去。
+    """
+    entries = ui[0]["rules"]["rule_entries"]
+    entries["字数上限"].insert(0, "40")
+    entries["无标题章节"].insert(0, "序")
+    saved = _collect(ui)
+    assert saved["max_title_len"] == 40
+    assert saved["preface_title"] == "序"
+    for _label, opt_name, _mode in RULES.BUILTIN_ROWS:
+        assert opt_name in saved
+
+
+def test_collect_saved_purifies_the_two_new_rows(ui):
+    """净化的规矩对这两个框一样：非法值存 None，不原样落盘。"""
+    entries = ui[0]["rules"]["rule_entries"]
+    entries["字数上限"].insert(0, "abc")  # 转不成整数
+    entries["字数上限"].insert(0, "-1")  # 整数但值域非法
+    assert _collect(ui)["max_title_len"] is None
+    entries["字数上限"].insert(0, "")
+    assert _collect(ui)["max_title_len"] is None
+
+
+def test_max_title_len_round_trips(ui):
+    """存进去也要读得回来——apply_saved 走 BUILTIN_ROWS 同一张表。"""
+    ui[0]["rules"]["rule_entries"]["字数上限"].insert(0, "40")
+    saved = _collect(ui)
+    _apply(ui, saved)
+    assert _collect(ui)["max_title_len"] == 40
 
 
 def test_collect_saved_drops_a_bad_align(ui):

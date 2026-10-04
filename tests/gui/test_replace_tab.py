@@ -4,7 +4,11 @@
 真正建控件的路径（勾选框有没有接回调）测不到，这里只钉住它依赖的判定逻辑。
 """
 
-from simple_ebook_converter.core.replace import Rule
+from simple_ebook_converter.core.replace import (
+    Rule,
+    rules_from_list,
+    rules_to_list,
+)
 from simple_ebook_converter.gui.tabs.replace import collect_rules, rules_snapshot
 
 
@@ -33,6 +37,22 @@ def test_collect_keeps_enabled_state():
     assert [r.enabled for r in rules] == [False, True]
 
 
+def test_collect_keeps_blank_cards():
+    """空 pattern 的卡片照样收：那是用户自己的半成品，存进配置下次打开还在。
+
+    丢掉等于替用户删了想写的东西。空规则不生效由 core 的 replacers_by_stage() 负责。
+    """
+    rules = collect_rules([_card(pattern=""), _card(pattern="a")])
+    assert [r.pattern for r in rules] == ["", "a"]
+
+
+def test_blank_rules_round_trip_through_the_config_payload():
+    """存档 → 读回：空卡片还在，用户下次打开能接着改。"""
+    saved = rules_to_list(collect_rules([_card(pattern=""), _card(pattern="a")]))
+    assert [r["pattern"] for r in saved] == ["", "a"]
+    assert [r.pattern for r in rules_from_list(saved)] == ["", "a"]
+
+
 def test_snapshot_changes_when_enabled_toggles():
     """勾选/取消启用必须改变快照，否则勾选框的刷新回调不起作用。"""
     on = rules_snapshot([_card(enabled=True)])
@@ -40,10 +60,14 @@ def test_snapshot_changes_when_enabled_toggles():
     assert on != off
 
 
-def test_snapshot_ignores_empty_pattern_cards():
-    """空 pattern 的卡片不计入快照：增删空卡不误触发刷新。"""
-    assert rules_snapshot([_card(pattern="")]) == ()
-    assert rules_snapshot([_card(), _card(pattern="")]) == rules_snapshot([_card()])
+def test_snapshot_ignores_blank_cards():
+    """空规则不生效，改它不该触发预览重算——但填上 pattern 就要触发。"""
+    blank = rules_snapshot([_card(pattern="")])
+    assert blank == ()
+    # 只改 replace 字段：卡片还是空的，快照不变
+    assert rules_snapshot([_card(pattern="", replace="写了一半")]) == blank
+    # 填上 pattern：立刻计入并触发
+    assert rules_snapshot([_card(pattern="甲", replace="写了一半")]) != blank
 
 
 def test_snapshot_changes_on_pattern_replace_stage():

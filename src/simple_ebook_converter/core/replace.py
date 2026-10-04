@@ -187,9 +187,19 @@ class Replacer:
 def replacers_by_stage(rules: Iterable[Rule]) -> tuple[Replacer, Replacer]:
     """按阶段拆成 (raw 替换器, html 替换器)；两个阶段一前一后作用在标题上。
 
-    禁用的规则（`enabled=False`）直接跳过，不参与任何阶段。
+    跳过两种规则，都不参与任何阶段：
+
+    - **禁用的**（`enabled=False`）：用户主动关掉的。
+    - **pattern 为空的**：`re.compile("")` 合法且匹配每个位置，作用上去等于把替换文本
+      插到标题的每个字符之间（"第一卷" → "X第X一X卷X"）。空 pattern 不是"没填完的
+      规则"，是没有可匹配的东西，所以在这里拦掉。
+
+      这条要在 core 拦而不是让 GUI 拦：配置文件是用户可手改的，一条
+      `{"pattern": "", "replace": "X", "enabled": true}` 就能让整本书的标题全毁。
+      GUI 那边（`tabs.replace.collect_rules`）照样原样保存空卡片——那是用户自己的
+      半成品，存着不该丢。
     """
-    rules = [r for r in rules if r.enabled]
+    rules = [r for r in rules if r.enabled and r.pattern]
     return (
         Replacer.of(r for r in rules if r.stage == "raw"),
         Replacer.of(r for r in rules if r.stage == "html"),

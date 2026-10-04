@@ -161,24 +161,22 @@ def build(
 def collect_rules(cards: list[dict[str, Any]]) -> list[Rule]:
     """卡片列表 → core 的 `Rule` 列表。
 
-    保留 `enabled` 状态：core 的 `replacers_by_stage()` 会自动跳过禁用的规则，
-    与 CLI 行为一致（禁用规则仍在列表里但不下发）。阶段标签「原文/HTML」由
-    `check_stage()` 自动转成 raw/html，未知值抛 ValueError。
+    **空 pattern 的卡片照样返回**：那张卡是用户自己留的半成品，存进配置里下次打开还在，
+    丢掉等于替用户删了想写的东西。空规则不会真的生效——`core.replacers_by_stage()`
+    在那边把空 pattern 一起跳掉，配置文件被手改也拦得住。
+
+    阶段标签「原文/HTML」由 `check_stage()` 自动转成 raw/html，未知值抛 ValueError
+    （只可能来自手改的控件值，选项菜单本身给不了非法值）。
     """
-    rules: list[Rule] = []
-    for card in cards:
-        pattern = card["pattern_entry"].get()
-        if not pattern:
-            continue
-        rules.append(
-            Rule(
-                pattern=pattern,
-                replace=card["replace_entry"].get(),
-                stage=check_stage(card["stage_menu"].get()),
-                enabled=bool(card["enabled_var"].get()),
-            )
+    return [
+        Rule(
+            pattern=card["pattern_entry"].get(),
+            replace=card["replace_entry"].get(),
+            stage=check_stage(card["stage_menu"].get()),
+            enabled=bool(card["enabled_var"].get()),
         )
-    return rules
+        for card in cards
+    ]
 
 
 def _make_card(
@@ -303,9 +301,14 @@ def rules_snapshot(cards: list[dict[str, Any]]) -> tuple:
     四个字段齐了才触发刷新：pattern / replace / stage / **enabled**。少一个都会漏刷新
     ——`enabled` 曾经就漏了，勾选框没接回调，预览一直停在改动前的样子。
 
-    基于 `collect_rules()` 的输出：空 pattern 的卡片不计入，增删空卡不会误触发刷新。
+    空 pattern 的卡片不计入（与 `collect_rules()` 不同，那条为了存档保留空卡片）：
+    空规则不生效，改它不该触发预览重算。但它一旦填上 pattern 就立刻计入并触发。
     """
-    return tuple((r.pattern, r.replace, r.stage, r.enabled) for r in collect_rules(cards))
+    return tuple(
+        (r.pattern, r.replace, r.stage, r.enabled)
+        for r in collect_rules(cards)
+        if r.pattern
+    )
 
 
 def _relayout(cards: list[dict[str, Any]]) -> None:
