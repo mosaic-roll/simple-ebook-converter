@@ -32,6 +32,25 @@ CSS_SOURCE_TEXT = "text"
 CSS_SOURCE_FILE = "file"
 
 
+def _restore_placeholder(entry: ctk.CTkEntry) -> None:
+    """失焦时恢复 CTkEntry 的 placeholder。
+
+    使用 _is_focused / _activate_placeholder() 是因为 CTkEntry 没有公开 API 来
+    「手动激活 placeholder」。这两个是 CTkEntry 实例上真实存在的方法/属性（可
+    通过 hasattr(type(e), '_activate_placeholder') 验证），但属于内部实现细节，
+    前缀下划线只是约定而非 Python 强制限制。若 customtkinter 升级时重命名或移
+    除，这里会静默失效——届时需要回到该类源码确认新路径。
+
+    CTkEntry 内部 _entry_focus_out 依赖 _is_focused 判断是否激活 placeholder，
+    但我们的 FocusOut 绑定比内部绑定先运行，_is_focused 此时仍为 True，导致占
+    位符在字段为空时无法恢复。修复：临时设 _is_focused=False 再调
+    _activate_placeholder()，走与内部相同的激活路径。
+    """
+    if entry._entry.get() == "":
+        entry._is_focused = False  # type: ignore[attr-defined]
+        entry._activate_placeholder()  # type: ignore[attr-defined]
+
+
 def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     """构建排版 Tab，返回控件引用。"""
     parent.grid_columnconfigure(0, weight=1)
@@ -48,6 +67,9 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     para_spacing = make_field(
         p, 2, "段间距", ctx, default_text("para_spacing", ctx.saved), col=0
     )
+    # 失焦时恢复 placeholder：用户清空框后点别处，placeholder 重新出现
+    for e in (indent, line_height, para_spacing):
+        e._entry.bind("<FocusOut>", _restore_placeholder, add="+")  # type: ignore[attr-defined]
 
     # ---- 对齐方式 ----
     # 菜单存的是中文，收集时用 ALIGN_LABELS 换回 core 取值；默认值也从 core 取
