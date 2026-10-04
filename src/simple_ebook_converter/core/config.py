@@ -45,8 +45,8 @@ _CHAPTER_CORES = (
 #: 章标题（re.match 从行首匹配）
 DEFAULT_CHAPTER_RE = (
     rf"^(?:{_CHAPTER_CORES}){_TAIL}"
-    r"|^[Cc]hapter"  # 英文：Chapter
-    r"|^番外"
+    r"|^[Cc]hapter"  # 英文：Chapter 1 / Chapter One
+    r"|^番外"  # 番外 / 番外一
     r"|^[后後]日[谈談]"  # 后日谈 / 後日談
     r"|^上架感言"
     r"|^完本感言"
