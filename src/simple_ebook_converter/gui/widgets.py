@@ -112,17 +112,19 @@ def make_text_field(
     col: int = 0,
     span: int = 1,
     height: int = 3,
+    pady: tuple[int, int] | int = ROW_PADY,
 ) -> ctk.CTkTextbox:
     """一行：标签 + 多行文本框。
 
     `height` 是文本框占几行字高（默认 3）。`col` / `span` 同 `make_field`。
+    `pady` 是上下间距，默认 `ROW_PADY`；放在组最后一行时传 `CHECK_PADY_LAST`。
     """
     font = ctx.fonts.base
     ctk.CTkLabel(parent, text=label, anchor="nw", font=font).grid(
         row=r,
         column=col,
         padx=LABEL_PADX,
-        pady=(ROW_PADY, 0),
+        pady=pady,
         sticky="nw",
     )
     tb = ctk.CTkTextbox(
@@ -137,7 +139,7 @@ def make_text_field(
         column=col + 1,
         columnspan=span,
         padx=FIELD_PADX,
-        pady=(ROW_PADY, 0),
+        pady=pady,
         sticky="nsew",
     )
     return tb

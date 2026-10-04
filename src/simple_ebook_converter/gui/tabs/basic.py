@@ -56,7 +56,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     lang_menu = make_field_combo(m, 3, "语言", LANGUAGES, ctx, col=2)
     # 简介用多行文本框，放在组最下方：核心文案是纯文本，单行框不够用
     book_description = make_text_field(
-        m, 4, "简介", ctx, placeholder="书籍简介", col=0, span=3
+        m, 4, "简介", ctx, placeholder="书籍简介", col=0, span=3, pady=CHECK_PADY_LAST
     )
 
     c = make_group(parent, "封面", 2, ctx)
