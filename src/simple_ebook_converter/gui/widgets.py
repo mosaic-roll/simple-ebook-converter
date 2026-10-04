@@ -115,13 +115,10 @@ def make_text_field(
     )
     if placeholder:
         tb.insert("1.0", placeholder)
-        tb.tag_configure("ph", foreground=("gray40", "gray60"))
-        tb.tag_add("ph", "1.0", "end")
         # 获得焦点时清占位符，收藏时不留脏数据
         def _clear_ph(_event=None):
             if tb.get("1.0", "end-1c").strip() == placeholder.strip():
                 tb.delete("1.0", "end")
-            tb.tag_remove("ph", "1.0", "end")
         tb.bind("<FocusIn>", _clear_ph, add="+")
     return tb
 
