@@ -6,13 +6,11 @@
 
 import json
 
-import pytest
-
 from simple_ebook_converter.core.config import default_levels
 from simple_ebook_converter.core.parser import parse
 from simple_ebook_converter.core.pipeline import preview_titles
 from simple_ebook_converter.core.replace import Rule
-from simple_ebook_converter.core.toc import tree_from_json
+from simple_ebook_converter.core.toc import load_entries
 from simple_ebook_converter.gui.constants import TAG_DELETED, TAG_HTML, TAG_HTML_DELETED
 from simple_ebook_converter.gui.toc_panel import (
     _tags_for,
@@ -64,66 +62,14 @@ def test_tags_give_deleted_priority_over_html():
     assert _tags_for(deleted=False, html_hit=False) == ()
 
 
-# ---------- import_toc_json：字段规则与 core 同一份 ----------
+def test_import_toc_json_delegates_to_core(tmp_path):
+    """导入就是转发给 `core.toc.load_entries`——条目形状由 core 定，GUI 不解释。
 
-
-def _write(tmp_path, data):
-    p = tmp_path / "toc.json"
-    p.write_text(json.dumps(data), encoding="utf-8")
-    return p
-
-
-def test_import_normalizes_level0_class_like_core(tmp_path):
-    """level 0 的 class 归一成 chapter：core 建树时这么改，导入时也要，
-    否则回填再导出会把 core 规范化过的值退回去。"""
-    entries = import_toc_json(
-        _write(
-            tmp_path,
-            [{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}],
-        )
-    )
-    assert entries[0]["class_name"] == "chapter"
-
-
-def test_import_keeps_deleted_row_visible(tmp_path):
-    """deleted 条目仍要带回标题：删除线划在哪一行是用户要看的。"""
-    entries = import_toc_json(
-        _write(
-            tmp_path,
-            [
-                {"raw_title": " 第一章 ", "level": 2, "line": 1},
-                {"raw_title": "第二章", "level": 2, "line": 9, "deleted": True},
-            ],
-        )
-    )
-    assert [e["deleted"] for e in entries] == [False, True]
-    assert entries[1]["raw_title"] == "第二章"
-
-
-def test_import_tolerates_non_string_title_on_deleted_row(tmp_path):
-    """core 不校验 deleted 条目的 raw_title，界面要自己兜住非字符串。"""
-    entries = import_toc_json(
-        _write(tmp_path, [{"raw_title": None, "level": 2, "deleted": True}])
-    )
-    assert entries[0]["raw_title"] == ""
-
-
-def test_import_rejects_out_of_range_level(tmp_path):
-    """层级范围与 core 一致：0~6。"""
-    with pytest.raises(ValueError, match="层级不合法"):
-        import_toc_json(_write(tmp_path, [{"raw_title": "甲", "level": 9, "line": 1}]))
-
-
-def test_import_does_not_range_check_line(tmp_path):
-    """导入时没有正文文件，行号上界查不了，只查是不是正整数。
-
-    反过来记：core 的 `tree_from_json` 拿到 `lines` 会查上界，导入这条路不查。
+    字段规则本身在 `tests/core/test_toc.py`，这里只钉住「GUI 没有自己那一份」。
     """
-    entries = import_toc_json(
-        _write(tmp_path, [{"raw_title": "甲", "level": 2, "line": 99999}])
+    p = tmp_path / "toc.json"
+    p.write_text(
+        json.dumps([{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}]),
+        encoding="utf-8",
     )
-    assert entries[0]["line"] == 99999
-    with pytest.raises(ValueError, match="超出输入范围"):
-        tree_from_json(
-            [{"raw_title": "甲", "level": 2, "line": 99999}], ["只有一行"]
-        )
+    assert import_toc_json(p) == load_entries(p)

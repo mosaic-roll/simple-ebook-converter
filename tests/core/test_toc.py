@@ -1,10 +1,18 @@
 """`core.toc`：扁平目录 JSON 的渲染与往返（`--toc-file` 的数据契约）。"""
 
+import json
+
 import pytest
 
-from simple_ebook_converter.core.config import LevelRule
+from simple_ebook_converter.core.config import LevelRule, default_levels
 from simple_ebook_converter.core.parser import Node, parse
-from simple_ebook_converter.core.toc import load_toc, to_json, to_text, tree_from_json
+from simple_ebook_converter.core.toc import (
+    load_entries,
+    load_toc,
+    to_json,
+    to_text,
+    tree_from_json,
+)
 
 
 def _sample_tree() -> list[Node]:
@@ -256,9 +264,7 @@ def test_tree_from_json_no_delete_round_trip():
         {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "line": 2},
     ]
     restored = tree_from_json(data, lines)
-    # 与 scan_toc 走 parse() 的结果逐节点比对（含子节点）
-    from simple_ebook_converter.core.config import LevelRule
-
+# 与 scan_toc 走 parse() 的结果逐节点比对（含子节点）
     rules = [LevelRule(2, r"^第一卷$", "volume"), LevelRule(3, r"^第一章 ", "chapter")]
     parsed, _ = parse(lines, rules, fallback_title="书名")
     assert [n.raw_title for n in walk(parsed)] == [n.raw_title for n in walk(restored)]
@@ -341,3 +347,78 @@ def test_tree_from_json_keeps_an_empty_class_name():
     data = [{"raw_title": "Part 1", "level": 1, "class_name": "", "line": 1}]
     restored = tree_from_json(data, ["Part 1", "正文"])
     assert restored[0].class_name == ""
+
+
+# ---------- load_entries：给导入方的规整版条目列表 ----------
+
+
+def _write_toc(tmp_path, data):
+    p = tmp_path / "toc.json"
+    p.write_text(json.dumps(data), encoding="utf-8")
+    return p
+
+
+def test_load_entries_normalizes_level0_class(tmp_path):
+    """level 0 的 class 归一成 chapter：与 tree_from_json 同一份规则，
+    否则「导出 → 编辑 → 导入 → 再导出」会把规范化过的值退回去。"""
+    entries = load_entries(
+        _write_toc(
+            tmp_path, [{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}]
+        )
+    )
+    assert entries[0]["class_name"] == "chapter"
+
+
+def test_load_entries_keeps_deleted_row_with_title(tmp_path):
+    """deleted 条目照样返回：删除线划在哪一行是用户要看的。"""
+    entries = load_entries(
+        _write_toc(
+            tmp_path,
+            [
+                {"raw_title": " 第一章 ", "level": 2, "line": 1},
+                {"raw_title": "第二章", "level": 2, "line": 9, "deleted": True},
+            ],
+        )
+    )
+    assert [e["deleted"] for e in entries] == [False, True]
+    assert entries[0]["raw_title"] == "第一章"
+    assert entries[1]["raw_title"] == "第二章"
+
+
+def test_load_entries_tolerates_non_string_title_on_deleted_row(tmp_path):
+    """这一支 core 不校验 raw_title，但返回的形状要定死：非字符串给空串。"""
+    entries = load_entries(
+        _write_toc(tmp_path, [{"raw_title": None, "level": 2, "deleted": True}])
+    )
+    assert entries[0]["raw_title"] == ""
+
+
+def test_load_entries_rejects_out_of_range_level(tmp_path):
+    """层级范围与 tree_from_json 一致：0~6。"""
+    with pytest.raises(ValueError, match="层级不合法"):
+        load_entries(_write_toc(tmp_path, [{"raw_title": "甲", "level": 9, "line": 1}]))
+
+
+def test_load_entries_does_not_range_check_line(tmp_path):
+    """导入时没有正文文件，行号上界查不了：只查是不是正整数。
+
+    反过来记：tree_from_json 拿到 lines 会查上界，导入这条路不查，问题留到生成时。
+    """
+    entries = load_entries(
+        _write_toc(tmp_path, [{"raw_title": "甲", "level": 2, "line": 99999}])
+    )
+    assert entries[0]["line"] == 99999
+    with pytest.raises(ValueError, match="超出输入范围"):
+        tree_from_json([{"raw_title": "甲", "level": 2, "line": 99999}], ["只有一行"])
+
+
+def test_load_entries_round_trips_to_json(tmp_path):
+    """导入再导出与原文件一致（往返是这一层的存在理由）。"""
+    tree, _stats = parse(
+        ["第一章 甲", "正文", "第二章 乙"], default_levels(), fallback_title="书名"
+    )
+    original = to_json(tree)
+    restored = load_entries(_write_toc(tmp_path, original))
+    assert [e["raw_title"] for e in restored] == [e["raw_title"] for e in original]
+    assert [e["level"] for e in restored] == [e["level"] for e in original]
+    assert [e["line"] for e in restored] == [e["line"] for e in original]

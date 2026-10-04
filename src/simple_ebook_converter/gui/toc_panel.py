@@ -292,29 +292,11 @@ def export_toc_json(entries: list[dict], path: Path) -> None:
 
 
 def import_toc_json(path: Path) -> list[dict]:
-    """从 JSON 文件加载目录条目（与 `to_json` 导出一致），返回扁平条目列表。
+    """导入目录 JSON。规整与字段校验都在 core，这里只转发。
 
-    只做读取与字段校验，不挂树、不切正文——界面要的是 raw_title / level /
-    class_name / line / deleted，生成阶段再由 core 从这些条目重建。
-    字段规则问 `core.toc.check_entry`，与生成那条路同一份，不在这里重述。
-    读不了、不是列表或字段非法时抛 `ValueError`。
-
-    行号只查是不是正整数：导入时还没有正文文件，上界留到生成时由
-    `tree_from_json` 兜（`check_entry` 的 `lines` 参数）。
+    条目的形状由 `core.toc` 定死——GUI 不解释这个结构，只把它存进 `ctx.toc_entries`
+    传给预览与生成。见 `core.toc.load_entries`。
     """
-    from ..core.toc import check_entry, load_toc
+    from ..core.toc import load_entries
 
-    entries: list[dict] = []
-    for i, item in enumerate(load_toc(path), start=1):
-        fields = check_entry(item, f"第 {i} 个条目")
-        if fields is None:
-            # deleted 条目不建节点，但标题仍要显示给用户看（删除线划在哪一行），
-            # 所以原样带回界面。core 不校验这一支的 raw_title，界面要自己兜住
-            # 非字符串，否则下面 refresh() 拿它当文本用会炸。
-            title = item.get("raw_title")
-            entries.append(
-                {**item, "raw_title": title.strip() if isinstance(title, str) else ""}
-            )
-            continue
-        entries.append({**fields, "deleted": False})
-    return entries
+    return load_entries(path)

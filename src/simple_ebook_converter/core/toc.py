@@ -65,6 +65,30 @@ def load_toc(path: Path) -> list:
     return data
 
 
+def load_entries(path: Path) -> list[dict]:
+    """读目录树 JSON → 规整后的条目列表，字段与形状由 core 定死。
+
+    `load_toc()` 只解析不校验；这里是给「拿到条目列表就直接用」的调用方（GUI 导入）
+    的一步到位版，省得各自再拼一遍 `check_entry`。字段规则见 `check_entry`。
+
+    不收 `lines`：导入时还没有正文文件，行号上界查不了，只查是不是正整数。问题留到
+    `tree_from_json()` 拿到正文时才报出来。
+    """
+    entries = []
+    for i, item in enumerate(load_toc(path), start=1):
+        fields = check_entry(item, f"第 {i} 个条目")
+        # deleted 条目不建节点，但标题仍要显示（删除线划在哪一行），所以照样返回，
+        # 只是这一支 core 不校验 raw_title，界面上拿它当文本用得是字符串。
+        if fields is None:
+            title = item.get("raw_title")
+            entries.append(
+                {**item, "raw_title": title.strip() if isinstance(title, str) else ""}
+            )
+            continue
+        entries.append({**fields, "deleted": False})
+    return entries
+
+
 def tree_from_json(
     data: list,
     lines: list[str],
