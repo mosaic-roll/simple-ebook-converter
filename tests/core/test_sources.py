@@ -226,9 +226,9 @@ def test_cover_for_prefers_explicit(tmp_path):
 
 
 def test_cover_for_returns_none_when_no_explicit(tmp_path):
-    """不传显式路径时一律返回 None——自动发现由打开文件时填路径负责，不在这里。"""
+    """没给封面（`None`）且没关发现时，去同目录找唯一的 `cover.*`。"""
     _png(tmp_path)
-    assert cover_for(None, _cfg(tmp_path).input) is None
+    assert cover_for(None, _cfg(tmp_path).input).name == "cover.png"
 
 
 def test_cover_for_returns_none_without_input():
@@ -236,9 +236,27 @@ def test_cover_for_returns_none_without_input():
 
 
 def test_cover_for_treats_blank_as_absent(tmp_path):
-    """GUI 传的是输入框内容，空串 = 用户没填 = 返回 None（不自动发现）。"""
+    """空串是**显式说不要封面**，与「没给」（None）不是一回事。
+
+    GUI 传的就是输入框内容：用户把框清空了，就是不要封面，不能再去同目录翻一张
+    cover.png 替他做主。
+    """
     _png(tmp_path)
     assert cover_for("", _cfg(tmp_path).input) is None
+
+
+def test_cover_for_blank_beats_discovery(tmp_path):
+    """空串连 `discovery=True` 也压得住——它比开关更具体。"""
+    _png(tmp_path)
+    assert cover_for("", _cfg(tmp_path).input, discovery=True) is None
+
+
+def test_cover_for_explicit_beats_discovery(tmp_path):
+    """给了路径就用给的，同目录有没有 cover.* 都一样。"""
+    _png(tmp_path)
+    explicit = _jpeg(tmp_path, "mine.jpg")
+    assert cover_for(explicit, _cfg(tmp_path).input).name == "mine.jpg"
+    assert cover_for(explicit, _cfg(tmp_path).input, discovery=False).name == "mine.jpg"
 
 
 def test_cover_for_needs_explicit_path(tmp_path):
@@ -285,9 +303,28 @@ def test_load_sources_empty_config_gives_empty_sources(tmp_path):
     assert sources.cover is None
 
 
-def test_load_sources_no_cover_without_explicit(tmp_path):
-    """CLI 侧同样不自动发现：cover_for 只认显式路径。"""
+def test_load_sources_discovers_the_cover_by_default(tmp_path):
+    """CLI 默认也会去同目录找封面——不给 `--cover` 就该有封面，不是让用户多打一遍。"""
     _png(tmp_path)
+    assert load_sources(_cfg(tmp_path)).cover.name == "cover.png"
+
+
+def test_load_sources_no_cover_discovery_off(tmp_path):
+    """`--no-cover-discovery` 时不翻目录，直接走文字封面。"""
+    _png(tmp_path)
+    assert load_sources(_cfg(tmp_path, cover_discovery=False)).cover is None
+
+
+def test_load_sources_explicit_cover_wins_over_discovery(tmp_path):
+    _png(tmp_path)
+    cfg = _cfg(tmp_path, cover=_jpeg(tmp_path, "mine.jpg"))
+    assert load_sources(cfg).cover.name == "mine.jpg"
+
+
+def test_load_sources_ambiguous_cover_is_not_discovered(tmp_path):
+    """同目录两张 cover.*（png + jpg）时 `find_cover()` 返回 None——挑一个是在替用户猜。"""
+    _png(tmp_path)
+    _jpeg(tmp_path)
     assert load_sources(_cfg(tmp_path)).cover is None
 
 

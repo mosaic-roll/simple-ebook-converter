@@ -20,7 +20,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import Config
-from .mediatypes import cover_media_type, font_media_type, sniff_font, sniff_image
+from .mediatypes import (
+    cover_media_type,
+    find_cover,
+    font_media_type,
+    sniff_font,
+    sniff_image,
+)
 from .toc import load_toc
 
 
@@ -109,17 +115,32 @@ def read_text(path: str | Path, label: str = "文件") -> str:
 def cover_for(
     explicit: str | Path | None,
     input_path: str | Path | None = None,
-    text_cover: bool = True,
+    discovery: bool = True,
 ) -> Resource | None:
-    """封面内容：显式给的路径优先，否则返回 `None` 由调用方处理。
+    """封面内容：显式路径优先，否则自动发现，都没有就返回 `None`（走文字封面）。
 
-    自动发现封面图片（同目录恰好一张 `cover.*`）只在「打开输入文件」时由
-    GUI 调 `find_cover()` 预填路径；生成阶段只认显式给出的路径。
-    两个前端共用：CLI 传 `cfg.cover` / `cfg.input` / `cfg.text_cover`，
-    GUI 传封面输入框与输入输入框的内容及 `text_cover` 勾选项。
+    `explicit` 分三种，不是两种——`None` 和空串的含义正好相反：
+
+    - **非空**：就用它。用户显式指定的路径**永远优先**，不受 `discovery` 影响。
+    - **空串**：用户显式说了「不要封面」（GUI 里把输入框清空、脚本里传了个空变量）。
+      直接返回 None，**不去同目录翻**。当成「没填」去发现一张，是替用户改主意。
+    - **`None`**：没指定。这才轮到 `discovery` 说话。
+
+    `discovery` 为真且有 `input_path` 时，在同目录下用 `find_cover()` 找一个
+    `cover.*`。`find_cover()` 只认**唯一一个**候选：同目录既有 `cover.png` 又有
+    `cover.jpg` 时它返回 None，因为挑一个是在替用户猜。
+
+    `text_cover` 不作为参数收：它是「没有封面图时」的文案页开关，逻辑在 builder 那边。
+    收进来会让这个函数的职责一半是「找图」一半是「画页」。
     """
     if explicit:
         return cover_resource(explicit)
+    if explicit is not None:
+        return None
+    if discovery and input_path is not None:
+        found = find_cover(Path(input_path))
+        if found is not None:
+            return cover_resource(found)
     return None
 
 
@@ -127,7 +148,7 @@ def load_sources(cfg: Config) -> Sources:
     """把 `Config` 上的资源路径字段读成内容。**CLI 用**；GUI 从表单直接构造。
 
     封面走 `cover_for()`，与 GUI 同一个函数——两个前端的封面优先级必须一致，
-    这里的「显式路径 / 同目录自动发现」判断只有这一份。
+    这里的「显式路径 / 同目录自动发现 / 都没有」判断只有这一份。
     """
     return Sources(
         toc_entries=load_toc(cfg.toc_file) if cfg.toc_file is not None else None,
@@ -136,7 +157,7 @@ def load_sources(cfg: Config) -> Sources:
             read_text(cfg.css_append, "附加 CSS") if cfg.css_append else None
         ),
         font=font_resource(cfg.font) if cfg.font else None,
-        cover=cover_for(cfg.cover, cfg.input, cfg.text_cover),
+        cover=cover_for(cfg.cover, cfg.input, cfg.cover_discovery),
     )
 
 

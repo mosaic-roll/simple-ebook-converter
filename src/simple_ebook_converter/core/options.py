@@ -144,8 +144,15 @@ OPTIONS: tuple[Option, ...] = (
     Option(
         "cover",
         "封面图",
-        "留空则用文字封面页（同目录的 cover.* 只由 GUI 预填）",
+        "封面图片路径；不给则按「自动发现封面」决定",
         "书籍信息",
+    ),
+    Option(
+        "cover_discovery",
+        "自动发现封面",
+        "没给封面图时是否自动发现同目录的 cover.*（默认发现）",
+        "书籍信息",
+        negative=True,
     ),
     Option(
         "text_cover",

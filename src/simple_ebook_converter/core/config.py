@@ -140,7 +140,9 @@ class Config:
     date: str | None = None
     language: str = "zh"
     cover: Path | None = None
-    #: 没有封面图时是否生成只含书名/作者的封面页
+    #: 没有显式封面图时，是否自动发现同目录下的 `cover.*`
+    cover_discovery: bool = True
+    #: 没有封面图时是否生成纯文字/作者的封面页
     text_cover: bool = True
 
     # 章节识别
