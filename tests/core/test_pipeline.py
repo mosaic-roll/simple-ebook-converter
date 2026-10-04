@@ -79,7 +79,7 @@ def test_resolve_without_input_leaves_metadata_alone():
 
 
 def test_resolve_validates_config():
-    """取值范围在这一步兜住，不必指望每个前端记得调 validate()。"""
+    """取值范围在这一步兜住，不必指望每个前端记得调 `validate_config()`。"""
     with pytest.raises(ValueError, match="目录深度"):
         resolve(_cfg(toc_depth=99))
 
@@ -561,7 +561,7 @@ def _blocked_out(tmp_path):
 
 
 def test_write_epub_reports_failure_with_context(cfg, tmp_path):
-    """组装阶段出错要补上「无法生成 EPUB」这个上下文。"""
+    """写入阶段出错要补上「无法生成 EPUB」这个上下文（组装阶段的不补，见下一个测试）。"""
     book = read_book(replace(cfg, out=_blocked_out(tmp_path)))
     with pytest.raises(ValueError, match="无法生成 EPUB"):
         write_epub(book)

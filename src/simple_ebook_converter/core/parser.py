@@ -88,7 +88,7 @@ def parse(
 ) -> tuple[list[Node], ParseStats]:
     """把行切分为章节树，返回 (顶层节点列表, 统计信息)。
 
-    逐行找标题：先按级别从低到高试，同一级按 `levels` 的顺序试（前端把卷/章/节三条排
+    逐行找标题：先按级别从低到高试，同一级按 `levels` 的顺序试（前端把卷/章两条排
     在最前，用户写的额外层级按书写顺序跟在后面），第一条命中的规则说了算，同一行的其余
     规则不再试。超长的行（> `max_title_len`）直接按正文处理，不参与匹配。
 
@@ -99,7 +99,7 @@ def parse(
     # 排序键只有级别，而排序是稳定的 → 同级保持 `levels` 的顺序，即上面的优先级
     rules = sorted((r for r in levels if r.active), key=lambda r: r.level)
     if not rules:
-        raise NoEnabledRulesError("没有启用的标题规则：卷/章/节至少要有一个非空正则")
+        raise NoEnabledRulesError("没有启用的标题规则：卷/章至少要有一个非空正则")
     compiled = [(r, re.compile(r.pattern)) for r in rules]
     compiled_exclude = [re.compile(exclude)] if exclude else []
 

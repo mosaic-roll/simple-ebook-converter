@@ -826,7 +826,7 @@ class App(ctk.CTk):
         """扫描用的参数：与 `_collect_config()` 同源，但**不做值域校验**。
 
         扫描只是预览，填了个非法缩进不该挡住用户看目录；`ValueError` 留给
-        真正生成时（`read_book` 内部会 `resolve()` → `validate()`）。
+        真正生成时（`read_book` 内部会 `resolve()` → `validate_config()`）。
         """
         try:
             return self._collect_config()

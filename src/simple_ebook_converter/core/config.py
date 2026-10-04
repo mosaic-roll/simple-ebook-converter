@@ -104,7 +104,7 @@ class LevelRule:
 
 
 def default_levels() -> list[LevelRule]:
-    """内置的卷/章/节三条层级。调用方拿到的是新列表，可随意改。"""
+    """内置的卷(h2) / 章(h3)两条层级。调用方拿到的是新列表，可随意改。"""
     return [
         LevelRule(level, pattern, name) for level, name, _, pattern in LEVEL_PRESETS
     ]

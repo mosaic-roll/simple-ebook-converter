@@ -69,7 +69,7 @@ def scan_toc(
 ) -> tuple[list[Node], ParseStats]:
     """阶段一：从原始行扫出目录树（原始标题 + 标题行号），不做清理与替换。
 
-    `entries` 给了就跳过正则解析，按条目构树（可经界面编辑），卷/章/节正则与
+    `entries` 给了就跳过正则解析，按条目构树（可经界面编辑），卷/章正则与
     `max_title_len` 在这一形态下都不参与。条目来自 `Sources.toc_entries`：
     CLI 侧的 `--toc-file` 由 `load_sources()` 读成条目，GUI 侧是目录面板那份，
     所以这里**一次文件都不读**。

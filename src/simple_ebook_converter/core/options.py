@@ -45,7 +45,7 @@ def _config_kinds() -> dict[str, type]:
 
 CONFIG_KINDS = _config_kinds()
 
-#: 预设层级：class 名（= 选项名）→ 级别。卷/章/节是三条预设的 `--level` 规格。
+#: 预设层级：class 名（= 选项名）→ 级别。卷/章是两条预设的 `--level` 规格。
 _LEVEL_BY_NAME = {name: level for level, name, _, _ in LEVEL_PRESETS}
 
 
@@ -172,7 +172,7 @@ OPTIONS: tuple[Option, ...] = (
         "level",
         "额外层级",
         "额外层级规则，可重复；格式 hN[.class]:正则（如 h1.part:^Part），与 CSS 选择器一致；"
-        "同一级可给多条，先写的优先（内置卷/章/节还在它们前面）",
+        "同一级可给多条，先写的优先（内置卷/章还在它们前面）",
         "章节识别",
         multiple=True,
     ),
@@ -343,9 +343,9 @@ def is_valid(name: str, value: Any) -> bool:
 
 
 def _level_rules(values: Mapping[str, Any]) -> list[LevelRule]:
-    """卷/章/节三条预设 + 前端给的额外层级 → 校验排序后的 `Config.levels`。
+    """卷/章两条预设 + 前端给的额外层级（如 h4 小节）→ 校验排序后的 `Config.levels`。
 
-    预设未给用内置正则，显式空串表示不识别该层级；class 名就是选项名。预设三条排在
+    预设未给用内置正则，显式空串表示不识别该层级；class 名就是选项名。预设两条排在
     额外层级前面——这就是同级的优先级（`parse()` 照此试）。
 
     `values["level"]` 里已经是 `LevelRule`：GUI 从三个输入框直接构造，CLI 把

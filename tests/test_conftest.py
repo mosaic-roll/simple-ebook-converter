@@ -39,7 +39,7 @@ XHTML = "application/xhtml+xml"
 def make_epub(items=(), refs=(), opf="EPUB/content.opf"):
     """拼一本最小 EPUB。
 
-    `items` 是 `(id, href, media-type, 内容)`；内容为 `None` 表示空文件。
+    `items` 是 `(id, href, media-type, 内容, properties)`；内容为 `None` 表示空文件。
     """
     manifest = "".join(
         ITEM.format(

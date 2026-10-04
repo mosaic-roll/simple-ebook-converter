@@ -47,7 +47,7 @@ def test_check_pattern_reports_the_label():
 
 def test_build_rules_without_rules_has_none():
     """内置默认值不在这里补：`Config` 的字段默认是 `default_levels()`，前端
-    （`options._level_rules()`）把卷/章/节三条排在前面传进来。"""
+    （`options._level_rules()`）把卷/章两条排在前面传进来。"""
     assert build_rules() == []
 
 
