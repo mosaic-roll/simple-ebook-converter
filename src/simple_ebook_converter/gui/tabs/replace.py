@@ -66,14 +66,9 @@ def build(
     # 增删空卡不会误触发刷新。
     _last_snapshot: tuple = ()
 
-    def _snapshot(cards: list[dict[str, Any]]) -> tuple:
-        return tuple(
-            (r.pattern, r.replace, r.stage, r.enabled) for r in collect_rules(cards)
-        )
-
     def _fire() -> None:
         nonlocal _last_snapshot
-        snap = _snapshot(rule_cards)
+        snap = rules_snapshot(rule_cards)
         if snap == _last_snapshot:
             return
         _last_snapshot = snap
@@ -203,9 +198,15 @@ def _make_card(
     head.grid_columnconfigure(0, weight=1)
 
     enabled_var = tk.BooleanVar(master=card, value=True)
-    ctk.CTkCheckBox(head, text="启用", variable=enabled_var, font=font).grid(
-        row=0, column=0, sticky="w"
-    )
+    # 勾选/取消都要刷新：enabled 进了 _snapshot 的比较，规则非空时勾选状态一变，
+    # 预览就得按新的启用集合重算。漏了这个回调，预览会一直停在改动前的样子。
+    ctk.CTkCheckBox(
+        head,
+        text="启用",
+        variable=enabled_var,
+        font=font,
+        command=lambda: on_change(),
+    ).grid(row=0, column=0, sticky="w")
 
     right = ctk.CTkFrame(head, fg_color="transparent")
     right.grid(row=0, column=1, sticky="e")
@@ -294,6 +295,17 @@ def _make_card(
         stage_menu=stage_menu,
     )
     return ref
+
+
+def rules_snapshot(cards: list[dict[str, Any]]) -> tuple:
+    """卡片列表 → 可比较的规则快照，供 `_fire()` 判断「规则是否真的变了」。
+
+    四个字段齐了才触发刷新：pattern / replace / stage / **enabled**。少一个都会漏刷新
+    ——`enabled` 曾经就漏了，勾选框没接回调，预览一直停在改动前的样子。
+
+    基于 `collect_rules()` 的输出：空 pattern 的卡片不计入，增删空卡不会误触发刷新。
+    """
+    return tuple((r.pattern, r.replace, r.stage, r.enabled) for r in collect_rules(cards))
 
 
 def _relayout(cards: list[dict[str, Any]]) -> None:
