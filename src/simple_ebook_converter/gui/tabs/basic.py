@@ -12,6 +12,7 @@ from ..constants import (
     CHECK_PADY_LAST,
     CHECK_PADY_MID,
     ENCODING_LABELS,
+    GAP,
     LANGUAGES,
 )
 from ..context import GuiContext
@@ -65,37 +66,47 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         placeholder="封面图片（.jpg / .png / .webp）",
         extra_btns=[("查看", ctx.cb("open_cover"))],
     )
+    # 两个勾选框装在一个透明子框架里并排，**不能**直接塞进分组的 4 列 grid。
+    #
+    # 为什么：路径输入框那一行是 `column=1, columnspan=3, sticky="ew"`，也就是它要吃
+    # 1/2/3 三列的宽度。而 grid 里某个控件的自然宽度只会加到它**自己那一列**上
+    # （跨列的才分摊给有权重的列）。所以把「自动发现封面」放进第 2 列，第 2 列就被撑到
+    # 7 个字宽，输入框跟着短一截、整体往右偏。
+    #
+    # 子框架自己跨 0-3 列、`sticky="ew"` 铺满整行，宽度和分组一致；内部用 `pack` 并排，
+    # 起点就是这一行的左边，跟外层 grid 的排法对齐。跨列的宽度需求会分摊给有权重的列
+    # （3、1），和原先那个单勾选框完全一样——实测分组最小宽 478、标签列 64，与旧布局
+    # 一字不差，所以路径框既不变窄也不平移。子框架不设 width、不给背景，`grid` 出来的
+    # 位置就是它唯一的作用。
+    checks = ctk.CTkFrame(c, fg_color="transparent")
+    checks.grid(
+        row=2,
+        column=0,
+        columnspan=4,
+        padx=CHECK_PADX,
+        pady=CHECK_PADY_LAST,
+        sticky="ew",
+    )
+
     # 初值走 core 的 DEFAULTS（有存档用存档），不手抄字面量
-    text_cover_var = tk.BooleanVar(master=c, value=_bool_default("text_cover", ctx))
+    text_cover_var = tk.BooleanVar(master=checks, value=_bool_default("text_cover", ctx))
     ctk.CTkCheckBox(
-        c,
+        checks,
         text="无封面时生成文字封面",
         variable=text_cover_var,
         font=ctx.fonts.base,
-    ).grid(
-        row=2,
-        column=0,
-        padx=CHECK_PADX,
-        pady=CHECK_PADY_LAST,
-        sticky="w",
-    )
+    ).pack(side="left")
     # 排在文字封面右边。两个开关各自独立、都默认开：文字封面管「没图时画不画一页」，
     # 自动发现管「去不去同目录找图」。标签取 core 选项表里的 `cover_discovery`，不手抄。
     cover_discovery_var = tk.BooleanVar(
-        master=c, value=_bool_default("cover_discovery", ctx)
+        master=checks, value=_bool_default("cover_discovery", ctx)
     )
     ctk.CTkCheckBox(
-        c,
+        checks,
         text=option_label("cover_discovery"),
         variable=cover_discovery_var,
         font=ctx.fonts.base,
-    ).grid(
-        row=2,
-        column=2,
-        padx=CHECK_PADX,
-        pady=CHECK_PADY_LAST,
-        sticky="w",
-    )
+    ).pack(side="left", padx=(GAP, 0))
 
     o = make_group(parent, "其他", 3, ctx)
     clean_var = tk.BooleanVar(master=o, value=_bool_default("clean", ctx))
