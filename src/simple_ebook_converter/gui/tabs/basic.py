@@ -99,7 +99,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     )
     ctk.CTkCheckBox(
         checks,
-        text="无封面时生成文字封面",
+        text="无封面生成文字封面",
         variable=text_cover_var,
         font=ctx.fonts.base,
     ).grid(row=0, column=0, sticky="w")
