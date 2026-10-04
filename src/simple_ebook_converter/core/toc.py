@@ -86,39 +86,10 @@ def tree_from_json(
     # 不用在切片阶段额外处理。
     kept: list[Node] = []
     for i, e in enumerate(data, start=1):
-        where = f"第 {i} 个条目"
-        if not isinstance(e, dict):
-            raise ValueError(f"{where}不是 JSON 对象")  # noqa: TRY004
-        deleted = e.get("deleted", False)
-        if not isinstance(deleted, bool):
-            raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
-        # deleted 条目不生成 Node，不参与正文范围计算，不做行号校验；
-        # 只需确认它是布尔值，避免把 "yes" 之类误当 False。
-        if deleted:
+        fields = check_entry(e, f"第 {i} 个条目", lines)
+        if fields is None:
             continue
-        title = e.get("raw_title")
-        level = e.get("level")
-        line = e.get("line")
-        class_name = e.get("class_name", "")
-        if not isinstance(title, str) or not title.strip():
-            raise ValueError(f"{where}缺少标题（raw_title）")
-        if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
-            raise ValueError(f"{where}的层级不合法：{level!r}")
-        if not isinstance(class_name, str):
-            raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
-        # level 0 的标题是合成的，class 跟扫描路径一致按章级渲染，不看文件里的值。
-        if level == 0:
-            class_name = "chapter"
-        _check_line(e, lines, where)
-        kept.append(
-            Node(
-                title.strip(),
-                level,
-                class_name,
-                raw_title=title.strip(),
-                line=line,
-            )
-        )
+        kept.append(Node(**fields))
 
     if not kept:
         # 所有条目都被删——整篇作为前言
@@ -176,13 +147,50 @@ def tree_from_json(
     return tree
 
 
-def _check_line(entry: dict, lines: list[str], where: str) -> None:
-    """校验条目的 `line` 字段合法（仅 kept 条目需要）。"""
+def check_entry(
+    entry: dict, where: str, lines: list[str] | None = None
+) -> dict | None:
+    """校验一个扁平条目，返回建 `Node` 要的字段；`deleted` 条目返回 `None`。
+
+    `tree_from_json` 与 GUI 的目录面板导入共用这一份规则，避免各写一遍后漂移。
+
+    `lines` 给定时额外校验行号不越界。GUI 导入拿不到正文（用户还没选文件），传 `None`：
+    那时只能查行号是不是正整数，上界留给生成时的 `tree_from_json` 兜。
+
+    `deleted` 条目不建节点、不参与正文范围计算，也就不查行号——但仍要确认它是布尔值，
+    免得把 `"yes"` 之类误当 False。
+    """
+    if not isinstance(entry, dict):
+        raise ValueError(f"{where}不是 JSON 对象")  # noqa: TRY004
+    deleted = entry.get("deleted", False)
+    if not isinstance(deleted, bool):
+        raise ValueError(f"{where}的 deleted 只能是 true/false：{deleted!r}")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
+    if deleted:
+        return None
+    title = entry.get("raw_title")
+    level = entry.get("level")
     line = entry.get("line")
+    class_name = entry.get("class_name", "")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError(f"{where}缺少标题（raw_title）")
+    if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
+        raise ValueError(f"{where}的层级不合法：{level!r}")
+    if not isinstance(class_name, str):
+        raise ValueError(f"{where}的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
+    # level 0 的标题是合成的，class 跟扫描路径一致按章级渲染，不看文件里的值。
+    if level == 0:
+        class_name = "chapter"
     if not isinstance(line, int) or isinstance(line, bool):
         raise ValueError(f"{where}的行号不合法：{line!r}（应为整数行号）")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
-    if not 1 <= line <= len(lines):
+    if lines is not None and not 1 <= line <= len(lines):
         raise ValueError(f"{where}的行号超出输入范围：{line}（输入共 {len(lines)} 行）")
+    return {
+        "title": title.strip(),
+        "level": level,
+        "class_name": class_name,
+        "raw_title": title.strip(),
+        "line": line,
+    }
 
 
 def to_text(tree: list[Node], depth: int = DEFAULTS.toc_depth) -> str:

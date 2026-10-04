@@ -296,37 +296,25 @@ def import_toc_json(path: Path) -> list[dict]:
 
     只做读取与字段校验，不挂树、不切正文——界面要的是 raw_title / level /
     class_name / line / deleted，生成阶段再由 core 从这些条目重建。
+    字段规则问 `core.toc.check_entry`，与生成那条路同一份，不在这里重述。
     读不了、不是列表或字段非法时抛 `ValueError`。
-    """
-    from ..core.toc import load_toc
 
-    data = load_toc(path)
+    行号只查是不是正整数：导入时还没有正文文件，上界留到生成时由
+    `tree_from_json` 兜（`check_entry` 的 `lines` 参数）。
+    """
+    from ..core.toc import check_entry, load_toc
+
     entries: list[dict] = []
-    for i, item in enumerate(data, start=1):
-        if not isinstance(item, dict):
-            raise ValueError(f"第 {i} 个条目不是 JSON 对象")  # noqa: TRY004  # 用户数据校验统一抛 ValueError
-        title = item.get("raw_title")
-        level = item.get("level")
-        line = item.get("line")
-        if not isinstance(title, str) or not title.strip():
-            raise ValueError(f"第 {i} 个条目缺少标题（raw_title）")
-        if not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 6:
-            raise ValueError(f"第 {i} 个条目的层级不合法：{level!r}")
-        if not isinstance(line, int) or isinstance(line, bool) or line < 1:
-            raise ValueError(f"第 {i} 个条目的行号不合法：{line!r}")
-        class_name = item.get("class_name", "")
-        if not isinstance(class_name, str):
-            raise ValueError(f"第 {i} 个条目的 class_name 不合法：{class_name!r}")  # noqa: TRY004  # 同上
-        deleted = item.get("deleted", False)
-        if not isinstance(deleted, bool):
-            raise ValueError(f"第 {i} 个条目的 deleted 只能是 true/false")  # noqa: TRY004  # 同上
-        entries.append(
-            {
-                "raw_title": title.strip(),
-                "level": level,
-                "class_name": class_name,
-                "line": line,
-                "deleted": deleted,
-            }
-        )
+    for i, item in enumerate(load_toc(path), start=1):
+        fields = check_entry(item, f"第 {i} 个条目")
+        if fields is None:
+            # deleted 条目不建节点，但标题仍要显示给用户看（删除线划在哪一行），
+            # 所以原样带回界面。core 不校验这一支的 raw_title，界面要自己兜住
+            # 非字符串，否则下面 refresh() 拿它当文本用会炸。
+            title = item.get("raw_title")
+            entries.append(
+                {**item, "raw_title": title.strip() if isinstance(title, str) else ""}
+            )
+            continue
+        entries.append({**fields, "deleted": False})
     return entries
