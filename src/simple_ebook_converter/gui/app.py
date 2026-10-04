@@ -127,9 +127,15 @@ def _replace_entry(entry: Any, text: str) -> None:
 
     单独一个函数是因为回填存档、选完文件、扫完目录都要用同一套「清空 → 写入」两步，
     漏掉 `delete` 就会把新值接在旧值后面。
+
+    当 `text` 为空串时，显式触发 CTkEntry 的 `_activate_placeholder()`，否则
+    直接 `delete` + `insert` 会跳过内部状态机，placeholder 不会恢复显示。
     """
     entry.delete(0, "end")
-    entry.insert(0, text)
+    if text:
+        entry.insert(0, text)
+    elif hasattr(entry, "_activate_placeholder"):
+        entry._activate_placeholder()
 
 
 def _initial_out(input_path: str) -> tuple[str | None, str | None]:
