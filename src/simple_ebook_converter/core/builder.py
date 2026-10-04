@@ -14,10 +14,10 @@ import uuid
 
 from ebooklib import epub
 
-from .cleaner import escape
 from .config import Config
 from .parser import Node
 from .sources import Resource, Sources
+from .text import escape
 
 #: 封面页的语义角色，写进 `epub:type`（EPUB 3 结构语义词汇表里的标准声明）
 COVER_SECTION_TYPE = "cover"

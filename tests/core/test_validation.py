@@ -1,8 +1,4 @@
-"""`core.validation`：单字段的值域（`field_error`）与整份配置的校验（`validate_config`）。
-
-这里测的是规则本身。两个入口共用 `_CHECKS` 这张表，所以大部分用例只要喂值、看消息，
-不必构造 `Config`——需要构造的地方是跨字段约束与「第一个错先冒出来」这两条。
-"""
+"""`core.validation`：`field_error`（单字段）与 `validate_config`（整份配置）。"""
 
 import dataclasses
 
@@ -71,13 +67,10 @@ def test_field_error_skips_absent_media():
 
 
 def test_field_error_requires_typed_values():
-    """`field_error` 的约定：收**已类型化**的值，不是前端原始文本。
+    """`field_error` 的约定：收已类型化的值，不是前端原始文本。
 
-    「已类型化」是约定不是强制——把签名标成 `Any` 拦不住任何调用方，
-    `field_error("encoding", 123)` 该崩还是崩（`123.lower()` 没有）。真要防就在
-    `_CHECKS` 那一层统一包 `try`，代价是稀释每个检查自己的责任，不值。
-
-    所以这条测试钉的是约定本身：类型那一层归 `options._convert()` 管。
+    真传错类型该崩还是崩（`field_error("encoding", 123)` 会在 `.lower()` 上炸），
+    兜住它得在 `_CHECKS` 那一层统一包 `try`，不值。这里钉的是约定本身。
     """
     assert field_error("indent", 2) is None
     assert field_error("indent", -1) is not None
@@ -94,10 +87,8 @@ def test_every_checked_field_is_a_config_field():
 
 
 def test_cross_checks_are_not_in_the_field_table():
-    """跨字段规则不进 `_CHECKS`，只有 `validate_config()` 才查得到。
+    """跨字段规则不进 `_CHECKS`——它的键是字段名，而跨字段约束没有归属的字段。
 
-    `_CHECKS` 的键是字段名，而跨字段约束依赖两个字段同时存在，没有归属的字段——
-    硬塞进去就得让一个字段替另一个字段做主语，消息也会变得莫名其妙。
     单字段入口对这两个字段一律返回 None（各自单独给都合法），这是设计如此。
     """
     assert _CROSS_CHECKS
@@ -105,6 +96,13 @@ def test_cross_checks_are_not_in_the_field_table():
     assert "css_append" not in _CHECKS
     assert field_error("css_file", "a.css") is None
     assert field_error("css_append", "a.css") is None
+
+
+def test_cross_checks_are_named_functions():
+    """收命名函数不收 lambda：第二条进来时，一堆 lambda 里嵌消息字符串会很难读。"""
+    for cross in _CROSS_CHECKS:
+        assert cross.__name__ != "<lambda>"
+        assert cross.__module__ == "simple_ebook_converter.core.validation"
 
 
 # ---------------------------------------------------------- validate_config

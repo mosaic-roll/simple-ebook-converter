@@ -367,8 +367,8 @@ def _level_rules(values: Mapping[str, Any]) -> list[LevelRule]:
 def _convert(opt: Option, value: Any) -> Any:
     """一个选项的原始值 → 收进 `Config` 的值。
 
-    只服务于进 `Config` 的选项；多值项（`--level`）不进 `Config`，在 `_level_specs()`
-    里合成。
+    只服务于「一个选项对应一个 `Config` 字段」的选项。`--level` 不是 `Config` 字段，
+    它的值经 `_level_rules()` 合成 `Config.levels`（一个列表），不走这条单值转换。
     """
     if value is None:
         return option_default(opt)

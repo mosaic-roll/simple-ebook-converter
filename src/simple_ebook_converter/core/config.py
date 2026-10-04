@@ -71,7 +71,7 @@ DEFAULT_EXCLUDE_RE = ""
 #: 标题对齐方式，写进 CSS 的 `text-align`
 ALIGN_CHOICES = ("left", "center", "right", "justify")
 
-#: 目录输出格式：`--toc-format` 的取值，也是 `validate()` 认的集合。
+#: 目录输出格式：`--toc-format` 的取值，也是 `validation._CHECKS["toc_format"]` 认的集合。
 #: 放在这里而不是 `toc`——`toc` 要 import 本模块，反向导入会成环。
 FORMATS = ("text", "json")
 
@@ -121,7 +121,8 @@ class Config:
 
     字段默认值 = 省略该参数时的行为。两个前端都只收值、调 `pipeline`，不各自拼流程；
     字段一律用正面表述（`overwrite` 而不是 `no_overwrite`），「关掉某功能」由前端表达为
-    `--no-xxx` / 反向勾选框，收上来时已经是这里的正面语义。取值范围校验在 `validate()`。
+    `--no-xxx` / 反向勾选框，收上来时已经是这里的正面语义。取值范围校验在
+    `validation.validate_config()`。
 
     注意资源路径字段（`cover` / `font` / `css_file` / `css_append` / `toc_file`）：
     它们是**选项解析的落点**，唯一消费者是 `sources.load_sources()`，转换流程

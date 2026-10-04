@@ -1,18 +1,16 @@
 """取值校验：单字段的值域 + 整份配置的跨字段约束。
 
-**校验规则只有一份。** 单字段的值域拆成纯函数登记在 `_CHECKS` 表里，
-`validate_config()` 遍历它（整份配置），`field_error()` 只查一个（GUI 存盘时手里
-只有单个字段的原始值）。两个入口共用同一张表，所以存盘与生成的合法性判定不会漂移。
+**校验规则只有一份。** 值域拆成纯函数登记在 `_CHECKS` 表里，`validate_config()` 遍历它
+（整份配置），`field_error()` 只查一个（GUI 存盘时手里只有单个字段的原始值）。两个入口
+共用同一张表，存盘与生成的合法性判定就不会漂移。
 
-**为什么校验不住在 `config.py` 里。** `config` 讲的是「配置长什么样」——字段、默认值、
-取值集合；这里讲的是「配置合不合法」。两者是独立的关注点。证据很直接：`_check_*` 里
-没有一个引用 `Config`，它们只用到值域常量（`ALIGN_CHOICES` / `FORMATS`）与标准库。
-所以 `validation` 单向依赖 `config`，而 `config` 不知道 `validation` 存在——依赖方向
-是直的，不需要在调用方做延迟导入来回避一个环。
+住在这里而不是 `config.py`：`config` 讲「配置长什么样」，这里讲「配置合不合法」。证据是
+`_check_*` 里没有一个引用 `Config`，所以 `validation` 单向依赖 `config`，反向不需要任何
+妥协——不必在 `Config` 上留个方法再在方法体里延迟导入来回避一个环。
 
-按**约束**拆检查，不按字段拆：三个 align 是同一条约束，用一个 `_align_check(label)`
-构造器，不必写三遍。每个检查住在它约束的真源旁边——值域常量在 `config`，扩展名表在
-`mediatypes`（`_media_check` 只是把已在抛的 `ValueError` 收成 `str | None`）。
+按**约束**拆，不按字段拆：三个 align 是同一条约束，用一个 `_align_check(label)` 构造器就
+够了。检查函数都住在本模块，只是按需**引用**真源——值域常量从 `config` 取，扩展名表从
+`mediatypes` 取。
 """
 
 from __future__ import annotations
@@ -134,36 +132,32 @@ _CHECKS: dict[str, Callable[[Any], str | None]] = {
     "cover": _media_check(cover_media_type),
 }
 
-#: 跨字段约束：接收整份 `Config`，合法返回 None，非法返回消息。
+
+def _check_css_mutex(cfg: Config) -> str | None:
+    """`--css-file` 与 `--css-append` 互斥。
+
+    消息报旗标名而不是字段名：这条错只有 CLI 会触发，用户是从命令行打进来的。
+    """
+    if cfg.css_file and cfg.css_append:
+        return (
+            "--css-file 与 --css-append 互斥：前者替代内置样式，后者追加在内置样式之后"
+        )
+    return None
+
+
+#: 跨字段约束：收整份 `Config`，合法返回 None。
 #:
-#: 现在只有 `css_file` 与 `css_append` 互斥一条。它依赖两个字段同时存在，**没有归属的
-#: 字段**，所以不进 `_CHECKS`——那张表的键是字段名，跨字段规则挂不上去。
-#:
-#: 加第二条时往这个元组里 `+` 一项即可，不用回头改 `validate_config()`。判断依据始终
-#: 是那句：这个约束依赖别的字段吗？依赖就进这里，不依赖就进 `_CHECKS`。
-_CROSS_CHECKS: tuple[Callable[[Config], str | None], ...] = (
-    lambda c: (
-        "--css-file 与 --css-append 互斥：前者替代内置样式，后者追加在内置样式之后"
-        if c.css_file and c.css_append
-        else None
-    ),
-)
+#: 依赖两个字段同时存在的约束放这里，`_CHECKS` 的键是字段名，挂不上去。加第二条时
+#: `+` 一项即可，不用改 `validate_config()`。
+_CROSS_CHECKS: tuple[Callable[[Config], str | None], ...] = (_check_css_mutex,)
 
 
 def field_error(name: str, value: Any) -> str | None:
     """单个字段的值域是否合法。合法返回 None，否则返回可直接展示的说明。
 
-    `validate_config()` 遍历 `_CHECKS` 查全部字段；`options.is_valid()` 只查一个——
-    GUI 存盘时手里只有单个字段的原始值，需要的正是这条单字段入口。
-
-    收的是**已类型化**的值（`int` / `Path` / `str`），不是前端原始文本；类型那一层由
-    `options._convert()` 管。两者不重叠。
-
-    「已类型化」是**约定不是强制**：签名故意留在 `Any` 上（`_CHECKS` 里那些检查要接
-    `int` / `Path` / `str` 三种类型，标窄了就要一堆 cast），签名再准也拦不住调用方
-    传错类型——`field_error("encoding", 123)` 该崩还是崩（`123.lower()` 没有）。
-    真要防就在 `_CHECKS` 那一层统一包 `try`，代价是稀释每个检查自己的责任，不值。
-    约定的测试在 `tests/core/test_validation.py`。
+    收的是**已类型化**的值（`int` / `Path` / `str`），类型那一层归 `options._convert()`。
+    这是约定不是强制——签名留在 `Any` 上也拦不住 `field_error("encoding", 123)`，要防就
+    得在 `_CHECKS` 那一层统一包 `try`，不值。
     """
     check = _CHECKS.get(name)
     return check(value) if check else None
@@ -172,11 +166,8 @@ def field_error(name: str, value: Any) -> str | None:
 def validate_config(cfg: Config) -> None:
     """校验整份配置，非法抛 `ValueError`（消息可直接展示给用户）。
 
-    `pipeline.resolve()` 会自动调它，所以两个前端不必各自记得校验；直接调
-    `build_epub()` 的调用方应自己先过一遍。
-
-    这里只做调度：先遍历 `_CHECKS` 查单字段的值域，再走 `_CROSS_CHECKS` 查跨字段的。
-    任何一条检查逻辑都不该留在这个函数里。
+    `pipeline.resolve()` 会自动调它，两个前端不必各自记得校验。纯调度：先单字段值域，
+    再跨字段，检查逻辑一律不进这个函数。
     """
     for name, check in _CHECKS.items():
         error = check(getattr(cfg, name))

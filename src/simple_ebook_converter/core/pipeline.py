@@ -20,13 +20,13 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from .builder import build_epub, builtin_css
-from .cleaner import clean_lines, escape
 from .config import Config
 from .encoding import EncodingError, read_lines
 from .meta import resolve_metadata
 from .parser import Node, ParseStats, parse, walk
 from .replace import Replacer, Rule, replacers_by_stage
 from .sources import Sources
+from .text import clean_lines, escape
 from .toc import render, tree_from_json
 from .validation import validate_config
 
