@@ -1,43 +1,90 @@
 # simple-ebook-converter-cli 命令行说明书
 
-本文档面向用户，介绍如何使用命令行转换电子书。
+本文档列出所有命令行选项。设计细节见 [cli设计.md](../文档/cli设计.md)。
 
 ## 基本用法
 
 ```bash
-uv run simple-ebook-converter-cli 我的小说.txt           # 生成 我的小说.epub
-uv run simple-ebook-converter-cli -i 输入.txt -o 输出    # 指定输入输出
-uv run simple-ebook-converter-cli --help                 # 查看全部选项
+uv run simple-ebook-converter-cli 我的小说.txt              # 生成 我的小说.epub
+uv run simple-ebook-converter-cli -i 输入.txt -o 输出       # 指定输入输出
+uv run simple-ebook-converter-cli --help                    # 查看全部选项
 ```
 
-## 常用选项
+单一命令：通过 `--toc-only` 切换「只输出目录」模式，通过 `--dump-css FILE` 切换「只导出 CSS」模式。目录和 EPUB 共用同一套输入选项。
 
-| 选项 | 说明 |
-|------|------|
-| `--title TEXT` | 书名，不写则从文件名猜（`《书名》作者：作者`） |
-| `--author TEXT` | 作者，不写则从文件名猜 |
-| `--date TEXT` | 出版日期，如 `2024-05-13`，不写则省略 |
-| `--language zh` | 语言代码（默认 `zh`） |
-| `--cover cover.jpg` | 封面图片路径，不写则自动发现同目录的 `cover.*` |
-| `--no-text-cover` | 不要文字封面页 |
-| `--no-overwrite` | 输出文件已存在时不覆盖 |
+---
+
+## 输入
+
+| 选项 | 说明 | 默认 |
+|------|------|------|
+| `-i, --input FILE` | 输入 TXT 文件（也可直接作为位置参数） | — |
+| `-e, --encoding TEXT` | 输入编码。`auto` 自动检测（BOM → chardet → utf-8/gb18030/big5/cp932/euc_jp），也可填 Python codec 名 | `auto` |
+
+## 输出
+
+| 选项 | 说明 | 默认 |
+|------|------|------|
+| `-o, --out FILE` | 输出文件名（不含 `.epub` 后缀），省略则取输入文件名 | 同输入名 |
+| `--no-overwrite` | 输出文件已存在时不覆盖 | 覆盖 |
+| `--dump-css FILE` | 把内置 CSS 模板写到文件，不读输入，不受 `--css-file` / `--css-append` 影响 | — |
+
+EPUB 以最高压缩等级打包（zip DEFLATE compresslevel=9）。
+
+---
+
+## 书籍信息
+
+| 选项 | 说明 | 默认 |
+|------|------|------|
+| `--title TEXT` | 书名。留空则从文件名猜（`《书名》作者：作者`） | 文件名提取 |
+| `--author TEXT` | 作者。留空则从文件名猜；仍留空则不写入元数据 | 文件名提取 |
+| `--date TEXT` | 出版日期，如 `2024-05-13`；留空则省略 `dc:date` | — |
+| `--language TEXT` | 语言代码，EPUB 3 `dc:language` 用的 BCP 47 标签 | `zh` |
+| `--description TEXT` | 书籍简介，留空则不写入 `dc:description` | — |
+| `--cover PATH` | 封面图片路径；省略则自动发现同目录的 `cover.*` | — |
+| `--no-cover-discovery` | 不给 `--cover` 时也不去同目录自动发现封面 | 自动发现 |
+| `--no-text-cover` | 没有封面图时也不生成文字封面页 | 生成 |
+
+**封面优先级**：显式 `--cover` > 自动发现（同目录恰好唯一一张 `cover.*`） > 文字封面页（书名 + 作者）。多张 `cover.*` 不静默挑选——作者没拿准时应该手动指定。
+
+---
 
 ## 章节识别
 
-程序按标题正则把 TXT 切分成章节。内置默认能识别常见的「第X章」「Chapter 1」等格式。
+程序按标题正则把 TXT 切分成章节，匹配行提升为对应 HTML 标题级别。
 
-```bash
-# 自定义卷/章标题正则
-uv run simple-ebook-converter-cli 我的小说.txt \
-  --volume "自定义卷正则" --chapter "自定义章正则"
+| 选项 | 说明 |
+|------|------|
+| `--volume REGEX` | 卷标题正则，匹配行提升为 h2 + class=volume；留空表示不识别卷标题 |
+| `--chapter REGEX` | 章标题正则，匹配行提升为 h3 + class=chapter；留空表示不识别章标题 |
+| `--no-volume` | 卷行不当标题（等同清空 `--volume`）；显式给 `--volume` 时以正则为准 |
+| `--level SPEC` | 额外层级规则，可重复；格式 `hN[.class]:正则`（如 `h1.part:^Part`），与 CSS 选择器一致；同一级可给多条，先写的优先（内置卷/章还在它们前面） |
+| `--max-title-len N` | 标题最大字数，超过视为正文 | 35 |
+| `--exclude REGEX` | 排除规则；行命中该正则时不作为标题 | — |
+| `--preface-title TEXT` | 首个标题之前那些无标题段落归到这一组 | `前言` |
 
-# 关闭卷识别（只识别章节）
-uv run simple-ebook-converter-cli 我的小说.txt --no-volume
-```
+**标题正则匹配整行**：一条规则命中，代表整行被当作标题；未命中的行按正文处理。命中行若超过 `--max-title-len` 也按正文处理。
 
-## 替换规则
+---
 
-对识别出的标题做文字修改，规则写在 JSON 文件里：
+## 清理与替换
+
+| 选项 | 说明 | 默认 |
+|------|------|------|
+| `--no-clean` | 关闭默认清理（保留空行 / 段首段尾空格） | 清理 |
+| `--replace-rules FILE` | 从 JSON 文件读取替换规则（一个有序列表），每条含 `pattern` / `replace` / `stage`（`raw` \| `html`） / `enabled` | — |
+
+**`stage` 控制规则在哪个阶段生效：**
+
+| `stage` | 作用对象 | 用途 |
+|---------|----------|------|
+| `raw`（默认） | 转义前的原始标题 | 改名、去前缀等纯文本处理 |
+| `html` | 转义后的标题 | 注入 HTML 标签，配合 `--css-append` 上样式 |
+
+`raw` 先于 `html`：先改原文标题（写进 `node.title`，目录页 / NCX / 元数据都用它），再转义，然后 `html` 规则在转义结果上再改一次。`html` 阶段适合给标题里的片段（如整段「第…章」）套 `<span>`；它不会影响纯文本的目录与元数据。
+
+示例规则文件：
 
 ```json
 [
@@ -46,33 +93,85 @@ uv run simple-ebook-converter-cli 我的小说.txt --no-volume
 ]
 ```
 
-| `stage` | 说明 |
-|---------|------|
-| `raw`（默认） | 改纯文本标题，影响目录和元数据 |
-| `html` | 改书页 HTML，可注入标签配合 CSS 样式 |
+**每条规则字段：**
 
-## 只输出目录
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| `pattern` | string | 是 | — | 正则表达式 |
+| `replace` | string | 否 | `""` | 替换文本；省略或删除匹配内容 |
+| `stage` | `"raw"` \| `"html"` | 否 | `"raw"` | 生效阶段 |
+| `enabled` | bool | 否 | `true` | 是否启用该条 |
 
-```bash
-uv run simple-ebook-converter-cli 我的小说.txt --toc-only          # 输出到 stdout
-uv run simple-ebook-converter-cli 我的小说.txt --toc-only -o toc.json --toc-format json
-```
+正则非法时程序会报错退出。
 
-## 排版选项
+---
+
+## 排版
 
 | 选项 | 说明 | 默认 |
 |------|------|------|
-| `--indent N` | 缩进字数 | 2 |
+| `--indent N` | 段落缩进字数，0 为不缩进 | 2 |
 | `--line-height TEXT` | 行高，如 `1.5` | 1.5 |
-| `--para-spacing TEXT` | 段间距，如 `1em` / `12px` | 1em |
-| `--chapter-align center` | 章标题对齐（left/center/right/justify） | center |
+| `--para-spacing TEXT` | 段间距，带单位，如 `1em` / `12px` | 1em |
+| `--chapter-align MODE` | 章标题对齐方式：`left` / `center` / `right` / `justify` | center |
+| `--volume-align MODE` | 卷标题对齐方式：`left` / `center` / `right` / `justify` | center |
+| `--para-align MODE` | 正文默认对齐方式：`left` / `center` / `right` / `justify` | justify |
+| `--font FILE` | 嵌入到书里的正文字体（ttf / otf / woff / woff2） | — |
+| `--css-file FILE` | 替代内置样式：给了它就用这一份（先用 `--dump-css` 导一份内置模板作起点） | — |
+| `--css-append FILE` | 追加在内置样式之后，用于少量覆盖（与 `--css-file` 互斥） | — |
 
-## 禁用默认行为
+---
+
+## 目录
+
+| 选项 | 说明 | 默认 |
+|------|------|------|
+| `--no-toc-page` | 目录页是否进正文流（阅读器导航目录不受影响，始终生成） | 进正文 |
+| `--toc-depth N` | 目录包含到第几级，1~6 | 6 |
+| `--toc-file FILE` | 从 JSON 文件读取目录树：跳过正则解析，按行号从输入取正文；标题用文件里的值，仍会做清理与替换 | — |
+| `--toc-only` | 只输出目录，不生成 EPUB | — |
+| `--toc-format FORMAT` | 只输出目录时的格式：`text` / `json` | text |
+
+`text` 格式按层级关系缩进输出；`json` 格式输出可编辑的目录树，编辑后可通过 `--toc-file` 回喂重新生成。不带 `-o` 或 `-o -` 时写 stdout。
+
+**目录树 JSON 格式：**
+
+```json
+[
+  { "raw_title": "第一卷 起源", "level": 2, "class_name": "volume", "line": 1 },
+  { "raw_title": "第一章 开端", "level": 3, "class_name": "chapter", "line": 3 },
+  { "raw_title": "第二章 转折", "level": 3, "class_name": "chapter", "line": 8, "deleted": true }
+]
+```
+
+**每个条目字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `raw_title` | string | 是 | 原始标题文本 |
+| `level` | int | 是 | 层级，0~6（0 = 前言，2 = 卷，3 = 章，以此类推） |
+| `class_name` | string | 否 | 语义 class，如 `volume` / `chapter` |
+| `line` | int | 是 | 标题在输入文件中的行号（1-based） |
+| `deleted` | bool | 否 | `true` 表示删除该条目；不生成标题节点，其正文并入前一条目 |
+
+> `--toc-only --toc-format json` 可先导出一份目录树，人工编辑后通过 `--toc-file` 回喂，跳过正则解析，直接按行号取正文。被删条目的行仍保留在文件中（行号不变），只是不再作为标题节点。
+
+---
+
+## 禁用默认行为汇总
 
 | 默认开启 | 禁用参数 |
 |----------|----------|
 | 清理段首空格与空行 | `--no-clean` |
-| 自动发现封面 | `--no-cover-discovery` |
-| 生成文字封面页 | `--no-text-cover` |
+| 自动发现同目录封面 | `--no-cover-discovery` |
+| 无封面图时生成文字封面页 | `--no-text-cover` |
 | 识别卷标题 | `--no-volume` |
 | 覆盖已有文件 | `--no-overwrite` |
+
+---
+
+## 其他
+
+| 选项 | 说明 |
+|------|------|
+| `--version` | 显示版本号并退出 |
