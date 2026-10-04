@@ -113,13 +113,6 @@ def make_text_field(
         pady=(ROW_PADY, 0),
         sticky="nsew",
     )
-    if placeholder:
-        tb.insert("1.0", placeholder)
-        # 获得焦点时清占位符，收藏时不留脏数据
-        def _clear_ph(_event=None):
-            if tb.get("1.0", "end-1c").strip() == placeholder.strip():
-                tb.delete("1.0", "end")
-        tb.bind("<FocusIn>", _clear_ph, add="+")
     return tb
 
 
