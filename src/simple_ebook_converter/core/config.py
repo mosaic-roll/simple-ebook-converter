@@ -139,6 +139,7 @@ class Config:
     author: str = ""
     date: str | None = None
     language: str = "zh"
+    description: str = ""
     cover: Path | None = None
     #: 没有显式封面图时，是否自动发现同目录下的 `cover.*`
     cover_discovery: bool = True

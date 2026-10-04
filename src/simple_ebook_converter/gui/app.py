@@ -759,6 +759,7 @@ class App(ctk.CTk):
             "author": basic_tab["book_author"].get().strip(),
             "date": basic_tab["book_date"].get().strip() or None,
             "language": basic_tab["lang_menu"].get(),
+            "description": basic_tab["book_description"].get().strip() or None,
 "text_cover": bool(basic_tab["text_cover_var"].get()),
             "cover_discovery": bool(basic_tab["cover_discovery_var"].get()),
             # 文本处理

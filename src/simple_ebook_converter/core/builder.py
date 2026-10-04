@@ -168,6 +168,8 @@ def build_epub(
     book.set_language(cfg.language)
     if cfg.date:
         book.add_metadata("DC", "date", cfg.date)
+    if cfg.description:
+        book.add_metadata("DC", "description", cfg.description)
 
     book.add_item(
         epub.EpubItem(
