@@ -10,9 +10,7 @@ from ...core.options import option_label
 from ..constants import (
     CHECK_PADX,
     CHECK_PADY_LAST,
-    CHECK_PADY_MID,
     ENCODING_LABELS,
-    GAP,
     LANGUAGES,
 )
 from ..context import GuiContext
@@ -87,8 +85,10 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         pady=CHECK_PADY_LAST,
         sticky="ew",
     )
+    # 内部两等分：左半区 / 右半区
+    checks.grid_columnconfigure(0, weight=1, uniform="half")
+    checks.grid_columnconfigure(1, weight=1, uniform="half")
 
-    # 初值走 core 的 DEFAULTS（有存档用存档），不手抄字面量
     text_cover_var = tk.BooleanVar(
         master=checks, value=_bool_default("text_cover", ctx)
     )
@@ -97,9 +97,8 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         text="无封面时生成文字封面",
         variable=text_cover_var,
         font=ctx.fonts.base,
-    ).pack(side="left")
-    # 排在文字封面右边。两个开关各自独立、都默认开：文字封面管「没图时画不画一页」，
-    # 自动发现管「去不去同目录找图」。标签取 core 选项表里的 `cover_discovery`，不手抄。
+    ).grid(row=0, column=0, sticky="w")
+
     cover_discovery_var = tk.BooleanVar(
         master=checks, value=_bool_default("cover_discovery", ctx)
     )
@@ -108,40 +107,38 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         text=option_label("cover_discovery"),
         variable=cover_discovery_var,
         font=ctx.fonts.base,
-    ).pack(side="left", padx=(GAP, 0))
+    ).grid(row=0, column=1, sticky="w")
 
     o = make_group(parent, "其他", 3, ctx)
-    # 同一行并排，直接占第 0/2 列——**不用**像封面组那样套透明子框架：这组里没有跨列的
-    # 字段行，没有输入框的宽度要保护，两个勾选框的自然宽度落在哪列都无所谓。
-    clean_var = tk.BooleanVar(master=o, value=_bool_default("clean", ctx))
+    checks_other = ctk.CTkFrame(o, fg_color="transparent")
+    checks_other.grid(
+        row=1,
+        column=0,
+        columnspan=4,
+        padx=CHECK_PADX,
+        pady=CHECK_PADY_LAST,
+        sticky="ew",
+    )
+    checks_other.grid_columnconfigure(0, weight=1, uniform="half")
+    checks_other.grid_columnconfigure(1, weight=1, uniform="half")
+
+    clean_var = tk.BooleanVar(master=checks_other, value=_bool_default("clean", ctx))
     ctk.CTkCheckBox(
-        o,
+        checks_other,
         text="清理段首空格及空行",
         variable=clean_var,
         font=ctx.fonts.base,
-    ).grid(
-        row=1,
-        column=0,
-        columnspan=2,
-        padx=CHECK_PADX,
-        pady=CHECK_PADY_MID,
-        sticky="w",
-    )
+    ).grid(row=0, column=0, sticky="w")
 
-    toc_in_book_var = tk.BooleanVar(master=o, value=_bool_default("toc_in_spine", ctx))
+    toc_in_book_var = tk.BooleanVar(
+        master=checks_other, value=_bool_default("toc_in_spine", ctx)
+    )
     ctk.CTkCheckBox(
-        o,
+        checks_other,
         text="生成书内目录页",
         variable=toc_in_book_var,
         font=ctx.fonts.base,
-    ).grid(
-        row=1,
-        column=2,
-        columnspan=2,
-        padx=CHECK_PADX,
-        pady=CHECK_PADY_MID,
-        sticky="w",
-    )
+    ).grid(row=0, column=1, sticky="w")
 
     return {
         "input_entry": input_entry,

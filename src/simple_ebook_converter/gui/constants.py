@@ -35,7 +35,6 @@ GROUP_TITLE_PADY = (6, 2)
 
 CHECK_PADX = 10
 CHECK_PADY_LAST = (0, 10)
-CHECK_PADY_MID = (0, 6)
 SEG_PADY = (6, 4)
 
 # ==========================================================================
