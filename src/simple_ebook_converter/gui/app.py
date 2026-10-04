@@ -423,6 +423,9 @@ class App(ctk.CTk):
             Path(config_dir) if config_dir is not None else config.default_dir()
         )
         self._saved_settings = config.load(self._config_dir)
+        # 手动编辑 config.json 可能注入非法值（类型错或值域错）。启动时统一清理：
+        # 非法字段置 None，后续 default_text() 会回退到核心默认，等同于"没填过"。
+        self._sanitize_saved()
 
         # ---- 运行时状态 ----
         self.fonts = FontManager(DEFAULT_UI_SIZE, DEFAULT_FONT_LABEL, DEFAULT_TOC_SIZE)
@@ -996,6 +999,22 @@ class App(ctk.CTk):
             config_dir=self._config_dir,
             on_invalid_rules=lambda msg: self._set_status(msg, "error"),
         )
+
+    def _sanitize_saved(self) -> None:
+        """把 `_saved_settings` 里有值域约束的字段逐一校验，非法者置 `None`。
+
+        用户手动编辑 `config.json` 时可能注入类型错误或非法值；这里统一清理，
+        后续 `default_text(name, saved)` 会因为 `saved[name] is None` 回退到核心
+        默认，等同于"该字段从未填写"。存盘校验（`_save_gui_settings`）负责在用户
+        主动保存时提示，这里只处理存量坏数据。
+        """
+        from ..core.validation import _CHECKS
+
+        for name in _CHECKS:
+            if name not in self._saved_settings:
+                continue
+            if field_error(name, self._saved_settings[name]) is not None:
+                self._saved_settings[name] = None
 
     def _save_custom_css(self) -> None:
         """把 CSS 文本框内容写进 `custom.css`，供下次启动回填。

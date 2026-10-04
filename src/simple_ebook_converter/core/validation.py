@@ -188,12 +188,32 @@ def field_error(name: str, value: Any) -> str | None:
     这是约定不是强制——签名留在 `Any` 上也拦不住 `field_error("encoding", 123)`，要防就
     得在 `_CHECKS` 那一层统一包 `try`，不值。
 
-    `None`（未填写）一律视为合法，不触发检查。
+    `None`（未填写）一律视为合法，不触发检查。类型不对（如把 int 字段存成了字符串）
+    也视为不合法，返回错误消息而不是抛异常。
     """
     if value is None:
         return None
     check = _CHECKS.get(name)
-    return check(value) if check else None
+    if check is None:
+        return None
+    try:
+        return check(value)
+    except TypeError:
+        return f"{name} 值类型错误，应为 {type_hint_for(name)}，收到：{type(value).__name__}"
+
+
+_TYPE_HINTS: dict[str, str] = {
+    "indent": "整数",
+    "max_title_len": "正整数",
+    "toc_depth": "整数（1~6）",
+    "exclude": "正则",
+    "date": "日期字符串",
+}
+
+
+def type_hint_for(name: str) -> str:
+    """某字段的期望类型提示，给错误消息用。"""
+    return _TYPE_HINTS.get(name, "对应类型")
 
 
 def validate_config(cfg: Config) -> None:
