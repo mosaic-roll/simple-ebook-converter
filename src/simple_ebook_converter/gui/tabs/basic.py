@@ -109,6 +109,8 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).pack(side="left", padx=(GAP, 0))
 
     o = make_group(parent, "其他", 3, ctx)
+    # 同一行并排，直接占第 0/2 列——**不用**像封面组那样套透明子框架：这组里没有跨列的
+    # 字段行，没有输入框的宽度要保护，两个勾选框的自然宽度落在哪列都无所谓。
     clean_var = tk.BooleanVar(master=o, value=_bool_default("clean", ctx))
     ctk.CTkCheckBox(
         o,
@@ -118,7 +120,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).grid(
         row=1,
         column=0,
-        columnspan=4,
+        columnspan=2,
         padx=CHECK_PADX,
         pady=CHECK_PADY_MID,
         sticky="w",
@@ -131,11 +133,11 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         variable=toc_in_book_var,
         font=ctx.fonts.base,
     ).grid(
-        row=2,
-        column=0,
-        columnspan=4,
+        row=1,
+        column=2,
+        columnspan=2,
         padx=CHECK_PADX,
-        pady=CHECK_PADY_LAST,
+        pady=CHECK_PADY_MID,
         sticky="w",
     )
 
