@@ -30,7 +30,9 @@ def default_text(name: str, saved: Mapping[str, Any] | None = None) -> str:
     """
     if saved is not None and name in saved:
         value = saved[name]
-        return "" if value is None else str(value)
+        # None 在 Config 里表示「未显式指定」，等同于用核心默认；展示时
+        # placeholder 也该回退到核心默认，否则框里什么都没有
+        return default_text(name) if value is None else str(value)
     value = option_default(_OPTION_BY_NAME[name])
     return "" if value is None else str(value)
 
