@@ -218,9 +218,8 @@ def collect_saved(
             for row in rules_tab["extra_rows"]
         ],
         # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
-        # 对齐用 `.get` 而不是下标：菜单里的标签是闭合集合，但存盘路径不该因为
-        # 一个不认识的值抛 `KeyError`——`_on_close` 只接 `OSError`，抛出去这一轮
-        # 配置就整个存不下了，比存空更糟。取不到就是 None，交给 core 默认。
+# 对齐用 `.get`：`_on_close` 只接 `OSError`，一个不认识的值抛 `KeyError` 会让整轮
+    # 配置存不下，比存空更糟。取不到就是 None，交给 core 默认。
         "volume_align": config_check.as_stored(
             "volume_align", ALIGN_LABELS.get(layout_tab["align_volume"].get())
         ),

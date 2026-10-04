@@ -1,8 +1,4 @@
-"""文本处理：清理（去段首段尾空格、删空行）与 HTML 转义。`--no-clean` 整体关掉清理。
-
-`escape()` 原先在 `builder` 里，`pipeline` 处理标题时得从那儿借——一个组 EPUB 的模块
-当纯文本工具的中转站，位置不对。搬过来是因为它和 `clean_line` 是同一类东西。
-"""
+"""文本处理：清理（去段首段尾空格、删空行）与 HTML 转义。`--no-clean` 整体关掉清理。"""
 
 from __future__ import annotations
 

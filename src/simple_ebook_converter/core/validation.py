@@ -61,11 +61,10 @@ def _check_indent(value: int) -> str | None:
 
 
 def _check_exclude(value: str) -> str | None:
-    """`exclude` 是唯一直接躺在 `Config` 上的正则字段。
+    """`exclude` 是唯一直接躺在 `Config` 上的正则字段：卷/章走 `levels.build_rules()`、
+    替换规则走 `replace.replacers_by_stage()`，都在各自入口编译校验，只有这条要在这里查。
 
-    卷/章走 `levels.build_rules()`、替换规则走 `replace.replacers_by_stage()`，都在各自
-    的入口编译校验，只有这条曾经没人管——非法正则一路留到 `parser.parse()` 才炸，而
-    `re.error` 不是 `ValueError`，GUI 的 `except ValueError` 接不住。
+    非法正则必须转成 `ValueError`：`re.error` 不是它，两个前端的 `except ValueError` 接不住。
     """
     if not value:
         return None
@@ -112,8 +111,8 @@ def _media_check(check: Callable[[Path], Any]) -> Callable[[Path | None], str | 
 
 #: 字段名 → 单字段校验函数。**插入顺序就是校验顺序**，第一个错先冒出来。
 #:
-#: 这张表是「哪些字段有值域约束」的唯一真源：加字段只需写 `_check_xxx` 再插一条，
-#: `validate_config()` 不用动。跨字段约束不在这里——见 `_CROSS_CHECKS`。
+#: 「哪些字段有值域约束」的真源：加字段写个 `_check_xxx` 再插一条，`validate_config()`
+#: 不用动。跨字段约束见 `_CROSS_CHECKS`。
 _CHECKS: dict[str, Callable[[Any], str | None]] = {
     "encoding": _check_encoding,
     "max_title_len": _check_max_title_len,
@@ -125,9 +124,7 @@ _CHECKS: dict[str, Callable[[Any], str | None]] = {
     "volume_align": _align_check("卷对齐"),
     "para_align": _align_check("正文对齐"),
     "date": _check_date,
-    # 扩展名只做快检：`sources.font_resource` / `cover_resource` 读字节时还会再调一遍
-    # 同样两个函数。保留它，是因为用户可能想在加载资源、解析输入之前就看到"字体格式
-    # 不对"，而不是先等半天读文件才报同一件事。
+    # 扩展名只做快检：`sources.*_resource()` 读字节时还会再查一遍，报错时机不同。
     "font": _media_check(font_media_type),
     "cover": _media_check(cover_media_type),
 }
@@ -145,10 +142,8 @@ def _check_css_mutex(cfg: Config) -> str | None:
     return None
 
 
-#: 跨字段约束：收整份 `Config`，合法返回 None。
-#:
-#: 依赖两个字段同时存在的约束放这里，`_CHECKS` 的键是字段名，挂不上去。加第二条时
-#: `+` 一项即可，不用改 `validate_config()`。
+#: 跨字段约束：收整份 `Config`，合法返回 None。依赖两个字段同时存在的放这里——
+#: `_CHECKS` 的键是字段名，跨字段的挂不上去。加第二条时 `+` 一项即可。
 _CROSS_CHECKS: tuple[Callable[[Config], str | None], ...] = (_check_css_mutex,)
 
 

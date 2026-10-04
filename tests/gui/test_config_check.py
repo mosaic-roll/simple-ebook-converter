@@ -16,9 +16,8 @@ from simple_ebook_converter.gui.config_check import (
 )
 from simple_ebook_converter.gui.tabs.layout import CSS_MODES, CSS_SOURCE_FILE
 
-# ------------------------------------------------------------------ as_stored
 
-
+# --------------------------------------------------- as_stored ---------------------------------------------------
 def test_as_stored_turns_an_int_field_into_a_number():
     """`indent` 存成 4 而不是 "4"——`Config` 那边的类型对不上。"""
     assert as_stored("indent", " 4 ") == 4
@@ -62,9 +61,7 @@ def test_as_stored_keeps_a_legal_int_field():
     assert as_stored("toc_depth", "6") == 6
 
 
-# ------------------------------------------------------------ 正则字段的净化
-
-
+# ----------------------------------------------------- 正则字段的净化 -----------------------------------------------------
 def test_as_stored_drops_an_invalid_volume_regex():
     """卷/章的正则非法时存空——否则之后每次生成都在同一条规则上报错。"""
     assert as_stored("volume", "(") is None
@@ -97,9 +94,7 @@ def test_as_stored_drops_an_unknown_align():
     assert as_stored("para_align", "justify") == "justify"
 
 
-# ------------------------------------------------------------- GUI 自己的字段
-
-
+# --------------------------------------------------- GUI 自己的字段 ---------------------------------------------------
 def test_gui_only_fields_are_checked_against_their_own_values():
     """`css_source` / `css_mode` 不进 `Config`，core 不认这两个名字。"""
     assert accepts("css_source", "text") is True
@@ -114,9 +109,7 @@ def test_gui_only_fields_are_sanitized_too():
     assert as_stored("css_mode", "胡说") is None
 
 
-# ------------------------------------------------------------------ accepts
-
-
+# ----------------------------------------------------- accepts -----------------------------------------------------
 def test_accepts_treats_none_as_always_legal():
     """`None` 是「用 core 默认」，默认本身合法。"""
     assert accepts("indent", None) is True
@@ -124,9 +117,7 @@ def test_accepts_treats_none_as_always_legal():
     assert accepts("css_mode", None) is True
 
 
-# --------------------------------------------------------------- level_number
-
-
+# ------------------------------------------------ level_number ------------------------------------------------
 @pytest.mark.parametrize(
     ("text", "expected"), [("h4", 4), ("H4", 4), ("4", 4), (" 6 ", 6)]
 )
@@ -144,9 +135,7 @@ def test_level_number_returns_none_when_unreadable(text):
     assert level_number(text) is None
 
 
-# ---------------------------------------------------------------- extra_level
-
-
+# ------------------------------------------------- extra_level -------------------------------------------------
 def test_extra_level_keeps_a_legal_row():
     assert extra_level("h5", "note", "^Part") == {
         "level": "h5",

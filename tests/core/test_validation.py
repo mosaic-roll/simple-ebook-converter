@@ -29,9 +29,7 @@ BAD_FIELDS = [
 ]
 
 
-# ------------------------------------------------------------- field_error
-
-
+# ------------------------------------------------- field_error -------------------------------------------------
 @pytest.mark.parametrize(("name", "value", "message"), BAD_FIELDS)
 def test_field_error_reports_bad_values(name, value, message):
     assert message in (field_error(name, value) or "")
@@ -77,9 +75,7 @@ def test_field_error_requires_typed_values():
     assert field_error("chapter_align", "center") is None
 
 
-# ------------------------------------------------------------- 注册表的形状
-
-
+# ------------------------------------------------------ 注册表的形状 ------------------------------------------------------
 def test_every_checked_field_is_a_config_field():
     """`_CHECKS` 里不该出现不存在的字段名——打错字会静默变成「无约束」。"""
     names = {f.name for f in dataclasses.fields(Config)}
@@ -105,9 +101,7 @@ def test_cross_checks_are_named_functions():
         assert cross.__module__ == "simple_ebook_converter.core.validation"
 
 
-# ---------------------------------------------------------- validate_config
-
-
+# --------------------------------------------- validate_config ---------------------------------------------
 def test_validate_accepts_defaults():
     validate_config(DEFAULTS)
 
