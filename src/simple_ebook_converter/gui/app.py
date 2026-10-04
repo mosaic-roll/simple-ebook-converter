@@ -46,6 +46,7 @@ from ..core.sources import (
     font_resource,
     read_text,
 )
+from ..core.validation import field_error
 from . import config, config_check, settings_dialog, theme
 from .constants import (
     ALIGN_LABELS,
@@ -529,6 +530,20 @@ class App(ctk.CTk):
             "ui_font_size": self.fonts.ui_size,
             "toc_font_size": self.fonts.toc_size,
         }
+        # 存盘前先校验核心字段：非法值会被 as_stored 过滤成 None，但用户手动编辑
+        # config.json 时可能绕过这层，这里补一次硬校验，警告后仍落盘（保持友好）。
+        errors = []
+        for name in ("indent", "line_height", "para_spacing", "max_title_len", "toc_depth"):
+            raw = self._collect_saved().get(name)
+            msg = field_error(name, raw)
+            if msg:
+                errors.append(msg)
+        if errors:
+            messagebox.showwarning(
+                "配置值非法",
+                "保存时发现以下字段值不符合规范，已按原值保存（下次生成时会报错）：\n\n"
+                + "\n".join(f"· {e}" for e in errors),
+            )
         config.save(self._config_dir, self._collect_saved())
 
     # ---------------------------------------------------------------- 主体

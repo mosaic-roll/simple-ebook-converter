@@ -79,6 +79,34 @@ def _check_exclude(value: str) -> str | None:
     return None
 
 
+_CSS_LEN_RE = re.compile(r"^-?\d+(\.\d+)?(?:em|rem|ex|px|pt|cm|mm|in|pc|ch|vw|vh|vmin|vmax)$")
+_CSS_NUM_RE = re.compile(r"^-?\d+(\.\d+)?$")
+
+
+def _check_line_height(value: str) -> str | None:
+    """CSS `line-height`：纯数值 / 百分比 / 长度均可。"""
+    if not value:
+        return None
+    if _CSS_NUM_RE.match(value):
+        return None
+    if value.endswith("%") and _CSS_NUM_RE.match(value[:-1]):
+        return None
+    if _CSS_LEN_RE.match(value):
+        return None
+    return f"行高格式非法，收到：{value}（应为数值、百分比或长度，如 1.5 / 150% / 1.5em）"
+
+
+def _check_para_spacing(value: str) -> str | None:
+    """CSS `margin` 值，段间距用这条：长度或百分比。"""
+    if not value:
+        return None
+    if _CSS_LEN_RE.match(value):
+        return None
+    if value.endswith("%") and _CSS_NUM_RE.match(value[:-1]):
+        return None
+    return f"段间距格式非法，收到：{value}（应为长度或百分比，如 1em / 2px）"
+
+
 def _align_check(label: str) -> Callable[[str], str | None]:
     def check(value: str) -> str | None:
         if value in ALIGN_CHOICES:
@@ -124,6 +152,8 @@ _CHECKS: dict[str, Callable[[Any], str | None]] = {
     "toc_format": _check_toc_format,
     "indent": _check_indent,
     "exclude": _check_exclude,
+    "line_height": _check_line_height,
+    "para_spacing": _check_para_spacing,
     "chapter_align": _align_check("章对齐"),
     "volume_align": _align_check("卷对齐"),
     "para_align": _align_check("正文对齐"),
@@ -157,7 +187,11 @@ def field_error(name: str, value: Any) -> str | None:
     收的是**已类型化**的值（`int` / `Path` / `str`），类型那一层归 `options._convert()`。
     这是约定不是强制——签名留在 `Any` 上也拦不住 `field_error("encoding", 123)`，要防就
     得在 `_CHECKS` 那一层统一包 `try`，不值。
+
+    `None`（未填写）一律视为合法，不触发检查。
     """
+    if value is None:
+        return None
     check = _CHECKS.get(name)
     return check(value) if check else None
 
