@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import customtkinter as ctk
 
@@ -47,6 +48,30 @@ def make_group(
     return frame
 
 
+def _bind_placeholder_restore(entry: ctk.CTkEntry) -> None:
+    """给 CTkEntry 绑上 placeholder 自动恢复：清空后失去焦点时重新显示。
+
+    直接调 tk 的 `delete` + `insert` 会绕过 CTkEntry 内部状态机，空值时
+    placeholder 不会恢复；需要补调 `_activate_placeholder()`。失焦时
+    `_is_focused` 仍为 True（外部绑定比内部先跑），临时设 False 再调即可走通
+    内部路径。两个都是 CTkEntry 实例上的真实方法/属性，customtkinter 升级时若
+    改名会静默失效——届时需回到该类源码确认新路径。
+    """
+    if not hasattr(type(entry), "_activate_placeholder"):
+        return
+
+    def _on_focusin(_event: Any | None = None) -> None:
+        entry._is_focused = True  # type: ignore[attr-defined]
+
+    def _on_focusout(_event: Any | None = None) -> None:
+        if entry._entry.get() == "":
+            entry._is_focused = False  # type: ignore[attr-defined]
+            entry._activate_placeholder()  # type: ignore[attr-defined]
+
+    entry._entry.bind("<FocusIn>", _on_focusin, add="+")  # type: ignore[attr-defined]
+    entry._entry.bind("<FocusOut>", _on_focusout, add="+")  # type: ignore[attr-defined]
+
+
 def make_field(
     parent: ctk.CTkBaseClass,
     r: int,
@@ -65,6 +90,8 @@ def make_field(
         row=r, column=col, padx=LABEL_PADX, pady=ROW_PADY, sticky="w"
     )
     entry = ctk.CTkEntry(parent, placeholder_text=placeholder, font=font)
+    if placeholder:
+        _bind_placeholder_restore(entry)
     entry.grid(
         row=r,
         column=col + 1,
@@ -147,6 +174,8 @@ def make_field_btn(
         sticky="ew",
     )
     entry = ctk.CTkEntry(box, font=font, placeholder_text=placeholder)
+    if placeholder:
+        _bind_placeholder_restore(entry)
     entry.pack(side="left", fill="x", expand=True)
 
     btn_box = ctk.CTkFrame(box, fg_color="transparent")

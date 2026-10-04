@@ -24,7 +24,7 @@ from ..constants import (
 )
 from ..context import GuiContext
 from ..defaults import default_text
-from ..widgets import make_field_btn, make_group
+from ..widgets import _bind_placeholder_restore, make_field_btn, make_group
 
 #: 预置行取值方式：`PREFILL` 启动时把默认值填进框（卷/章是长正则，placeholder 放不下）；
 #: `HINT` 框留空、placeholder 显示默认值，留空即表示用默认值（字数/前言的默认值很短）。
@@ -185,8 +185,10 @@ def _extra_level_row(
 
     cls = ctk.CTkEntry(row, width=ENTRY_W_M, placeholder_text="class", font=font)
     cls.grid(row=0, column=1, padx=(0, 6))
+    _bind_placeholder_restore(cls)
 
     regex = ctk.CTkEntry(row, placeholder_text="正则", font=font)
     regex.grid(row=0, column=2, sticky="ew")
+    _bind_placeholder_restore(regex)
 
     return {"frame": row, "level": menu, "class": cls, "regex": regex}

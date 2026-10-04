@@ -28,6 +28,7 @@ from ..constants import (
     STAGES,
 )
 from ..context import GuiContext
+from ..widgets import _bind_placeholder_restore
 
 CARD_PADY = (0, 6)
 
@@ -258,32 +259,18 @@ def _make_card(
     )
     replace_entry.grid(row=2, column=1, padx=FIELD_PADX, pady=ROW_PADY, sticky="ew")
 
-    # 失焦时刷新预览：用户编辑完规则、移开焦点后应用。
-    #
-    # 使用 _is_focused / _activate_placeholder() 是因为 CTkEntry 没有公开 API 来
-    # 「手动激活 placeholder」。这两个是 CTkEntry 实例上真实存在的方法/属性（可
-    # 通过 hasattr(type(e), '_activate_placeholder') 验证），但属于内部实现细节，
-    # 前缀下划线只是约定而非 Python 强制限制。若 customtkinter 升级时重命名或移
-    # 除，这里会静默失效——届时需要回到该类源码确认新路径。
-    #
-    # CTkEntry 内部 _entry_focus_out 依赖 _is_focused 判断是否激活 placeholder，
-    # 但我们的 FocusOut 绑定比内部绑定先运行，_is_focused 此时仍为 True，导致占
-    # 位符在字段为空时无法恢复。修复：临时设 _is_focused=False 再调 _activate_placeholder()，
-    # 走与内部相同的激活路径。
-    def _on_pattern_focusout(_event=None) -> None:
-        on_change()
-        if pattern_entry._entry.get() == "":
-            pattern_entry._is_focused = False
-            pattern_entry._activate_placeholder()
-
-    def _on_replace_focusout(_event=None) -> None:
-        on_change()
-        if replace_entry._entry.get() == "":
-            replace_entry._is_focused = False
-            replace_entry._activate_placeholder()
-
-    pattern_entry._entry.bind("<FocusOut>", _on_pattern_focusout)  # type: ignore[attr-defined]
-    replace_entry._entry.bind("<FocusOut>", _on_replace_focusout)  # type: ignore[attr-defined]
+    # 失焦时刷新预览，并恢复 placeholder（使用 widgets 里的统一 helper）。
+    # 注意：placeholder 恢复走 _bind_placeholder_restore 的 FocusOut 绑定，
+    # 我们的 on_change() 绑定在前（先绑），placeholder 绑定在后（add=True）——
+    # 顺序保证 on_change() 先跑，不会干扰 placeholder 恢复。
+    pattern_entry._entry.bind(
+        "<FocusOut>", lambda _e=None: on_change(), add=False
+    )  # type: ignore[attr-defined]
+    replace_entry._entry.bind(
+        "<FocusOut>", lambda _e=None: on_change(), add=False
+    )  # type: ignore[attr-defined]
+    _bind_placeholder_restore(pattern_entry)
+    _bind_placeholder_restore(replace_entry)
 
     ref.update(
         frame=card,
