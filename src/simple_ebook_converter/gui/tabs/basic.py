@@ -74,7 +74,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "路径",
         ctx,
         command=ctx.cb("pick_cover"),
-        placeholder="封面图片（.jpg / .png / .webp）",
+        placeholder="封面图片（.jpg / .png / .gif）",
         extra_btns=[("查看", ctx.cb("open_cover"))],
     )
     # 两个勾选框装在一个透明子框架里并排，**不能**直接塞进分组的 4 列 grid。
