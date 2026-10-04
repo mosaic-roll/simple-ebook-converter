@@ -1,4 +1,4 @@
-# simple-ebook-converter-cli 命令行说明书
+# 命令行说明书
 
 本文档列出所有命令行选项。设计细节见 [cli设计.md](../文档/cli设计.md)。
 
