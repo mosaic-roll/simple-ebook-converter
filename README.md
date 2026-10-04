@@ -41,7 +41,42 @@ uv run simple-ebook-converter-cli --help
 uv run simple-ebook-converter-cli 我的小说.txt
 ```
 
-输入、输出都可以省略：
+## 简要说明
+
+### 常用正则表达式
+
+章节识别会匹配识别到的整行。
+
+数字标题的章节误报严重，因此没有内置。
+
+- 匹配： `1、章节`，包括全半角数字
+  ```
+  ^[0-9０-９]+、
+  ```
+
+
+- 匹配：`一、章节`
+  ```
+  ^[一二三四五六七八九十百千零〇両两兩萬万]+、
+  ```
+
+- 匹配： `第一章`
+  ```
+  ^第[一二三四五六七八九十百千零〇両两兩萬万]+章
+  ```
+
+### 添加封面
+
+封面图片格式推荐使用 png 和 jpg。
+
+也可以用 gif、 webp、svg、avif。
+
+但 webp、svg 在阅读器中兼容性较差，avif 在epub标准中仍处于草稿阶段。
+
+
+### 命令行
+
+输入输出：
 
 - 输入：直接作为位置参数（`我的小说.txt`），或用 `-i/--input` 指定。省略则报错。
 - 输出：`-o/--out` 指定输出文件名（不含扩展名）。省略则取输入文件名，默认覆盖同名 `.epub`；用 `--no-overwrite` 禁止覆盖。
@@ -58,7 +93,7 @@ uv run simple-ebook-converter-cli 我的小说.txt \
   --language zh --cover cover.jpg
 ```
 
-`--title` 不写则从文件名猜（`《书名》作者：作者`）；`--author` 不写同样从文件名猜；`--date` 不写则省略；`--cover` 不写则自动发现同目录的 `cover.*`。
+`--title` （书名）、`--author` （作者）， 不写则从文件名猜（格式：`《书名》作者：作者`）；`--date` 不写则省略；`--cover` 不写则自动发现同目录的 `cover.*`。
 
 章节识别：
 
@@ -85,10 +120,10 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 
 规则分两个阶段，**针对原文的 `raw` 规则永远排在 `html` 规则之前**：
 
-| `stage` | 作用对象 | 用途 |
-| --- | --- | --- |
-| `raw`（默认） | 转义前的原始标题 | 改名、去前缀等纯文本处理 |
-| `html` | 转义后的标题 | 注入 HTML 标签，配合 `--css-append` 上样式 |
+| `stage`       | 作用对象         | 用途                                       |
+| ------------- | ---------------- | ------------------------------------------ |
+| `raw`（默认） | 转义前的原始标题 | 改名、去前缀等纯文本处理                   |
+| `html`        | 转义后的标题     | 注入 HTML 标签，配合 `--css-append` 上样式 |
 
 `html` 阶段可用于自定义标题样式。比如把章节编号和标题内容**分行显示**：
 
@@ -97,19 +132,18 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 ```
 
 ```css
-.chapter-number { display: block; font-size: 0.8em; }
-.chapter-title  { display: block; }
+.chapter-number { display: block; font-size: 0.65em; }
 ```
 
 默认开启的选项及禁用方式：
 
-| 默认行为 | 禁用参数 |
-| --- | --- |
-| 清理段首空格与空行 | `--no-clean` |
-| 自动发现同目录封面 | `--no-cover-discovery` |
-| 无封面图时生成文字封面页 | `--no-text-cover` |
-| 卷 / 章标题识别 | `--no-volume` 关卷；`--chapter ""` 关章 |
-| 覆盖已存在的输出文件 | `--no-overwrite` |
+| 默认行为                 | 禁用参数                                |
+| ------------------------ | --------------------------------------- |
+| 清理段首空格与空行       | `--no-clean`                            |
+| 自动发现同目录封面       | `--no-cover-discovery`                  |
+| 无封面图时生成文字封面页 | `--no-text-cover`                       |
+| 卷 / 章标题识别          | `--no-volume` 关卷；`--chapter ""` 关章 |
+| 覆盖已存在的输出文件     | `--no-overwrite`                        |
 
 ## 文档
 
