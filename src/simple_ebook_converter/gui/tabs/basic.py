@@ -89,7 +89,9 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     )
 
     # 初值走 core 的 DEFAULTS（有存档用存档），不手抄字面量
-    text_cover_var = tk.BooleanVar(master=checks, value=_bool_default("text_cover", ctx))
+    text_cover_var = tk.BooleanVar(
+        master=checks, value=_bool_default("text_cover", ctx)
+    )
     ctk.CTkCheckBox(
         checks,
         text="无封面时生成文字封面",
