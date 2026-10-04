@@ -14,7 +14,7 @@ from typing import Any
 
 import customtkinter as ctk
 
-from ...core.replace import Rule, check_stage
+from ...core.replace import Rule, check_stage, rules_from_file, rules_to_json
 from ..constants import (
     BTN_GAP,
     BTN_W_M,
@@ -316,8 +316,6 @@ def _relayout(cards: list[dict[str, Any]]) -> None:
 
 def export_rules_json(cards: list[dict[str, Any]], path: Path) -> None:
     """把当前规则卡片序列化为 JSON 文件（与 core.replace.rules_to_json 同格式）。"""
-    from ...core.replace import rules_to_json
-
     rules = collect_rules(cards)
     Path(path).write_text(rules_to_json(rules), encoding="utf-8")
 
@@ -332,7 +330,6 @@ def import_rules_json(
 
     读不了或格式非法抛 `ValueError`。填充细节见 `fill_rules()`。
     """
-    from ...core.replace import rules_from_file
 
     fill_rules(cards, rules_from_file(path), add_card, fire)
 

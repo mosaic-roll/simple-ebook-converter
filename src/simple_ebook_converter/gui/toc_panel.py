@@ -13,6 +13,8 @@ from typing import Any
 
 import customtkinter as ctk
 
+from ..core.parser import Node
+from ..core.toc import load_entries, to_json
 from .constants import (
     BTN_GAP,
     BTN_W_M,
@@ -268,9 +270,6 @@ def export_toc_json(entries: list[dict], path: Path) -> None:
     格式与 `--toc-only --toc-format json` 完全一致（raw_title / level /
     class_name / line，`deleted` 为真时才写）。条目缺行号（未扫描）时报 ValueError。
     """
-    from ..core.parser import Node
-    from ..core.toc import to_json
-
     nodes = [
         Node(
             title=str(e.get("raw_title", "")),
@@ -297,6 +296,4 @@ def import_toc_json(path: Path) -> list[dict]:
     条目的形状由 `core.toc` 定死——GUI 不解释这个结构，只把它存进 `ctx.toc_entries`
     传给预览与生成。见 `core.toc.load_entries`。
     """
-    from ..core.toc import load_entries
-
     return load_entries(path)

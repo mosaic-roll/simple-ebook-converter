@@ -26,6 +26,8 @@ from .._meta import DIST_NAME
 )
 @click.version_option(package_name=DIST_NAME)
 def main(config_dir: Path | None = None) -> int:
+    # customtkinter 是可选依赖，这两处 import 必须留在函数体内：挪到模块顶部，缺依赖时
+    # 会先抛一个不友好的 ImportError，下面这段提示就没机会执行（`.app` 顶层也 import 它）。
     try:
         import customtkinter  # noqa: F401
     except ImportError:
