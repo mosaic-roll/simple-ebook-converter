@@ -76,6 +76,56 @@ def make_field(
     return entry
 
 
+def make_text_field(
+    parent: ctk.CTkBaseClass,
+    r: int,
+    label: str,
+    ctx: GuiContext,
+    placeholder: str = "",
+    col: int = 0,
+    span: int = 1,
+    height: int = 3,
+) -> ctk.CTkTextbox:
+    """一行：标签 + 多行文本框。
+
+    `height` 是文本框占几行字高（默认 3）。`col` / `span` 同 `make_field`。
+    """
+    font = ctx.fonts.base
+    ctk.CTkLabel(parent, text=label, anchor="nw", font=font).grid(
+        row=r,
+        column=col,
+        padx=LABEL_PADX,
+        pady=(ROW_PADY, 0),
+        sticky="nw",
+    )
+    tb = ctk.CTkTextbox(
+        parent,
+        height=font.metrics("linespace") * height + 12,
+        font=font,
+        corner_radius=4,
+        border_width=1,
+    )
+    tb.grid(
+        row=r,
+        column=col + 1,
+        columnspan=span,
+        padx=FIELD_PADX,
+        pady=(ROW_PADY, 0),
+        sticky="nsew",
+    )
+    if placeholder:
+        tb.insert("1.0", placeholder)
+        tb.tag_configure("ph", foreground=("gray40", "gray60"))
+        tb.tag_add("ph", "1.0", "end")
+        # 获得焦点时清占位符，收藏时不留脏数据
+        def _clear_ph(_event=None):
+            if tb.get("1.0", "end-1c").strip() == placeholder.strip():
+                tb.delete("1.0", "end")
+            tb.tag_remove("ph", "1.0", "end")
+        tb.bind("<FocusIn>", _clear_ph, add="+")
+    return tb
+
+
 def make_field_btn(
     parent: ctk.CTkBaseClass,
     r: int,

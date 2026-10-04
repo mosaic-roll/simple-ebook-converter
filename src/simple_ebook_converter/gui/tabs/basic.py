@@ -21,6 +21,7 @@ from ..widgets import (
     make_field_combo,
     make_field_menu,
     make_group,
+    make_text_field,
 )
 
 
@@ -49,11 +50,14 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     # 书名/作者各占满一行（span=3），长文本在半宽框里放不下
     book_title = make_field(m, 1, "书名", ctx, "书名", col=0, span=3)
     book_author = make_field(m, 2, "作者", ctx, "作者", col=0, span=3)
-    book_description = make_field(m, 3, "简介", ctx, "书籍简介", col=0, span=3)
     # core 的 `DEFAULTS.date` 是 None（不写就省掉 dc:date），所以这里给的是**格式提示**，
     # 不是默认值：留空即「不写」
-    book_date = make_field(m, 4, "出版日期", ctx, "如 1949-10-01", col=0)
-    lang_menu = make_field_combo(m, 4, "语言", LANGUAGES, ctx, col=2)
+    book_date = make_field(m, 3, "出版日期", ctx, "如 1949-10-01", col=0)
+    lang_menu = make_field_combo(m, 3, "语言", LANGUAGES, ctx, col=2)
+    # 简介用多行文本框，放在组最下方：核心文案是纯文本，单行框不够用
+    book_description = make_text_field(
+        m, 4, "简介", ctx, placeholder="书籍简介", col=0, span=3
+    )
 
     c = make_group(parent, "封面", 2, ctx)
     cover_entry = make_field_btn(
