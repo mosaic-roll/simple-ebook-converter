@@ -39,7 +39,13 @@ from ..core.pipeline import (
     write_epub,
 )
 from ..core.replace import rules_from_list, rules_to_list
-from ..core.sources import Sources, cover_for, font_resource, read_text
+from ..core.sources import (
+    Resource,
+    Sources,
+    cover_for,
+    font_resource,
+    read_text,
+)
 from . import config, config_check, settings_dialog, theme
 from .constants import (
     ALIGN_LABELS,
@@ -164,6 +170,30 @@ def _scannable_entries(entries: list[dict]) -> list[dict] | None:
     return entries if entries and all(e.get("line", 0) > 0 for e in entries) else None
 
 
+def cover_from_form(basic_tab: dict[str, Any]) -> Resource | None:
+    """封面组的三个控件 → core 的 `Resource | None`。
+
+    与 CLI 走同一个 `cover_for()`，同一套优先级：显式路径 > 同目录自动发现 > 文字封面页。
+
+    封面框的内容**原样传**，不 `or None`：空串在 `cover_for()` 里是「用户显式说了不要
+    封面」（把框清空了），`None` 才是「没指定，交给发现」。写成 `or None` 就把这两种
+    抹平了——用户清空框反而会被系统替他找一张 cover.png 出来。
+
+    源文件框反过来要 `or None`：那里「空」是「没选」，而 `cover_for()` 的 `input_path`
+    只在需要定位同目录时才用得上，空串会让 `Path("")` 变成当前目录。
+
+    `discovery` 这个参数在界面上其实**推不出结果**：框里有值时显式路径赢，框空时空串
+    短路，两条路都轮不到它。它照实传是为了跟 `cover_for()` 的签名对齐、也让「界面上
+    发现是关的」这件事在这个调用点看得见。GUI 里「自动发现封面」真正起作用的地方是
+    `App._pick_input()`——不勾就不在选文件时预填路径。生成阶段一律以框里的内容为准。
+    """
+    return cover_for(
+        basic_tab["cover_entry"].get().strip(),
+        basic_tab["input_entry"].get().strip() or None,
+        basic_tab["cover_discovery_var"].get(),
+    )
+
+
 #: Tab 名 → (显示文字, 构建函数)
 _TABS = (
     ("basic", "基础", basic.build),
@@ -204,6 +234,7 @@ def collect_saved(
         # 基础 tab：文件、书籍信息、封面、其他
         "clean": bool(basic_tab["clean_var"].get()),
         "text_cover": bool(basic_tab["text_cover_var"].get()),
+        "cover_discovery": bool(basic_tab["cover_discovery_var"].get()),
         "toc_in_spine": bool(basic_tab["toc_in_book_var"].get()),
         # 规则 tab 的预置行：驱动自 `rules.BUILTIN_ROWS`，不在这里再抄一份字段名单。
         # 抄过的那份漏了「字数上限」和「无标题章节」，两个框里的值存不进配置——
@@ -285,6 +316,8 @@ def apply_saved(
         basic_tab["toc_in_book_var"].set(bool(saved["toc_in_spine"]))
     if "text_cover" in saved:
         basic_tab["text_cover_var"].set(bool(saved["text_cover"]))
+    if "cover_discovery" in saved:
+        basic_tab["cover_discovery_var"].set(bool(saved["cover_discovery"]))
 
     # 排版文本：layout.py 里这些值是 placeholder，不是初值，所以得在这里真填进去。
     # 存档可能被手改：`indent` 是 int 字段，塞进 "abc" 只会等到生成时报错，
@@ -572,10 +605,12 @@ class App(ctk.CTk):
         title, author = resolve_metadata(src)
         _replace_entry(basic_tab["book_title"], title or "")
         _replace_entry(basic_tab["book_author"], author or "")
-        # 封面自动发现在这里只作**预览**：告诉用户找到了哪张。生成的权威判断在
-        # `_collect_sources()` 的 `cover_for()`，与 CLI 同一个函数。
-        cover = find_cover(src)
-        _replace_entry(basic_tab["cover_entry"], str(cover) if cover else "")
+        # 封面自动发现在这里只作**预填**：告诉用户找到了哪张，填进框里他看得见、改得动。
+        # 「自动发现封面」没勾就整段跳过，一个字段都不碰——用户已经说了不要替他找。
+        # 生成阶段的权威判断在 `_collect_sources()` 的 `cover_for()`，与 CLI 同一个函数。
+        if basic_tab["cover_discovery_var"].get():
+            cover = find_cover(src)
+            _replace_entry(basic_tab["cover_entry"], str(cover) if cover else "")
         _replace_entry(basic_tab["output_entry"], str(src.with_suffix(".epub")))
 
         self._on_scan()  # 扫失败弹窗并保留已填的路径
@@ -724,7 +759,8 @@ class App(ctk.CTk):
             "author": basic_tab["book_author"].get().strip(),
             "date": basic_tab["book_date"].get().strip() or None,
             "language": basic_tab["lang_menu"].get(),
-            "text_cover": bool(basic_tab["text_cover_var"].get()),
+"text_cover": bool(basic_tab["text_cover_var"].get()),
+            "cover_discovery": bool(basic_tab["cover_discovery_var"].get()),
             # 文本处理
             "clean": bool(basic_tab["clean_var"].get()),
             # 排版
@@ -789,13 +825,7 @@ class App(ctk.CTk):
         font_path = layout_tab["font_entry"].get().strip()
         font = font_resource(font_path) if font_path else None
 
-        # 封面：显式优先，留空则按 CLI 同一套规则自动发现（同目录恰好一张 cover.*）；
-        # text_cover=False 时跳过自动发现，由 builder 走文字封面逻辑。
-        cover = cover_for(
-            basic_tab["cover_entry"].get().strip() or None,
-            basic_tab["input_entry"].get().strip() or None,
-            basic_tab["text_cover_var"].get(),
-        )
+        cover = cover_from_form(basic_tab)
 
         return Sources(
             toc_entries=toc_entries,

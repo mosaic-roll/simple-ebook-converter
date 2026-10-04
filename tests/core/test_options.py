@@ -292,8 +292,30 @@ def test_missing_asset_is_rejected(tmp_path):
         _config(tmp_path, css_append=str(tmp_path / "nope.css"))
 
 
+def test_empty_cover_path_turns_discovery_off(tmp_path):
+    """`--cover ""` 与 GUI 清空封面框同义：显式说不要封面。
+
+    `_path()` 会把空串归一成 `None`（`Config.cover` 的类型要求），不在这儿记一笔的话
+    「显式不要」就被抹成了「没给」，自动发现又去同目录翻一张 cover.png 出来。
+    """
+    assert _config(tmp_path, cover="").cover_discovery is False
+
+
+def test_absent_cover_keeps_discovery_on(tmp_path):
+    """没给 `--cover` 不碰发现开关——那才是「没指定，该去找」。"""
+    assert _config(tmp_path).cover_discovery is True
+
+
+def test_empty_cover_path_beats_the_discovery_switch(tmp_path):
+    """空路径压过发现开关，与 GUI 一致。
+
+    GUI 那边封面框清空时，`cover_for("")` 在看 `discovery` 之前就返回 None 了——
+    显式的路径状态比开关更具体。命令行不能有另一种解释。
+    """
+    assert _config(tmp_path, cover="", cover_discovery=True).cover_discovery is False
+
+
 def test_output_paths_need_not_exist(tmp_path):
-    """输出路径不要求已存在：本来就是要写出来的。"""
     cfg = _config(
         tmp_path,
         out=str(tmp_path / "deep" / "a.epub"),

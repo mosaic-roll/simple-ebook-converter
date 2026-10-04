@@ -6,6 +6,7 @@ import tkinter as tk
 
 import customtkinter as ctk
 
+from ...core.options import option_label
 from ..constants import (
     CHECK_PADX,
     CHECK_PADY_LAST,
@@ -74,7 +75,23 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
     ).grid(
         row=2,
         column=0,
-        columnspan=4,
+        padx=CHECK_PADX,
+        pady=CHECK_PADY_LAST,
+        sticky="w",
+    )
+    # 排在文字封面右边。两个开关各自独立、都默认开：文字封面管「没图时画不画一页」，
+    # 自动发现管「去不去同目录找图」。标签取 core 选项表里的 `cover_discovery`，不手抄。
+    cover_discovery_var = tk.BooleanVar(
+        master=c, value=_bool_default("cover_discovery", ctx)
+    )
+    ctk.CTkCheckBox(
+        c,
+        text=option_label("cover_discovery"),
+        variable=cover_discovery_var,
+        font=ctx.fonts.base,
+    ).grid(
+        row=2,
+        column=2,
         padx=CHECK_PADX,
         pady=CHECK_PADY_LAST,
         sticky="w",
@@ -121,6 +138,7 @@ def build(parent: ctk.CTkFrame, ctx: GuiContext) -> dict:
         "lang_menu": lang_menu,
         "cover_entry": cover_entry,
         "text_cover_var": text_cover_var,
+        "cover_discovery_var": cover_discovery_var,
         "clean_var": clean_var,
         "toc_in_book_var": toc_in_book_var,
     }

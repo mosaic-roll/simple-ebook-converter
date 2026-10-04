@@ -59,10 +59,15 @@ def _param_name(opt: Option) -> str:
 
 
 def _click_type(opt: Option):
-    """选项类型 → click 参数类型。`--level` 这类多值项只管单个值的类型。"""
+    """选项类型 → click 参数类型。`--level` 这类多值项只管单个值的类型。
+
+    `allow_empty` 的选项（如 `--cover`）用 STRING：`click.Path(exists=True)` 会把空串当成
+    「文件不存在」直接报错，可空串在那里恰恰有确切含义——显式说不要封面。存在性检查
+    没丢，`options._path()` 照样查非空路径。
+    """
     if opt.choices:
         return click.Choice(opt.choices)
-    if opt.kind is Path:
+    if opt.kind is Path and not opt.allow_empty:
         return click.Path(exists=not opt.output, dir_okay=False, path_type=Path)
     return click.INT if opt.kind is int else click.STRING
 

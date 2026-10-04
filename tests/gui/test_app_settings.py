@@ -76,6 +76,7 @@ def ui():
         "basic": {
             "clean_var": FakeVar(True),
             "text_cover_var": FakeVar(True),
+            "cover_discovery_var": FakeVar(True),
             "toc_in_book_var": FakeVar(True),
         },
         "layout": {
@@ -223,6 +224,21 @@ def test_max_title_len_round_trips(ui):
     saved = _collect(ui)
     _apply(ui, saved)
     assert _collect(ui)["max_title_len"] == 40
+
+
+def test_cover_discovery_is_saved_and_restored(ui):
+    """封面页两个勾选框都要落盘——漏一个，下次打开就悄悄变回默认。"""
+    ui[0]["basic"]["cover_discovery_var"].set(False)
+    ui[0]["basic"]["text_cover_var"].set(False)
+    saved = _collect(ui)
+    assert saved["cover_discovery"] is False
+    assert saved["text_cover"] is False
+
+    ui[0]["basic"]["cover_discovery_var"].set(True)
+    ui[0]["basic"]["text_cover_var"].set(True)
+    _apply(ui, saved)
+    assert _collect(ui)["cover_discovery"] is False
+    assert _collect(ui)["text_cover"] is False
 
 
 def test_collect_saved_drops_a_bad_align(ui):

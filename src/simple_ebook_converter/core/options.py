@@ -66,6 +66,12 @@ class Option:
     negative: bool = False
     #: 输出路径：不要求已存在
     output: bool = False
+    #: 空串是一个**有意义的值**，不是「没给」。
+    #:
+    #: `cover` 用它：`--cover ""` 表示显式不要封面（与 GUI 清空封面框同义），而 `None`
+    #: 才是没指定、该去自动发现。click 的 `Path(exists=True)` 会把空串当非法路径挡掉，
+    #: 所以这种选项不能用 click.Path 收，交给 `build_config()` 判。
+    allow_empty: bool = False
     #: 可重复（`--level`）
     multiple: bool = False
     choices: tuple[str, ...] = ()
@@ -141,11 +147,12 @@ OPTIONS: tuple[Option, ...] = (
     Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
     Option("date", "出版日期", "如 1949-10-01，留空则不写入", "书籍信息"),
     Option("language", "语言", "语言代码", "书籍信息"),
-    Option(
+Option(
         "cover",
         "封面图",
-        "封面图片路径；不给则按「自动发现封面」决定",
+        "封面图片路径；省略则自动发现封面",
         "书籍信息",
+        allow_empty=True,
     ),
     Option(
         "cover_discovery",
@@ -281,6 +288,15 @@ def option_default(opt: Option) -> Any:
     return () if opt.multiple else (False if opt.kind is bool else "")
 
 
+def option_label(name: str) -> str:
+    """按名字取选项的中文标签，给 GUI 摆控件用。
+
+    GUI 的控件标签一律从这张表出（见 `defaults.default_text` 的同类约定），不手抄——
+    抄的那份总会和 `--help` 对不上。
+    """
+    return _option(name).label
+
+
 # ---------- 原始值 → Config ----------
 
 
@@ -306,6 +322,16 @@ def build_config(
     values = dict(values)
     if values.pop("no_volume", None) and values.get("volume") is None:
         values["volume"] = ""  # --no-volume only wins when --volume is not given
+    # `--cover ""` 与 GUI 把封面框清空是同一个意思：显式说不要封面。`_path()` 会把空串
+    # 归一成 `None`（那是 `Config.cover` 的类型要求），不在这儿记一笔的话，「显式不要」
+    # 就被抹成了「没给」，自动发现又去同目录翻一张 cover.png 出来——正好是用户清空框
+    # 想避免的那件事。所以在这里直接把发现关掉，结果与 `cover_for("")` 一致。
+    #
+    # 空路径**压过**发现开关，跟 GUI 一样：`cover_for("")` 是在看 `discovery` 之前就返回
+    # None 的，命令行不能有第二种解释。只认「给了但为空」（`values["cover"] is not None`
+    # 且归一后为空），「没给」不碰。
+    if values.get("cover") is not None and _text(values["cover"]) is None:
+        values["cover_discovery"] = False
     if replacements is None:
         replacements = rules_from_file(
             _path(_option("replace_rules"), values.get("replace_rules"))
