@@ -67,12 +67,9 @@ def test_default_chapter_regex_covers_common_headings():
         "楔子",
         "序章",
         "Chapter 1",
-        "12",
-        "1、",
         "番外 后日谈",
         "最终章",
         "终章",
-        "第100章:副标题",
         "引子",
         "前言",
     ):
@@ -80,6 +77,11 @@ def test_default_chapter_regex_covers_common_headings():
     assert re.match(DEFAULT_VOLUME_RE, "第一卷 风起")
     # 「篇」不算卷，避免正文里的「第一篇」被误判
     assert not re.match(DEFAULT_VOLUME_RE, "第一篇 习作")
+    # 纯数字和数字+标点不再匹配（太容易误报）
+    assert not re.match(DEFAULT_CHAPTER_RE, "12")
+    assert not re.match(DEFAULT_CHAPTER_RE, "1、")
+    # 冒号分隔符也不再匹配（用户改用了空格/无分隔）
+    assert not re.match(DEFAULT_CHAPTER_RE, "第100章:副标题")
 
 
 def test_default_regexes_only_match_from_line_start():

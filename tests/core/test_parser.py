@@ -87,7 +87,8 @@ def test_english_and_numbered_titles_match_chapter():
         "正文四",
     ]
     tree, _ = parse(lines, default_levels(), fallback_title="书名")
-    assert [n.title for n in tree] == ["Chapter 1", "Section 2", "12", "5、"]
+    # 纯数字和数字+顿号不再匹配章标题（容易误报）；Section 也不匹配（已移除）
+    assert [n.title for n in tree] == ["Chapter 1"]
 
 
 def test_pian_not_volume():
