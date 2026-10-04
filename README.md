@@ -114,14 +114,3 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 ## 文档
 
 完整命令行选项、章节识别、替换规则、目录树等，见 [doc/cli.md](doc/cli.md)。
-
-## 作为库使用
-
-```python
-from pathlib import Path
-from simple_ebook_converter.core.config import Config
-from simple_ebook_converter.core.pipeline import read_book
-
-cfg = Config(input=Path("novel.txt"))
-book = read_book(cfg)
-```
