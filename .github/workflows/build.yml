@@ -33,7 +33,7 @@ jobs:
         run: uv pip install "nuitka[onefile]"
 
       - name: Create output directory
-        run: New-Item -ItemType Directory -Force -Path dist
+        run: mkdir -p dist
 
       - name: Build CLI executable
         shell: bash
