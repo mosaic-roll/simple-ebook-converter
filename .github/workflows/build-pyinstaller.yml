@@ -35,23 +35,11 @@ jobs:
       - name: Install pyinstaller
         run: uv pip install pyinstaller
 
-      - name: Build CLI executable
+      - name: Build executable
         run: |
           uv run pyinstaller `
             --clean `
             --noconfirm `
-            --name=simple-ebook-converter-cli `
-            --distpath=dist `
-            --paths=src `
-            --copy-metadata=simple-ebook-converter `
-            src/simple_ebook_converter/launcher.py
-
-      - name: Build GUI executable
-        run: |
-          uv run pyinstaller `
-            --clean `
-            --noconfirm `
-            --noconsole `
             --name=simple-ebook-converter `
             --distpath=dist `
             --hidden-import=customtkinter `
