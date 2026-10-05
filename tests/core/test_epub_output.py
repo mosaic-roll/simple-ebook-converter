@@ -160,10 +160,18 @@ def test_main_content_wraps_the_heading_too():
 
 
 def test_cover_page_keeps_its_own_section():
-    """封面页容器仍是 `.cover`，不被正文的壳波及。"""
+    """封面页容器带 `.cover`，不被正文的壳波及。"""
     page = _cover_xhtml()
-    assert '<section class="cover"' in page
     assert "main-content" not in page
+    assert re.search(r'<section class="[^"]*\bcover\b', page)
+
+
+def test_text_cover_page_carries_the_extra_class():
+    """文字封面多挂 `.text-cover`：内置样式靠它压低书名，图片封面不需要。"""
+    page = _cover_xhtml()
+    assert "text-cover" in page
+    image_page = _cover_xhtml(sources=_cover_sources())
+    assert "text-cover" not in image_page
 
 
 def test_deep_headings_share_the_ancestor_page():
@@ -435,11 +443,10 @@ def test_image_body_escapes_src_and_alt():
 
 def test_text_body_title_and_author():
     body = text_cover_body("书名", "作者")
-    assert '<section class="cover" epub:type="cover">' in body
+    assert '<section class="cover text-cover" epub:type="cover">' in body
     assert '<h1 class="book-title">书名</h1>' in body
     assert '<p class="book-author">作者</p>' in body
     assert "<img" not in body
-    assert 'class="cover"' in body
 
 
 def test_text_body_omits_missing_parts():
@@ -450,7 +457,7 @@ def test_text_body_omits_missing_parts():
 def test_text_body_empty_still_valid_section():
     assert (
         text_cover_body("", "")
-        == '<section class="cover" epub:type="cover">\n</section>'
+        == '<section class="cover text-cover" epub:type="cover">\n</section>'
     )
 
 

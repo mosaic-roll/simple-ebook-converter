@@ -100,13 +100,15 @@ h3.chapter {{
     css.append(""".cover {
   margin: 0;
 }
-.cover .book-title {
-  margin-top: 20%;
-  margin-bottom: 0;
+.text-cover {
+  margin-top: 20vh;
+}
+.text-cover .book-title {
+  margin: 0;
   font-size: 3em;
   text-align: center;
 }
-.cover .book-author {
+.text-cover .book-author {
   margin: 0;
   padding-top: 1em;
   font-size: 1.5em;
@@ -135,7 +137,7 @@ def text_cover_body(title: str, author: str = "") -> str:
 
     标签用 `h1` / `p`，另挂 class 供样式定位。
     """
-    parts = [f'<section class="cover" epub:type="{COVER_SECTION_TYPE}">']
+    parts = [f'<section class="cover text-cover" epub:type="{COVER_SECTION_TYPE}">']
     if title:
         parts.append(f'  <h1 class="book-title">{escape(title)}</h1>')
     if author:

@@ -46,11 +46,13 @@ def test_headings_centered_by_default():
 
 
 def test_cover_css_rules_present():
-    """封面页靠 `.cover` 这组 class 上样式（图片封面与文字封面共用同一个容器）。"""
+    """封面页靠 `.cover` 这组 class 上样式（图片封面与文字封面共用同一个容器），
+    文字封面另有 `.text-cover` 负责把书名作者压到页面偏下的位置。"""
     rules = parse_css(build_css(Config()))
     assert "margin" in rules[".cover"]
     assert "max-height" in rules[".cover img"]
-    assert rules[".cover .book-title"]["text-align"] == "center"
+    assert "margin-top" in rules[".text-cover"]
+    assert rules[".text-cover .book-title"]["text-align"] == "center"
 
 
 def test_css_text_replaces_builtin():
@@ -70,12 +72,12 @@ def test_builtin_css_is_unaffected_by_css_text():
 def test_css_append_text_adds_to_builtin():
     """`Sources.css_append_text` 加在内置样式之后，所以能覆盖内置规则。"""
     css = build_css(
-        Config(), Sources(css_append_text=".cover .book-title { color: red; }")
+        Config(), Sources(css_append_text=".text-cover .book-title { color: red; }")
     )
     # 追加在后面是层叠契约：同特异性的规则靠后写的赢，追加到前面就压不住内置值。
     assert css.index("color: red;") > css.index("max-height: 100vh;")
     assert "text-indent" in css  # 内置正文样式还在
-    assert parse_css(css)[".cover .book-title"]["color"] == "red"
+    assert parse_css(css)[".text-cover .book-title"]["color"] == "red"
 
 
 def test_css_append_text_keeps_font_face():
