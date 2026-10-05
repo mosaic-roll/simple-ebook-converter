@@ -48,6 +48,8 @@ def launcher(cli_mode: bool, args: tuple[str, ...]) -> None:
         cli_main(argv=list(args))
         return
 
+    if _is_freeconsole_build():
+        _free_console()
     gui_main.main(
         args=list(args), prog_name="simple-ebook-converter", standalone_mode=True
     )
@@ -62,6 +64,29 @@ def _is_cli_build() -> bool:
     """专用命令行包的 exe 名以 `-cli` 结尾，双击即可直接进命令行模式。"""
     stem = _exe_stem()
     return stem.endswith(("-cli", "_cli"))
+
+
+def _is_freeconsole_build() -> bool:
+    """FreeConsole 试验版：exe 名以 `-freeconsole` 结尾。"""
+    stem = _exe_stem()
+    return stem.endswith(("-freeconsole", "_freeconsole"))
+
+
+def _free_console() -> None:
+    """脱离当前控制台。
+
+    双击启动时控制台是本进程独占创建的，`FreeConsole` 一断开它就随之消失，
+    比 `ShowWindow(SW_HIDE)` 更彻底。副作用是之后 `print()` 没有去处，
+    GUI 若崩溃则报错无处可看，所以只用于试验对比。
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.kernel32.FreeConsole()
+    except Exception:  # noqa: BLE001, S110 - 脱离失败不应影响 GUI 启动
+        pass
 
 
 def main() -> int:

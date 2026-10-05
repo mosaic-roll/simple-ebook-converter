@@ -139,6 +139,60 @@ def test_gui_startup_failure_propagates(monkeypatch):
         launcher.main()
 
 
+def test_is_freeconsole_build_by_name(monkeypatch):
+    for name, expected in [
+        ("simple-ebook-converter-freeconsole.exe", True),
+        ("simple_ebook_converter_freeconsole.exe", True),
+        ("simple-ebook-converter-versatile.exe", False),
+        ("simple-ebook-converter-gui.exe", False),
+        ("simple-ebook-converter-cli.exe", False),
+    ]:
+        monkeypatch.setattr(launcher.sys, "executable", name)
+        assert launcher._is_freeconsole_build() is expected, name
+
+
+def test_freeconsole_build_detaches_console(monkeypatch, dispatched):
+    """试验版：进 GUI 前调 FreeConsole 脱离控制台。"""
+    called: list[bool] = []
+    monkeypatch.setattr(launcher, "_free_console", lambda: called.append(True))
+    run_main(monkeypatch, [], exe="simple-ebook-converter-freeconsole.exe")
+    assert called == [True]
+    assert dispatched == [("gui", [])]
+
+
+def test_versatile_build_does_not_touch_console(monkeypatch, dispatched):
+    """正式版不做任何控制台处理。"""
+    monkeypatch.setattr(
+        launcher,
+        "_free_console",
+        lambda: pytest.fail("正式版不应调用 FreeConsole"),
+    )
+    run_main(monkeypatch, [], exe="simple-ebook-converter-versatile.exe")
+    assert dispatched == [("gui", [])]
+
+
+def test_freeconsole_failure_does_not_break_startup(monkeypatch):
+    """FreeConsole 拿不到句柄时必须静默继续。"""
+    import ctypes
+
+    class Boom:
+        def __getattr__(self, name):
+            raise AttributeError(name)
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "windll", Boom())
+    launcher._free_console()  # 不应抛异常
+
+
+def test_freeconsole_not_called_in_cli_mode(monkeypatch, dispatched):
+    """命令行模式不能脱离控制台，否则没有输出。"""
+    monkeypatch.setattr(
+        launcher, "_free_console", lambda: pytest.fail("CLI 模式不应 FreeConsole")
+    )
+    run_main(monkeypatch, ["--cli", "book.txt"], exe="x-freeconsole.exe")
+    assert dispatched == [("cli", ["book.txt"])]
+
+
 def test_exe_stem_uses_executable_name(monkeypatch):
     monkeypatch.setattr(
         launcher.sys, "executable", r"C:\dist\simple-ebook-converter-versatile.exe"
