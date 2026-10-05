@@ -19,18 +19,22 @@ from simple_ebook_converter.cli.cli import main as cli_main
 from simple_ebook_converter.gui.__main__ import main as gui_main
 
 
-def _hide_console_window() -> None:
-    """隐藏本进程的控制台窗口（仅 Windows 有效，失败时静默忽略）。"""
+def _set_console_visible(visible: bool) -> None:
+    """显示/隐藏本进程的控制台窗口。
+
+    `GetConsoleWindow` 在 kernel32，`ShowWindow` 在 user32，写错模块会抛
+    `AttributeError`；这里兜住所有异常，宁可不隐藏也不能让 GUI 起不来。
+    """
     if sys.platform != "win32":
         return
     try:
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32
-        hwnd = kernel32.GetConsoleWindow()
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
-            kernel32.ShowWindow(hwnd, 0)  # SW_HIDE
-    except OSError:
+            # SW_HIDE=0, SW_SHOW=5
+            ctypes.windll.user32.ShowWindow(hwnd, 5 if visible else 0)
+    except Exception:  # noqa: BLE001, S110 - 隐藏失败不应影响 GUI 启动
         pass
 
 
@@ -59,10 +63,17 @@ def launcher(ctx: click.Context, cli_mode: bool, args: tuple[str, ...]) -> None:
         cli_main(argv=list(args))
         return
 
-    _hide_console_window()
-    gui_main.main(
-        args=list(args), prog_name="simple-ebook-converter", standalone_mode=True
-    )
+    _set_console_visible(False)
+    try:
+        gui_main.main(
+            args=list(args), prog_name="simple-ebook-converter", standalone_mode=True
+        )
+    except SystemExit:
+        raise
+    except BaseException:
+        # 控制台已隐藏，GUI 启动失败时若不恢复就什么都看不到，只会闪一下就消失
+        _set_console_visible(True)
+        raise
 
 
 def main() -> int:
