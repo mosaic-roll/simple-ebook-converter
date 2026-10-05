@@ -147,8 +147,10 @@ OPTIONS: tuple[Option, ...] = (
     Option("author", "作者", "留空则从文件名猜；仍留空则不写入元数据", "书籍信息"),
     Option("date", "出版日期", "如 1949-10-01，留空则不写入", "书籍信息"),
     Option("language", "语言", "语言代码", "书籍信息"),
-    Option("description", "简介", "书籍简介，留空则不写入 `dc:description`", "书籍信息"),
-Option(
+    Option(
+        "description", "简介", "书籍简介，留空则不写入 `dc:description`", "书籍信息"
+    ),
+    Option(
         "cover",
         "封面图",
         "封面图片路径；省略则自动发现封面",

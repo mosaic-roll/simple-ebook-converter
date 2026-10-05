@@ -175,7 +175,11 @@ def test_extra_level_agrees_with_core():
     """净化后的行一定能喂给 core——不能出现「存得下、生成时才炸」的中间态。"""
     from simple_ebook_converter.core.levels import build_rules
 
-    for level, class_name, regex in [("h5", "note", "^Part"), ("abc", "note", "^P"), ("h5", "n", "(")]:
+    for level, class_name, regex in [
+        ("h5", "note", "^Part"),
+        ("abc", "note", "^P"),
+        ("h5", "n", "("),
+    ]:
         row = extra_level(level, class_name, regex)
         number = level_number(row["level"])
         if number is None or not row["regex"]:

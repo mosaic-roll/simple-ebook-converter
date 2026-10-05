@@ -263,12 +263,8 @@ def _make_card(
     # 注意：placeholder 恢复走 _bind_placeholder_restore 的 FocusOut 绑定，
     # 我们的 on_change() 绑定在前（先绑），placeholder 绑定在后（add=True）——
     # 顺序保证 on_change() 先跑，不会干扰 placeholder 恢复。
-    pattern_entry._entry.bind(
-        "<FocusOut>", lambda _e=None: on_change(), add=False
-    )  # type: ignore[attr-defined]
-    replace_entry._entry.bind(
-        "<FocusOut>", lambda _e=None: on_change(), add=False
-    )  # type: ignore[attr-defined]
+    pattern_entry._entry.bind("<FocusOut>", lambda _e=None: on_change(), add=False)  # type: ignore[attr-defined]
+    replace_entry._entry.bind("<FocusOut>", lambda _e=None: on_change(), add=False)  # type: ignore[attr-defined]
     _bind_placeholder_restore(pattern_entry)
     _bind_placeholder_restore(replace_entry)
 

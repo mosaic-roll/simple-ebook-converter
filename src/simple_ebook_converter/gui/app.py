@@ -259,7 +259,7 @@ def collect_saved(
             for row in rules_tab["extra_rows"]
         ],
         # 排版 tab：段落、对齐方式、嵌入字体、自定义 CSS
-# 对齐用 `.get`：`_on_close` 只接 `OSError`，一个不认识的值抛 `KeyError` 会让整轮
+        # 对齐用 `.get`：`_on_close` 只接 `OSError`，一个不认识的值抛 `KeyError` 会让整轮
         # 配置存不下，比存空更糟。取不到就是 None，交给 core 默认。
         "volume_align": config_check.as_stored(
             "volume_align", ALIGN_LABELS.get(layout_tab["align_volume"].get())
@@ -373,9 +373,7 @@ def apply_saved(
 
     for label, opt_name, _mode in rules.BUILTIN_ROWS:
         if opt_name in saved:
-            _replace_entry(
-                rules_tab["rule_entries"][label], str(saved[opt_name] or "")
-            )
+            _replace_entry(rules_tab["rule_entries"][label], str(saved[opt_name] or ""))
 
     # 额外层级：先清空 build 里预置的两行，再按存档逐条重建（存档有几行就有几行，
     # 含用户刻意留的空行）
@@ -536,7 +534,13 @@ class App(ctk.CTk):
         # 存盘前先校验核心字段：非法值会被 as_stored 过滤成 None，但用户手动编辑
         # config.json 时可能绕过这层，这里补一次硬校验，警告后仍落盘（保持友好）。
         errors = []
-        for name in ("indent", "line_height", "para_spacing", "max_title_len", "toc_depth"):
+        for name in (
+            "indent",
+            "line_height",
+            "para_spacing",
+            "max_title_len",
+            "toc_depth",
+        ):
             raw = self._collect_saved().get(name)
             msg = field_error(name, raw)
             if msg:
@@ -785,7 +789,7 @@ class App(ctk.CTk):
             "language": basic_tab["lang_menu"].get(),
             "description": basic_tab["book_description"].get("1.0", "end-1c").strip()
             or None,
-"text_cover": bool(basic_tab["text_cover_var"].get()),
+            "text_cover": bool(basic_tab["text_cover_var"].get()),
             "cover_discovery": bool(basic_tab["cover_discovery_var"].get()),
             # 文本处理
             "clean": bool(basic_tab["clean_var"].get()),

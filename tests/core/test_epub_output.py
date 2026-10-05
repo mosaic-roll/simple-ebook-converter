@@ -36,7 +36,9 @@ def _default_tree():
 def _section_tree():
     """章(h3) 下带两个节(h4)：节应该并入章的页，而不是各建一个文件。"""
     lines = ["第一章 开端", "※清晨", "正文甲", "※黄昏", "正文乙"]
-    return parse(lines, _with_defaults(LevelRule(4, "^※", "section")), fallback_title="测试书")[0]
+    return parse(
+        lines, _with_defaults(LevelRule(4, "^※", "section")), fallback_title="测试书"
+    )[0]
 
 
 def _with_defaults(*extra: LevelRule):
@@ -270,14 +272,14 @@ def test_text_cover_escapes_markup():
 
 
 def test_text_cover_omits_author_when_empty():
-    page = _cover_xhtml(cfg=Config(input=Path("novel.txt"), title="书名")
-    )
+    page = _cover_xhtml(cfg=Config(input=Path("novel.txt"), title="书名"))
     assert "<p" not in page
 
 
 def test_cover_page_links_stylesheet():
     """封面页必须链到 style.css，否则内置封面样式和外部 CSS 都对它无效。"""
-    assert "style.css" in _cover_xhtml(cfg=Config(input=Path("novel.txt"), title="书名")
+    assert "style.css" in _cover_xhtml(
+        cfg=Config(input=Path("novel.txt"), title="书名")
     )
     assert "style.css" in _cover_xhtml(
         cfg=Config(input=Path("novel.txt")),
@@ -372,7 +374,10 @@ def test_font_href_and_css_url_follow_the_renamed_file(tmp_path):
 def test_preface_built():
     cfg = Config(input=Path("novel.txt"))
     tree, _ = parse(
-        ["开篇语", "第1章 一", "正文"], cfg.levels, preface_title="前言", fallback_title="x"
+        ["开篇语", "第1章 一", "正文"],
+        cfg.levels,
+        preface_title="前言",
+        fallback_title="x",
     )
     epub = _build(cfg=cfg, tree=tree)
     assert epub.text_pages(), "前言应该单独成页"
@@ -382,7 +387,10 @@ def test_preface_and_fallback_use_h3():
     """前言/兜底单章（level 0）按章级渲染 h3；h1 留给书名（文字封面页）。"""
     cfg = Config(input=Path("novel.txt"))
     tree, _ = parse(
-        ["开篇语", "第1章 一", "正文"], cfg.levels, preface_title="前言", fallback_title="x"
+        ["开篇语", "第1章 一", "正文"],
+        cfg.levels,
+        preface_title="前言",
+        fallback_title="x",
     )
     page = _preface_page(_build(cfg=cfg, tree=tree))
     assert_heading(page, "h3", "前言", class_name="chapter")

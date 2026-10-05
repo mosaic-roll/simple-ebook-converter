@@ -16,7 +16,9 @@ from helpers import Epub
 def novel(tmp_path: Path) -> Path:
     """一份最小可解析的输入：前言 + 两章。"""
     path = tmp_path / "novel.txt"
-    path.write_text("前言内容\n第一章 一\n正文一\n第二章 二\n正文二\n", encoding="utf-8")
+    path.write_text(
+        "前言内容\n第一章 一\n正文一\n第二章 二\n正文二\n", encoding="utf-8"
+    )
     return path
 
 

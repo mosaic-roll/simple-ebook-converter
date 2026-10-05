@@ -13,7 +13,7 @@ from helpers import Epub, assert_heading, parse_css, resolve_href
 CONTAINER = (
     '<?xml version="1.0"?>\n'
     '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">\n'
-    "  <rootfiles><rootfile full-path=\"{opf}\""
+    '  <rootfiles><rootfile full-path="{opf}"'
     ' media-type="application/oebps-package+xml"/></rootfiles>\n'
     "</container>\n"
 )
@@ -54,9 +54,12 @@ def make_epub(items=(), refs=(), opf="EPUB/content.opf"):
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("mimetype", "application/epub+zip")
         z.writestr("META-INF/container.xml", CONTAINER.format(opf=opf))
-        z.writestr(opf, OPF_HEAD + manifest + OPF_TAIL % "".join(
-            ITEMREF.format(idref=r) for r in refs
-        ))
+        z.writestr(
+            opf,
+            OPF_HEAD
+            + manifest
+            + OPF_TAIL % "".join(ITEMREF.format(idref=r) for r in refs),
+        )
         for _, href, _, content, _ in items:
             z.writestr(f"EPUB/{href}", b"" if content is None else content)
     return Epub(buf.getvalue())
@@ -105,11 +108,18 @@ def test_container_full_path_is_package_root_relative_not_meta_inf_relative():
 def test_links_reachable_passes_on_a_consistent_book():
     epub = make_epub(
         items=[
-            item("chapter_0", "text/p0001.xhtml",
-                 content='<h4 id="p0002">※清晨</h4><link href="../style.css"/>'),
+            item(
+                "chapter_0",
+                "text/p0001.xhtml",
+                content='<h4 id="p0002">※清晨</h4><link href="../style.css"/>',
+            ),
             item("css", "style.css", "text/css", b"body{}"),
-            item("nav", "nav.xhtml", content='<a href="text/p0001.xhtml#p0002">目录</a>',
-                 props="nav"),
+            item(
+                "nav",
+                "nav.xhtml",
+                content='<a href="text/p0001.xhtml#p0002">目录</a>',
+                props="nav",
+            ),
         ],
         refs=["nav", "chapter_0"],
     )
@@ -118,8 +128,14 @@ def test_links_reachable_passes_on_a_consistent_book():
 
 def test_links_reachable_catches_a_dangling_page():
     epub = make_epub(
-        items=[item("nav", "nav.xhtml", content='<a href="text/p0009.xhtml">目录</a>',
-                    props="nav")],
+        items=[
+            item(
+                "nav",
+                "nav.xhtml",
+                content='<a href="text/p0009.xhtml">目录</a>',
+                props="nav",
+            )
+        ],
         refs=["nav"],
     )
     with pytest.raises(AssertionError, match="指向不存在的条目"):
@@ -131,8 +147,12 @@ def test_links_reachable_catches_a_dangling_fragment():
     epub = make_epub(
         items=[
             item("chapter_0", "text/p0001.xhtml", content="<h4>清晨</h4>"),
-            item("nav", "nav.xhtml",
-                 content='<a href="text/p0001.xhtml#p0002">清晨</a>', props="nav"),
+            item(
+                "nav",
+                "nav.xhtml",
+                content='<a href="text/p0001.xhtml#p0002">清晨</a>',
+                props="nav",
+            ),
         ],
         refs=["nav", "chapter_0"],
     )
@@ -142,7 +162,9 @@ def test_links_reachable_catches_a_dangling_fragment():
 
 def test_links_reachable_catches_a_missing_stylesheet():
     epub = make_epub(
-        items=[item("chapter_0", "text/p0001.xhtml", content='<link href="../style.css"/>')],
+        items=[
+            item("chapter_0", "text/p0001.xhtml", content='<link href="../style.css"/>')
+        ],
         refs=["chapter_0"],
     )
     with pytest.raises(AssertionError, match="指向不存在的条目"):
@@ -151,8 +173,13 @@ def test_links_reachable_catches_a_missing_stylesheet():
 
 def test_links_reachable_skips_external_and_same_page():
     epub = make_epub(
-        items=[item("chapter_0", "text/p0001.xhtml",
-                    content='<a href="https://example.com">站外</a><a href="#p0001">本页</a>')],
+        items=[
+            item(
+                "chapter_0",
+                "text/p0001.xhtml",
+                content='<a href="https://example.com">站外</a><a href="#p0001">本页</a>',
+            )
+        ],
         refs=["chapter_0"],
     )
     epub.assert_links_reachable()
@@ -160,7 +187,13 @@ def test_links_reachable_skips_external_and_same_page():
 
 def test_links_reachable_reads_single_quoted_attributes():
     epub = make_epub(
-        items=[item("chapter_0", "text/p0001.xhtml", content="<a href='p0002.xhtml'>相邻</a>")],
+        items=[
+            item(
+                "chapter_0",
+                "text/p0001.xhtml",
+                content="<a href='p0002.xhtml'>相邻</a>",
+            )
+        ],
         refs=["chapter_0"],
     )
     with pytest.raises(AssertionError, match="指向不存在的条目"):
@@ -202,7 +235,9 @@ def test_manifest_media_types_accepts_truthful_declarations():
 def test_manifest_media_types_catches_a_lying_declaration(declared, data, actual):
     """扩展名和声明各自合法、互相撒谎——OPF-029 / PKG-022 就是这么报的。"""
     epub = make_epub(items=[item("x", "images/cover.png", declared, data)])
-    with pytest.raises(AssertionError, match=f"声明 '{declared}'，实际字节是 '{actual}'"):
+    with pytest.raises(
+        AssertionError, match=f"声明 '{declared}'，实际字节是 '{actual}'"
+    ):
         epub.assert_manifest_media_types_match_bytes()
 
 
@@ -241,9 +276,12 @@ def test_parse_css_splits_a_group_into_each_selector():
 
 def test_parse_css_drops_comments_before_reading_values():
     """`padding-left` 后面那条 `/* 装饰符号宽度 */` 不能粘进值里。"""
-    assert parse_css("p {\n  padding-left: 1.5em;  /* 装饰符号宽度 */\n}")["p"][
-        "padding-left"
-    ] == "1.5em"
+    assert (
+        parse_css("p {\n  padding-left: 1.5em;  /* 装饰符号宽度 */\n}")["p"][
+            "padding-left"
+        ]
+        == "1.5em"
+    )
 
 
 def test_parse_css_keeps_at_rules_as_keys():
@@ -254,7 +292,10 @@ def test_parse_css_keeps_at_rules_as_keys():
 
 def test_parse_css_lets_a_later_rule_win():
     """同选择器出现两次时后者覆盖——外部样式追加到内置之后的路径靠这个。"""
-    assert parse_css("body { color: red; }\nbody { color: blue; }")["body"]["color"] == "blue"
+    assert (
+        parse_css("body { color: red; }\nbody { color: blue; }")["body"]["color"]
+        == "blue"
+    )
 
 
 def test_parse_css_keeps_selectors_with_a_comment_on_the_same_line():
@@ -353,23 +394,29 @@ def test_spine_items_reads_an_explicit_linear_no():
         items=[item("cover", "cover.xhtml"), item("nav", "nav.xhtml")],
         refs=["cover", "nav"],
     )
-    epub.set_opf(lambda t: t.replace(
-        '<itemref idref="cover"/>', '<itemref idref="cover" linear="no"/>'
-    ))
+    epub.set_opf(
+        lambda t: t.replace(
+            '<itemref idref="cover"/>', '<itemref idref="cover" linear="no"/>'
+        )
+    )
     assert epub.spine_items() == [("cover", False), ("nav", True)]
 
 
 def test_manifest_item_selects_by_property():
     epub = make_epub(
-        items=[item("cover", "images/cover.png", "image/png", PNG, props="cover-image")],
+        items=[
+            item("cover", "images/cover.png", "image/png", PNG, props="cover-image")
+        ],
     )
     assert epub.manifest_item(prop="cover-image")["href"] == "images/cover.png"
 
 
 def test_manifest_item_complains_when_the_match_is_not_unique():
     epub = make_epub(
-        items=[item("a", "images/a.png", "image/png", PNG, props="cover-image"),
-               item("b", "images/b.png", "image/png", PNG, props="cover-image")],
+        items=[
+            item("a", "images/a.png", "image/png", PNG, props="cover-image"),
+            item("b", "images/b.png", "image/png", PNG, props="cover-image"),
+        ],
     )
     with pytest.raises(AssertionError, match="期望恰好一条 manifest item"):
         epub.manifest_item(prop="cover-image")
@@ -384,7 +431,9 @@ def test_text_pages_lists_sorted():
 
 def test_nav_finds_the_item_marked_as_nav():
     epub = make_epub(
-        items=[item("nav", "nav.xhtml", content="<nav/>", props="nav"),
-               item("c", "text/p1.xhtml", content="<p/>")],
+        items=[
+            item("nav", "nav.xhtml", content="<nav/>", props="nav"),
+            item("c", "text/p1.xhtml", content="<p/>"),
+        ],
     )
     assert "<nav/>" in epub.nav()

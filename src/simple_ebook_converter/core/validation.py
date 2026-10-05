@@ -79,7 +79,9 @@ def _check_exclude(value: str) -> str | None:
     return None
 
 
-_CSS_LEN_RE = re.compile(r"^-?\d+(\.\d+)?(?:em|rem|ex|px|pt|cm|mm|in|pc|ch|vw|vh|vmin|vmax)$")
+_CSS_LEN_RE = re.compile(
+    r"^-?\d+(\.\d+)?(?:em|rem|ex|px|pt|cm|mm|in|pc|ch|vw|vh|vmin|vmax)$"
+)
 _CSS_NUM_RE = re.compile(r"^-?\d+(\.\d+)?$")
 
 
@@ -93,7 +95,9 @@ def _check_line_height(value: str) -> str | None:
         return None
     if _CSS_LEN_RE.match(value):
         return None
-    return f"行高格式非法，收到：{value}（应为数值、百分比或长度，如 1.5 / 150% / 1.5em）"
+    return (
+        f"行高格式非法，收到：{value}（应为数值、百分比或长度，如 1.5 / 150% / 1.5em）"
+    )
 
 
 def _check_para_spacing(value: str) -> str | None:

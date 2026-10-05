@@ -140,7 +140,14 @@ def test_toc_output_formats(tmp_path):
     rules2 = _write_rules(tmp_path, [{"pattern": r"卷", "replace": "部"}])
     result = runner.invoke(
         convert,
-        [str(src), "--toc-only", "--replace-rules", str(rules2), "--toc-format", "json"],
+        [
+            str(src),
+            "--toc-only",
+            "--replace-rules",
+            str(rules2),
+            "--toc-format",
+            "json",
+        ],
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
@@ -161,12 +168,16 @@ def test_toc_output_formats(tmp_path):
 
     out2 = tmp_path / "toc2.txt"
     out2.write_text("旧内容", encoding="utf-8")
-    result = runner.invoke(convert, [str(src), "--toc-only", "-o", str(out2), "--no-overwrite"])
+    result = runner.invoke(
+        convert, [str(src), "--toc-only", "-o", str(out2), "--no-overwrite"]
+    )
     assert result.exit_code != 0
     assert out2.read_text(encoding="utf-8") == "旧内容"
 
     new_out = tmp_path / "new.txt"
-    result = runner.invoke(convert, [str(src), "--toc-only", "-o", str(new_out), "--no-overwrite"])
+    result = runner.invoke(
+        convert, [str(src), "--toc-only", "-o", str(new_out), "--no-overwrite"]
+    )
     assert result.exit_code == 0
     assert "第一章 开端" in new_out.read_text(encoding="utf-8")
 
@@ -189,7 +200,16 @@ def test_toc_json_depth_pruning(tmp_path):
     assert "§1" in deep.output
     shallow = CliRunner().invoke(
         convert,
-        [str(p), "--toc-only", "--toc-format", "json", "--level", "h4:^§", "--toc-depth", "3"],
+        [
+            str(p),
+            "--toc-only",
+            "--toc-format",
+            "json",
+            "--level",
+            "h4:^§",
+            "--toc-depth",
+            "3",
+        ],
     )
     assert shallow.exit_code == 0, shallow.output
     assert "第一章" in shallow.output
@@ -231,7 +251,9 @@ def test_convert_dump_css(tmp_path):
     assert result.exit_code != 0
 
     # 非数值在 click 解析时就报错，不等到 validate
-    result = CliRunner().invoke(convert, ["--dump-css", str(css_out), "--indent", "abc"])
+    result = CliRunner().invoke(
+        convert, ["--dump-css", str(css_out), "--indent", "abc"]
+    )
     assert result.exit_code != 0
     assert "not a valid integer" in result.output
 
@@ -326,7 +348,9 @@ def test_input_errors(tmp_path):
     assert "阶段只能是" in r.output
 
     # 替换规则文件不存在
-    r = runner.invoke(convert, [str(src), "--replace-rules", str(tmp_path / "nope.json")])
+    r = runner.invoke(
+        convert, [str(src), "--replace-rules", str(tmp_path / "nope.json")]
+    )
     assert r.exit_code != 0
     assert "nope.json" in r.output
 

@@ -174,9 +174,7 @@ def read_book(cfg: Config, sources: Sources | None = None) -> Book:
     return build_book(resolved, lines, used, sources or Sources())
 
 
-def build_book(
-    cfg: Config, lines: list[str], encoding: str, sources: Sources
-) -> Book:
+def build_book(cfg: Config, lines: list[str], encoding: str, sources: Sources) -> Book:
     """从已经读好的行组装 `Book`。不读文件，也不校验 `cfg`。
 
     `cfg` 应当是 `resolve()` 过的（`read_book()` 负责），这里只做切分和「有没有正文」

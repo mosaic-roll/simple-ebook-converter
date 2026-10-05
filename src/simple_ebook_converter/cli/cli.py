@@ -184,9 +184,7 @@ def _convert(input_txt: Path | None, params: dict) -> None:
     with _usage_errors():
         # `--level hN[.class]:正则` 是命令行的参数格式，在这一层就拆成 `LevelRule`。
         # core 内部只认结构化的级别/class/正则三项——`hN[.class]:正则` 不该渗进去。
-        values["level"] = [
-            parse_level_spec(spec) for spec in values["level"] or ()
-        ]
+        values["level"] = [parse_level_spec(spec) for spec in values["level"] or ()]
         _produce(build_config(values))
 
 

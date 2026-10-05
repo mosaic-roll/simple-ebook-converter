@@ -53,7 +53,9 @@ class Epub:
     def set_opf(self, transform) -> None:
         """就地改写 OPF 文本（`transform` 收原文、返新文）。给"故意造坏"用。"""
         name = self.opf_name()
-        self.entries[name] = transform(self.entries[name].decode("utf-8")).encode("utf-8")
+        self.entries[name] = transform(self.entries[name].decode("utf-8")).encode(
+            "utf-8"
+        )
 
     def html(self, name: str) -> str:
         return self.entries[name].decode("utf-8")
@@ -97,8 +99,9 @@ class Epub:
             )
         return items
 
-    def manifest_item(self, *, prop: str | None = None, suffix: str | None = None
-                      ) -> dict[str, str]:
+    def manifest_item(
+        self, *, prop: str | None = None, suffix: str | None = None
+    ) -> dict[str, str]:
         """按 `properties`（如 `cover-image`）或 href 后缀取唯一一条 manifest item。"""
         hits = [
             it
@@ -233,7 +236,9 @@ def assert_heading(
     实际拿到的属性串，失败信息能直接看出是 tag 不对、class 不对还是缺 id。
     """
     m = re.search(rf"<{tag}\b([^>]*)>\s*{re.escape(text)}\s*</{tag}>", html)
-    assert m, f"页里没有 <{tag}>{text}</{tag}>；实际标题：{_headings(html)}；整页：\n{html}"
+    assert m, (
+        f"页里没有 <{tag}>{text}</{tag}>；实际标题：{_headings(html)}；整页：\n{html}"
+    )
     attrs = m.group(1)
     if class_name is not None:
         found = re.search(r"""\bclass\s*=\s*["']([^"']*)["']""", attrs)

@@ -264,7 +264,7 @@ def test_tree_from_json_no_delete_round_trip():
         {"raw_title": "第一章 一", "level": 3, "class_name": "chapter", "line": 2},
     ]
     restored = tree_from_json(data, lines)
-# 与 scan_toc 走 parse() 的结果逐节点比对（含子节点）
+    # 与 scan_toc 走 parse() 的结果逐节点比对（含子节点）
     rules = [LevelRule(2, r"^第一卷$", "volume"), LevelRule(3, r"^第一章 ", "chapter")]
     parsed, _ = parse(lines, rules, fallback_title="书名")
     assert [n.raw_title for n in walk(parsed)] == [n.raw_title for n in walk(restored)]
@@ -363,7 +363,8 @@ def test_load_entries_normalizes_level0_class(tmp_path):
     否则「导出 → 编辑 → 导入 → 再导出」会把规范化过的值退回去。"""
     entries = load_entries(
         _write_toc(
-            tmp_path, [{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}]
+            tmp_path,
+            [{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}],
         )
     )
     assert entries[0]["class_name"] == "chapter"

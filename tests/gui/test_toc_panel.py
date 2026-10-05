@@ -69,7 +69,9 @@ def test_import_toc_json_delegates_to_core(tmp_path):
     """
     p = tmp_path / "toc.json"
     p.write_text(
-        json.dumps([{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}]),
+        json.dumps(
+            [{"raw_title": "前言", "level": 0, "class_name": "volume", "line": 1}]
+        ),
         encoding="utf-8",
     )
     assert import_toc_json(p) == load_entries(p)

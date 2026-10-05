@@ -171,9 +171,7 @@ def tree_from_json(
     return tree
 
 
-def check_entry(
-    entry: dict, where: str, lines: list[str] | None = None
-) -> dict | None:
+def check_entry(entry: dict, where: str, lines: list[str] | None = None) -> dict | None:
     """校验一个扁平条目，返回建 `Node` 要的字段；`deleted` 条目返回 `None`。
 
     `tree_from_json` 与 GUI 的目录面板导入共用这一份规则，避免各写一遍后漂移。

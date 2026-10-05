@@ -187,7 +187,9 @@ def test_first_written_wins_within_one_level():
 
 def test_same_class_specs_work_as_an_ordered_set():
     """同 class 拆成多条：第一条没命中的行交给下一条，内置那条已经让位。"""
-    levels = build_rules([LevelRule(2, "^第一卷", "volume"), LevelRule(2, "^第.+部", "volume")])
+    levels = build_rules(
+        [LevelRule(2, "^第一卷", "volume"), LevelRule(2, "^第.+部", "volume")]
+    )
     tree, _ = parse(
         ["第一卷 甲", "第二卷 乙", "第一部 丙"], levels, fallback_title="书名"
     )

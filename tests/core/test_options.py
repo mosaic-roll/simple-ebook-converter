@@ -237,9 +237,7 @@ def test_extra_level_at_preset_level_appends_behind_it(tmp_path):
 
 def test_extra_level_with_preset_class_joins_the_preset_rule(tmp_path):
     """class 撞上预设的也只新增一条：内置那条已经被 `--volume` 的值顶掉了。"""
-    cfg = _config(
-        tmp_path, volume="^甲", level=[parse_level_spec("h2.volume:^丙")]
-    )
+    cfg = _config(tmp_path, volume="^甲", level=[parse_level_spec("h2.volume:^丙")])
     assert [(r.class_name, r.pattern) for r in cfg.levels if r.level == 2] == [
         ("volume", "^甲"),
         ("volume", "^丙"),
@@ -542,7 +540,9 @@ def test_is_valid_agrees_with_resolve(name, good, bad, tmp_path):
         try:
             resolve(build_config({"input": _any_input(tmp_path), name: value}))
         except ValueError:
-            assert expected is False, f"{name}={value!r} 被 is_valid 放行却被 resolve 拒"
+            assert expected is False, (
+                f"{name}={value!r} 被 is_valid 放行却被 resolve 拒"
+            )
         else:
             assert expected is True, f"{name}={value!r} 被 resolve 放行却被 is_valid 拒"
 

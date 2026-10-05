@@ -171,7 +171,7 @@ def test_read_book_reports_empty_file(tmp_path):
 def test_read_book_reports_out_of_range_values(tmp_path):
     """取值范围在读入时就报，消息直接就是 validate_config() 那句。"""
     with pytest.raises(ValueError, match="目录深度"):
-        read_book(_cfg( toc_depth=99))
+        read_book(_cfg(toc_depth=99))
 
 
 # ---------- build_book：从已有的行组装 ----------
@@ -210,7 +210,7 @@ def test_build_book_falls_back_to_book_title_when_there_is_no_input():
 
 def test_process_reports_disabled_levels():
     with pytest.raises(NoEnabledRulesError):
-        process(SAMPLE, _cfg( levels=[LevelRule(2, "", "volume")]))
+        process(SAMPLE, _cfg(levels=[LevelRule(2, "", "volume")]))
 
 
 def test_process_falls_back_to_book_title():
@@ -236,12 +236,12 @@ def test_process_cleans_by_default():
 
 
 def test_process_keeps_blank_lines_when_not_cleaning():
-    tree, _ = process(["正文一", "", "正文二"], _cfg( clean=False))
+    tree, _ = process(["正文一", "", "正文二"], _cfg(clean=False))
     assert tree[0].paragraphs == ["正文一", "", "正文二"]
 
 
 def test_process_replaces_titles_keeping_raw():
-    cfg = _cfg( replacements=[Rule(r"^第", "第X")])
+    cfg = _cfg(replacements=[Rule(r"^第", "第X")])
     tree, _ = process(SAMPLE, cfg)
     volume = tree[1]
     assert volume.title == "第X一卷 风起"
@@ -261,7 +261,7 @@ def test_process_returns_stats():
 def test_levels_are_not_shared_between_configs():
     """两次调用不能互相污染 default_levels()。"""
     a = _cfg()
-    b = _cfg( levels=[*default_levels()])
+    b = _cfg(levels=[*default_levels()])
     process(SAMPLE, a)
     process(SAMPLE, b)
     assert [r.level for r in b.levels] == [r.level for r in default_levels()]
@@ -272,14 +272,14 @@ def test_levels_are_not_shared_between_configs():
 
 def test_replacement_never_touches_paragraphs():
     """替换只作用于标题；改正文请直接改源文件。"""
-    cfg = _cfg( replacements=[Rule("正文一", "改了")])
+    cfg = _cfg(replacements=[Rule("正文一", "改了")])
     tree, _ = process(SAMPLE, cfg)
     assert tree[1].children[0].paragraphs == ["正文一字"]
     assert tree[1].title == "第一卷 风起"
 
 
 def test_raw_stage_replaces_the_plain_title():
-    cfg = _cfg( replacements=[Rule("风起", "起风")])
+    cfg = _cfg(replacements=[Rule("风起", "起风")])
     tree, _ = process(SAMPLE, cfg)
     assert tree[1].title == "第一卷 起风"
     assert tree[1].raw_title == "第一卷 风起"
@@ -287,7 +287,7 @@ def test_raw_stage_replaces_the_plain_title():
 
 def test_raw_stage_result_is_escaped_for_the_page():
     """raw 阶段塞进来的 `<` 当文本转义，不会变成标签。"""
-    node = process(SAMPLE, _cfg( replacements=[Rule("第一卷", "<b>")]))[0][1]
+    node = process(SAMPLE, _cfg(replacements=[Rule("第一卷", "<b>")]))[0][1]
     assert node.title == "<b> 风起"
     assert node.title_html == "&lt;b&gt; 风起"
 
@@ -393,7 +393,7 @@ def test_preview_reads_raw_title_not_current_title():
 def test_preview_agrees_with_what_process_writes():
     """预览与生成走同一条链，同一份规则下结果必须一致。"""
     replacements = [Rule("风起", "起风"), Rule("离别", "<i>别离</i>", "html")]
-    tree, _ = process(SAMPLE, _cfg( replacements=replacements))
+    tree, _ = process(SAMPLE, _cfg(replacements=replacements))
     results = preview_titles(scan_toc(SAMPLE, Config())[0], replacements)
     for node, result in zip(walk(tree), results):
         assert (result.title, result.title_html) == (node.title, node.title_html)
@@ -407,7 +407,7 @@ def test_title_replacement_is_idempotent():
     这条测试立刻失败。
     """
     replacements = [Rule("第", "第X"), Rule("初遇", "<i>初遇</i>", "html")]
-    tree, _ = process(SAMPLE, _cfg( replacements=replacements))
+    tree, _ = process(SAMPLE, _cfg(replacements=replacements))
     results = preview_titles(tree, replacements)  # 注意：传入的是已处理的树
     for node, result in zip(walk(tree), results):
         assert (result.title, result.title_html) == (node.title, node.title_html)

@@ -277,9 +277,7 @@ def test_collect_saved_clears_the_regex_when_the_level_box_is_garbage(ui):
     row = ui[0]["rules"]["add_extra_row"]()
     row["level"].set("胡说")
     row["regex"].insert(0, "^Part")
-    assert _collect(ui)["extra_levels"] == [
-        {"level": "胡说", "class": "", "regex": ""}
-    ]
+    assert _collect(ui)["extra_levels"] == [{"level": "胡说", "class": "", "regex": ""}]
 
 
 def test_collect_saved_translates_align_labels(ui):
