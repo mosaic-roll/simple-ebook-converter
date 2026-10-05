@@ -38,6 +38,42 @@ uv run simple-ebook-converter-cli --help
 uv run simple-ebook-converter-cli 我的小说.txt
 ```
 
+### 可执行文件（免安装）
+
+不想装 Python 环境的话，直接下载已打包好的版本：
+
+[**Releases**](https://github.com/mosaic-roll/simple-ebook-converter/releases/latest) 页面下载 `simple-ebook-converter-windows.zip`，解压后得到：
+
+```
+simple-ebook-converter/
+├── simple-ebook-converter.exe       图形界面，双击运行
+├── simple-ebook-converter-cli.exe   命令行
+└── _internal/                       两个程序共用的依赖
+```
+
+**整个文件夹要一起保留**，不能只把 exe 拖出来 —— 它依赖同级的 `_internal`，缺少就启动失败。
+
+图形界面：双击 `simple-ebook-converter.exe`，无控制台窗口。
+
+命令行：
+
+```powershell
+# 查看全部选项
+.\simple-ebook-converter-cli.exe --help
+
+# 最简：转换一本书
+.\simple-ebook-converter-cli.exe 我的小说.txt
+
+# 指定输出名与元数据
+.\simple-ebook-converter-cli.exe 我的小说.txt -o 输出名 --title "书名" --author "作者"
+```
+
+选项与源码运行完全一致，下文所有 `uv run simple-ebook-converter-cli` 都可直接换成 `.\simple-ebook-converter-cli.exe`。
+
+配置文件默认在 `simple-ebook-converter\config\`，可用 `.\simple-ebook-converter.exe --config-dir DIRECTORY` 改位置。
+
+程序未做代码签名，Windows SmartScreen 可能拦截，需点「更多信息」→「仍要运行」。
+
 ## 简要说明
 
 ### 常用正则表达式
