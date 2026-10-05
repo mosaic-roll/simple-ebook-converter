@@ -38,10 +38,10 @@ jobs:
       - name: Build CLI executable
         shell: bash
         run: |
-          uv run python -m nuitka \
+          echo y | uv run python -m nuitka \
             --standalone \
             --onefile \
-            --windows-disable-console \
+            --windows-console-mode=disable \
             --output-filename=simple-ebook-converter-cli.exe \
             --output-dir=dist \
             src/simple_ebook_converter/cli/cli.py
@@ -49,11 +49,11 @@ jobs:
       - name: Build GUI executable
         shell: bash
         run: |
-          uv run python -m nuitka \
+          echo y | uv run python -m nuitka \
             --standalone \
             --onefile \
             --include-package=customtkinter \
-            --windows-disable-console \
+            --windows-console-mode=disable \
             --output-filename=simple-ebook-converter.exe \
             --output-dir=dist \
             src/simple_ebook_converter/gui/__main__.py
