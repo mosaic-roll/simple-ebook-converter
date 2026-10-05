@@ -35,53 +35,22 @@ jobs:
       - name: Install pyinstaller
         run: uv pip install pyinstaller
 
-      # 全能版：console 子系统，控制台始终正常显示
-      # GUI 模式不加 --cli 直接进图形界面，加 --cli 进命令行
-      - name: Build versatile executable
+      # 用 spec 打包，命令行版与图形界面版共用一份 _internal。
+      # spec 里两个 EXE 各自设定 console=True/False，所以控制台行为天生正确，
+      # 不需要任何运行时隐藏。详见 packaging/shared.spec 的说明。
+      - name: Build with shared spec
         run: |
           uv run pyinstaller `
             --clean `
             --noconfirm `
-            --name=simple-ebook-converter-versatile `
             --distpath=dist `
-            --hidden-import=customtkinter `
-            --paths=src `
-            --copy-metadata=simple-ebook-converter `
-            src/simple_ebook_converter/launcher.py
-
-      # 桌面版：--noconsole，天生没有控制台，双击最干净
-      - name: Build dedicated GUI executable
-        run: |
-          uv run pyinstaller `
-            --clean `
-            --noconfirm `
-            --noconsole `
-            --name=simple-ebook-converter-gui `
-            --distpath=dist `
-            --hidden-import=customtkinter `
-            --paths=src `
-            --copy-metadata=simple-ebook-converter `
-            src/simple_ebook_converter/launcher.py
-
-      # 命令行版：exe 名以 -cli 结尾，自动进命令行模式，不必手敲 --cli
-      # 这个包永远进不了 GUI 模式（没有 --cli 就会被强制补上），所以可以
-      # 放心排除 tkinter 那一套：tcl/tk 数据与 dll 合计约 7.5 MB
-      - name: Build dedicated CLI executable
-        run: |
-          uv run pyinstaller `
-            --clean `
-            --noconfirm `
-            --name=simple-ebook-converter-cli `
-            --distpath=dist `
-            --exclude-module=customtkinter `
-            --exclude-module=tkinter `
-            --paths=src `
-            --copy-metadata=simple-ebook-converter `
-            src/simple_ebook_converter/launcher.py
+            --workpath=build `
+            packaging/shared.spec
 
       - name: Smoke test executables
         run: |
           $ErrorActionPreference = "Stop"
+          $root = "dist\simple-ebook-converter"
 
           function Get-Subsystem([string]$Path) {
             $bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -89,60 +58,42 @@ jobs:
             return [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
           }
 
-          # 全能版：--cli 进命令行；不带参数进 GUI（只验证不闪退）
-          & dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe --cli --version
-          if ($LASTEXITCODE -ne 0) { throw "全能版 --cli 退出码 $LASTEXITCODE" }
-          & dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe --help
-          if ($LASTEXITCODE -ne 0) { throw "全能版 --help 退出码 $LASTEXITCODE" }
+          # 必须只有一份 _internal，否则说明 spec 没按预期共享依赖
+          $internals = @(Get-ChildItem $root -Recurse -Directory -Filter "_internal")
+          if ($internals.Count -ne 1) {
+            throw "期望 1 份 _internal，实际 $($internals.Count) 份"
+          }
+          Write-Output "共享 _internal：1 份"
 
-          # 命令行版：不需要 --cli
-          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --version
+          # 命令行版：console(3)，输出正常
+          $cli = "$root\simple-ebook-converter-cli.exe"
+          if ((Get-Subsystem $cli) -ne 3) { throw "命令行版子系统不是 Console(3)" }
+          & $cli --version
           if ($LASTEXITCODE -ne 0) { throw "命令行版 --version 退出码 $LASTEXITCODE" }
-          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --dump-css smoke.css
+          & $cli --dump-css smoke.css
           if (-not (Test-Path smoke.css)) { throw "命令行版未产出 smoke.css" }
 
-          # 桌面版：确认 PE 子系统是 GUI(2)，双击不会有控制台
-          $gui = "dist\simple-ebook-converter-gui\simple-ebook-converter-gui.exe"
-          if ((Get-Subsystem $gui) -ne 2) { throw "桌面版子系统不是 GUI(2)" }
-          Write-Output "桌面版 subsystem=2，双击无控制台"
+          # 图形界面版：GUI(2)，双击没有控制台
+          $gui = "$root\simple-ebook-converter.exe"
+          if ((Get-Subsystem $gui) -ne 2) { throw "图形界面版子系统不是 GUI(2)" }
+          Write-Output "子系统正确：命令行版=3，图形界面版=2"
 
-          # 全能版与命令行版必须是 console(3)，否则 --cli 没有 stdout
-          foreach ($p in @(
-            "dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe",
-            "dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe")) {
-            if ((Get-Subsystem $p) -ne 3) { throw "$p 子系统不是 Console(3)" }
-          }
-          Write-Output "全能版与命令行版 subsystem=3，--cli 可输出"
-
-      - name: Package each build separately
+      - name: Package
         run: |
-          $ErrorActionPreference = "Stop"
-          # 三份各自打成独立 zip，分别发布，互不依赖
-          Compress-Archive -Path dist\simple-ebook-converter-versatile `
-            -DestinationPath simple-ebook-converter-versatile-windows.zip -Force
-          Compress-Archive -Path dist\simple-ebook-converter-gui `
-            -DestinationPath simple-ebook-converter-gui-windows.zip -Force
-          Compress-Archive -Path dist\simple-ebook-converter-cli `
-            -DestinationPath simple-ebook-converter-cli-windows.zip -Force
-          Get-ChildItem *.zip | ForEach-Object {
-            "{0,-55} {1,7:N1} MB" -f $_.Name, ($_.Length / 1MB)
-          }
+          Compress-Archive -Path dist\simple-ebook-converter `
+            -DestinationPath simple-ebook-converter-windows.zip -Force
+          $zip = Get-Item simple-ebook-converter-windows.zip
+          "{0,-45} {1,7:N1} MB" -f $zip.Name, ($zip.Length / 1MB)
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            simple-ebook-converter-versatile-windows.zip
-            simple-ebook-converter-gui-windows.zip
-            simple-ebook-converter-cli-windows.zip
+          files: simple-ebook-converter-windows.zip
 
-      - name: Upload artifacts (manual runs)
+      - name: Upload artifact (manual runs)
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: windows-onedir-builds
-          path: |
-            simple-ebook-converter-versatile-windows.zip
-            simple-ebook-converter-gui-windows.zip
-            simple-ebook-converter-cli-windows.zip
+          name: windows-build
+          path: simple-ebook-converter-windows.zip

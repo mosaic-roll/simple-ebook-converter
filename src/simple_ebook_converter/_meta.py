@@ -6,7 +6,8 @@
 tests 里的 test_api 会独立断言这一致性，所以改包名时漏掉这里会被测出来。
 
 本模块刻意不导入任何项目内模块，这样顶层包可以零依赖地暴露 `__version__`。
-PyInstaller 打包时用 `--copy-metadata=<DIST_NAME>` 把元数据拷进可执行文件，
+PyInstaller 打包时要把元数据拷进可执行文件（spec 里用
+`PyInstaller.utils.hooks.copy_metadata`，等价于命令行的 `--copy-metadata`），
 否则冻结后的程序 `importlib.metadata.version()` 会抛 `PackageNotFoundError`。
 """
 
