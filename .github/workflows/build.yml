@@ -5,6 +5,9 @@ on:
   release:
     types: [published]  # 发布新版本时自动触发
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
