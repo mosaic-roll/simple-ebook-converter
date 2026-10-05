@@ -38,7 +38,6 @@ jobs:
       - name: Build CLI executable
         run: |
           uv run pyinstaller `
-            --onefile `
             --clean `
             --noconfirm `
             --name=simple-ebook-converter-cli `
@@ -50,7 +49,6 @@ jobs:
       - name: Build GUI executable
         run: |
           uv run pyinstaller `
-            --onefile `
             --clean `
             --noconfirm `
             --noconsole `
@@ -63,7 +61,7 @@ jobs:
 
       - name: Package for release
         run: |
-          Compress-Archive -Path dist/*.exe -DestinationPath simple-ebook-converter-windows-pyinstaller.zip -Force
+          Compress-Archive -Path dist/* -DestinationPath simple-ebook-converter-windows-pyinstaller.zip -Force
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
