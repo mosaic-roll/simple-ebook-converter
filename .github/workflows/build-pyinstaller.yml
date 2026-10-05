@@ -27,17 +27,14 @@ jobs:
           pip install uv
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --inexact
 
       - name: Install pyinstaller
         run: uv pip install pyinstaller
 
-      - name: Create output directory
-        run: mkdir -p dist
-
       - name: Build CLI executable
         run: |
-          pyinstaller `
+          uv run pyinstaller `
             --onefile `
             --clean `
             --noconfirm `
@@ -48,7 +45,7 @@ jobs:
 
       - name: Build GUI executable
         run: |
-          pyinstaller `
+          uv run pyinstaller `
             --onefile `
             --clean `
             --noconfirm `
