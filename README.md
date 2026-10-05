@@ -151,3 +151,7 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 ## 文档
 
 完整命令行选项、章节识别、替换规则、目录树等，见 [doc/cli.md](doc/cli.md)。
+
+## 参考
+
+内置正则和CSS部分参考了 [kaf-cli](https://github.com/ystyle/kaf-cli)
