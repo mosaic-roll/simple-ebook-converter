@@ -101,8 +101,8 @@ h3.chapter {{
   margin: 0;
 }
 .cover .book-title {
-  margin: 0;
-  padding-top: 3em;
+  margin-top: 20%;
+  margin-bottom: 0;
   font-size: 3em;
   text-align: center;
 }
