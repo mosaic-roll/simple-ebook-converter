@@ -30,7 +30,7 @@ jobs:
           pip install uv
 
       - name: Install dependencies
-        run: uv sync --inexact
+        run: uv sync --extra gui
 
       - name: Install pyinstaller
         run: uv pip install pyinstaller
@@ -43,10 +43,7 @@ jobs:
             --noconfirm `
             --name=simple-ebook-converter-cli `
             --distpath=dist `
-            --workpath=build `
-            --paths=src `
-            --exclude-module=customtkinter `
-            src/simple_ebook_converter/launcher_cli.py
+            src/simple_ebook_converter/cli/cli.py
 
       - name: Build GUI executable
         run: |
@@ -56,11 +53,8 @@ jobs:
             --noconfirm `
             --name=simple-ebook-converter `
             --distpath=dist `
-            --workpath=build `
             --hidden-import=customtkinter `
-            --paths=src `
-            --exclude-module=click `
-            src/simple_ebook_converter/launcher_gui.py
+            src/simple_ebook_converter/gui/__main__.py
 
       - name: Package for release
         run: |
