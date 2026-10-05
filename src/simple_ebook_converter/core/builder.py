@@ -101,22 +101,16 @@ h3.chapter {{
   margin: 0;
 }
 .cover .book-title {
-  margin-top: 3em;
-  margin-bottom: 0;
+  margin: 0;
+  padding-top: 3em;
   font-size: 3em;
   text-align: center;
 }
 .cover .book-author {
-  margin-top: 1em;
-  margin-bottom: 0;
-  padding-left: 1.5em;  /* 装饰符号宽度 */
-  text-indent: -1.5em;
+  margin: 0;
+  padding-top: 1em;
   font-size: 1.5em;
   text-align: center;
-}
-.cover .book-author::before {
-  content: "◎";
-  margin-right: 0.5em;
 }
 .cover img {
   display: block;
