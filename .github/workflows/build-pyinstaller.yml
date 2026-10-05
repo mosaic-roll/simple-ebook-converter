@@ -44,7 +44,9 @@ jobs:
             --name=simple-ebook-converter-cli `
             --distpath=dist `
             --workpath=build `
-            src/simple_ebook_converter/cli/cli.py
+            --paths=src `
+            --exclude-module=customtkinter `
+            src/simple_ebook_converter/launcher_cli.py
 
       - name: Build GUI executable
         run: |
@@ -56,7 +58,9 @@ jobs:
             --distpath=dist `
             --workpath=build `
             --hidden-import=customtkinter `
-            src/simple_ebook_converter/gui/__main__.py
+            --paths=src `
+            --exclude-module=click `
+            src/simple_ebook_converter/launcher_gui.py
 
       - name: Package for release
         run: |
