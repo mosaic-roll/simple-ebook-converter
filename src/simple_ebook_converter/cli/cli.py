@@ -17,6 +17,7 @@ from pathlib import Path
 import click
 
 from .._meta import CLI_PROG, __version__
+from .._stdio import make_output_encoding_safe
 from ..core.config import Config
 from ..core.levels import parse_level_spec
 from ..core.options import OPTIONS, Option, build_config, option_default, option_groups
@@ -212,6 +213,9 @@ for _opt in OPTIONS:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # 必须早于任何输出：Click 格式化 usage 与报错时也要写中文，
+    # 非 UTF-8 控制台上会抛 UnicodeEncodeError，把错误提示本身都吞掉
+    make_output_encoding_safe()
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         convert.main(args=args, prog_name=CLI_PROG, standalone_mode=False)

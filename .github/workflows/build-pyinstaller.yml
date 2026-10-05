@@ -50,7 +50,9 @@ jobs:
       - name: Smoke test executables
         run: |
           $ErrorActionPreference = "Stop"
-          $root = "dist\simple-ebook-converter"
+          # .NET 的 IO 方法按进程工作目录解析相对路径，不跟随 PowerShell 当前目录，
+          # 所以先解析成绝对路径
+          $root = (Resolve-Path "dist\simple-ebook-converter").Path
 
           function Get-Subsystem([string]$Path) {
             $bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -66,15 +68,16 @@ jobs:
           Write-Output "共享 _internal：1 份"
 
           # 命令行版：console(3)，输出正常
-          $cli = "$root\simple-ebook-converter-cli.exe"
+          $cli = Join-Path $root "simple-ebook-converter-cli.exe"
           if ((Get-Subsystem $cli) -ne 3) { throw "命令行版子系统不是 Console(3)" }
           & $cli --version
           if ($LASTEXITCODE -ne 0) { throw "命令行版 --version 退出码 $LASTEXITCODE" }
           & $cli --dump-css smoke.css
+          if ($LASTEXITCODE -ne 0) { throw "命令行版 --dump-css 退出码 $LASTEXITCODE" }
           if (-not (Test-Path smoke.css)) { throw "命令行版未产出 smoke.css" }
 
           # 图形界面版：GUI(2)，双击没有控制台
-          $gui = "$root\simple-ebook-converter.exe"
+          $gui = Join-Path $root "simple-ebook-converter.exe"
           if ((Get-Subsystem $gui) -ne 2) { throw "图形界面版子系统不是 GUI(2)" }
           Write-Output "子系统正确：命令行版=3，图形界面版=2"
 
