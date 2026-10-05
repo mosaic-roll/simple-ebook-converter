@@ -45,7 +45,7 @@ jobs:
             --paths=src `
             --copy-metadata=simple-ebook-converter `
             --add-data="simple_ebook_converter/_meta.py:simple_ebook_converter" `
-            src/simple_ebook_converter/launcher.py --cli
+            src/simple_ebook_converter/launcher.py -- --cli
 
       - name: Build GUI executable
         run: |
