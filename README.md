@@ -1,11 +1,8 @@
 # simple-ebook-converter
 
-TXT 转 EPUB3 工具。自动识别编码、按标题切分章节、生成目录与封面，输出标准 EPUB3。
+TXT 转 EPUB3 工具。自动识别编码、按标题切分章节、生成目录与封面，输出标准 EPUB3。提供GUI和CLI两个入口。
 
-提供两个前端：
-
-- **GUI**（图形界面，推荐普通用户）——入口 `simple-ebook-converter`
-- **CLI**（命令行）——入口 `simple-ebook-converter-cli`
+![界面](./assets/screenshot.png)
 
 ## 安装
 
