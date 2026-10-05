@@ -36,27 +36,23 @@ jobs:
         run: mkdir -p dist
 
       - name: Build CLI executable
-        shell: bash
-        run: |
-          echo y | uv run python -m nuitka \
-            --standalone \
-            --onefile \
-            --windows-console-mode=disable \
-            --output-filename=simple-ebook-converter-cli.exe \
-            --output-dir=dist \
-            src/simple_ebook_converter/cli/cli.py
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          script-name: src/simple_ebook_converter/cli/cli.py
+          onefile: true
+          windows-disable-console: true
+          output-filename: simple-ebook-converter-cli.exe
+          output-dir: dist
 
       - name: Build GUI executable
-        shell: bash
-        run: |
-          echo y | uv run python -m nuitka \
-            --standalone \
-            --onefile \
-            --include-package=customtkinter \
-            --windows-console-mode=disable \
-            --output-filename=simple-ebook-converter.exe \
-            --output-dir=dist \
-            src/simple_ebook_converter/gui/__main__.py
+        uses: Nuitka/Nuitka-Action@main
+        with:
+          script-name: src/simple_ebook_converter/gui/__main__.py
+          onefile: true
+          windows-disable-console: true
+          include-package: customtkinter
+          output-filename: simple-ebook-converter.exe
+          output-dir: dist
 
       - name: Package for release
         run: |
