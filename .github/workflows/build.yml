@@ -39,6 +39,7 @@ jobs:
         shell: bash
         run: |
           uv run python -m nuitka \
+            --assume-yes-for-downloads \
             --standalone \
             --onefile \
             --windows-console-mode=disable \
@@ -50,6 +51,7 @@ jobs:
         shell: bash
         run: |
           uv run python -m nuitka \
+            --assume-yes-for-downloads \
             --standalone \
             --onefile \
             --include-package=customtkinter \
