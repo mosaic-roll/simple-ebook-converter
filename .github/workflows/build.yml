@@ -33,23 +33,24 @@ jobs:
         run: uv pip install "nuitka[onefile]"
 
       - name: Create output directory
-        run: mkdir -p dist
+        run: New-Item -ItemType Directory -Force -Path dist
 
       - name: Build CLI executable
         run: |
-          nuitka `
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+          & uv run python -m nuitka `
             --standalone `
             --onefile `
             --windows-disable-console `
             --output-filename=simple-ebook-converter-cli.exe `
             --output-dir=dist `
             --yes `
-            simple_ebook_converter/cli/cli.py
-        shell: bash
+            src/simple_ebook_converter/cli/cli.py
 
       - name: Build GUI executable
         run: |
-          nuitka `
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+          & uv run python -m nuitka `
             --standalone `
             --onefile `
             --include-package=customtkinter `
@@ -57,12 +58,11 @@ jobs:
             --output-filename=simple-ebook-converter.exe `
             --output-dir=dist `
             --yes `
-            simple_ebook_converter/gui/__main__.py
-        shell: bash
+            src/simple_ebook_converter/gui/__main__.py
 
       - name: Package for release
         run: |
-          zip simple-ebook-converter-windows.zip dist/*.exe
+          Compress-Archive -Path dist/*.exe -DestinationPath simple-ebook-converter-windows.zip -Force
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
