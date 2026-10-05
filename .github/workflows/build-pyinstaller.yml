@@ -64,6 +64,8 @@ jobs:
             src/simple_ebook_converter/launcher.py
 
       # 命令行版：exe 名以 -cli 结尾，自动进命令行模式，不必手敲 --cli
+      # 这个包永远进不了 GUI 模式（没有 --cli 就会被强制补上），所以可以
+      # 放心排除 tkinter 那一套：tcl/tk 数据与 dll 合计约 7.5 MB
       - name: Build dedicated CLI executable
         run: |
           uv run pyinstaller `
@@ -71,7 +73,8 @@ jobs:
             --noconfirm `
             --name=simple-ebook-converter-cli `
             --distpath=dist `
-            --hidden-import=customtkinter `
+            --exclude-module=customtkinter `
+            --exclude-module=tkinter `
             --paths=src `
             --copy-metadata=simple-ebook-converter `
             src/simple_ebook_converter/launcher.py
@@ -121,7 +124,9 @@ jobs:
             -DestinationPath simple-ebook-converter-gui-windows.zip -Force
           Compress-Archive -Path dist\simple-ebook-converter-cli `
             -DestinationPath simple-ebook-converter-cli-windows.zip -Force
-          Get-ChildItem *.zip | Select-Object Name, Length
+          Get-ChildItem *.zip | ForEach-Object {
+            "{0,-55} {1,7:N1} MB" -f $_.Name, ($_.Length / 1MB)
+          }
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'

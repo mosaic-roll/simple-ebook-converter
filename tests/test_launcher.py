@@ -95,7 +95,7 @@ def test_help_without_cli_stays_in_launcher(monkeypatch, capsys):
         launcher.main()
     out = capsys.readouterr().out
     assert "--cli" in out
-    assert "gui.exe" in out
+    assert "脱离控制台" in out
 
 
 def test_is_cli_build_by_name(monkeypatch):
@@ -109,20 +109,8 @@ def test_is_cli_build_by_name(monkeypatch):
         assert launcher._is_cli_build() is expected, name
 
 
-def test_launcher_does_not_touch_console_window(monkeypatch, dispatched):
-    """控制台保持原样显示，launcher 不做任何隐藏/最小化处理。"""
-    import ctypes
-
-    def boom(*args, **kwargs):
-        raise AssertionError("launcher 不应操作控制台窗口")
-
-    monkeypatch.setattr(ctypes, "windll", boom)
-    run_main(monkeypatch, [])
-    assert dispatched == [("gui", [])]
-
-
 def test_gui_startup_failure_propagates(monkeypatch):
-    """GUI 起不来时异常要照常抛出，控制台可见时用户能直接看到报错。"""
+    """GUI 起不来时异常要照常抛出（控制台已脱离，报错经由 CI 日志可见）。"""
 
     class FailingGui:
         @staticmethod
@@ -139,40 +127,22 @@ def test_gui_startup_failure_propagates(monkeypatch):
         launcher.main()
 
 
-def test_is_freeconsole_build_by_name(monkeypatch):
-    for name, expected in [
-        ("simple-ebook-converter-freeconsole.exe", True),
-        ("simple_ebook_converter_freeconsole.exe", True),
-        ("simple-ebook-converter-versatile.exe", False),
-        ("simple-ebook-converter-gui.exe", False),
-        ("simple-ebook-converter-cli.exe", False),
-    ]:
-        monkeypatch.setattr(launcher.sys, "executable", name)
-        assert launcher._is_freeconsole_build() is expected, name
+def test_is_freeconsole_build_by_name_removed():
+    """FreeConsole 已从 opt-in 试验改为 GUI 模式默认行为，不再按 exe 名区分。"""
+    assert not hasattr(launcher, "_is_freeconsole_build")
 
 
-def test_freeconsole_build_detaches_console(monkeypatch, dispatched):
-    """试验版：进 GUI 前调 FreeConsole 脱离控制台。"""
+def test_gui_mode_detaches_console(monkeypatch, dispatched):
+    """GUI 模式进界面前必须脱离控制台，双击才看不到黑框。"""
     called: list[bool] = []
     monkeypatch.setattr(launcher, "_free_console", lambda: called.append(True))
-    run_main(monkeypatch, [], exe="simple-ebook-converter-freeconsole.exe")
+    run_main(monkeypatch, [], exe="simple-ebook-converter-versatile.exe")
     assert called == [True]
     assert dispatched == [("gui", [])]
 
 
-def test_versatile_build_does_not_touch_console(monkeypatch, dispatched):
-    """正式版不做任何控制台处理。"""
-    monkeypatch.setattr(
-        launcher,
-        "_free_console",
-        lambda: pytest.fail("正式版不应调用 FreeConsole"),
-    )
-    run_main(monkeypatch, [], exe="simple-ebook-converter-versatile.exe")
-    assert dispatched == [("gui", [])]
-
-
 def test_freeconsole_failure_does_not_break_startup(monkeypatch):
-    """FreeConsole 拿不到句柄时必须静默继续。"""
+    """FreeConsole 拿不到句柄时必须静默继续，不能把 GUI 一起带崩。"""
     import ctypes
 
     class Boom:
@@ -189,7 +159,7 @@ def test_freeconsole_not_called_in_cli_mode(monkeypatch, dispatched):
     monkeypatch.setattr(
         launcher, "_free_console", lambda: pytest.fail("CLI 模式不应 FreeConsole")
     )
-    run_main(monkeypatch, ["--cli", "book.txt"], exe="x-freeconsole.exe")
+    run_main(monkeypatch, ["--cli", "book.txt"])
     assert dispatched == [("cli", ["book.txt"])]
 
 
