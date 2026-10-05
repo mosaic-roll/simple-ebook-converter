@@ -157,7 +157,7 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 正则：
 
 ```
-(第.{1,10}章)\s*(.+)
+(第.+章)\s*(.+)
 ```
 
 替换：
@@ -169,7 +169,7 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 JSON（正则需要转义）
 
 ```json
-[{ "pattern": "(第.{1,10}章)\\s*(.+)", "replace": "<span class=\"chapter-number\">\\1</span><br /><span class=\"chapter-title\">\\2</span>", "stage": "html" }]
+[{ "pattern": "(第.+章)\\s*(.+)", "replace": "<span class=\"chapter-number\">\\1</span><br /><span class=\"chapter-title\">\\2</span>", "stage": "html" }]
 ```
 
 ```css
