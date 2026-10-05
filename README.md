@@ -76,6 +76,15 @@ uv run simple-ebook-converter-cli 我的小说.txt
 
 但 webp、svg 在阅读器中兼容性较差，avif 在epub标准中仍处于草稿阶段。
 
+### 更改配置文件夹位置
+
+使用以下命令启动GUI程序。
+
+`uv run simple-ebook-converter --config-dir DIRECTORY`
+
+配置文件默认创建在程序启动目录下的`config`文件夹。
+
+只有GUI界面拥有配置。
 
 ### 命令行
 
