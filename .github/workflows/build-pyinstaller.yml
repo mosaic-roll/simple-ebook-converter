@@ -1,4 +1,4 @@
-name: Build onedir with PyInstaller
+name: Build with PyInstaller
 
 on:
   workflow_dispatch:   # 手动触发
@@ -35,18 +35,21 @@ jobs:
       - name: Install pyinstaller
         run: uv pip install pyinstaller
 
-      - name: Build universal executable
+      # 全能版：console 子系统，控制台始终正常显示
+      # GUI 模式不加 --cli 直接进图形界面，加 --cli 进命令行
+      - name: Build versatile executable
         run: |
           uv run pyinstaller `
             --clean `
             --noconfirm `
-            --name=simple-ebook-converter `
+            --name=simple-ebook-converter-versatile `
             --distpath=dist `
             --hidden-import=customtkinter `
             --paths=src `
             --copy-metadata=simple-ebook-converter `
             src/simple_ebook_converter/launcher.py
 
+      # 桌面版：--noconsole，天生没有控制台，双击最干净
       - name: Build dedicated GUI executable
         run: |
           uv run pyinstaller `
@@ -60,6 +63,7 @@ jobs:
             --copy-metadata=simple-ebook-converter `
             src/simple_ebook_converter/launcher.py
 
+      # 命令行版：exe 名以 -cli 结尾，自动进命令行模式，不必手敲 --cli
       - name: Build dedicated CLI executable
         run: |
           uv run pyinstaller `
@@ -75,27 +79,65 @@ jobs:
       - name: Smoke test executables
         run: |
           $ErrorActionPreference = "Stop"
-          # 专用 CLI：不需要 --cli，双击即命令行
-          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --version
-          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --dump-css smoke.css
-          if (-not (Test-Path smoke.css)) { throw "CLI 包未产出 smoke.css" }
-          # 全能版：--cli 进命令行，不带参数进 GUI
-          & dist\simple-ebook-converter\simple-ebook-converter.exe --cli --version
-          & dist\simple-ebook-converter\simple-ebook-converter.exe --version
-          # GUI 专用：确认 PE 子系统是 GUI(2)，双击不会有控制台
-          $bytes = [System.IO.File]::ReadAllBytes(
-            "dist\simple-ebook-converter-gui\simple-ebook-converter-gui.exe")
-          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
-          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
-          if ($subsystem -ne 2) { throw "GUI 包 subsystem=$subsystem，应为 2" }
-          Write-Output "GUI 包 subsystem=2，无控制台"
 
-      - name: Package for release
+          function Get-Subsystem([string]$Path) {
+            $bytes = [System.IO.File]::ReadAllBytes($Path)
+            $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            return [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
+          }
+
+          # 全能版：--cli 进命令行；不带参数进 GUI（只验证不闪退）
+          & dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe --cli --version
+          if ($LASTEXITCODE -ne 0) { throw "全能版 --cli 退出码 $LASTEXITCODE" }
+          & dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe --help
+          if ($LASTEXITCODE -ne 0) { throw "全能版 --help 退出码 $LASTEXITCODE" }
+
+          # 命令行版：不需要 --cli
+          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "命令行版 --version 退出码 $LASTEXITCODE" }
+          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --dump-css smoke.css
+          if (-not (Test-Path smoke.css)) { throw "命令行版未产出 smoke.css" }
+
+          # 桌面版：确认 PE 子系统是 GUI(2)，双击不会有控制台
+          $gui = "dist\simple-ebook-converter-gui\simple-ebook-converter-gui.exe"
+          if ((Get-Subsystem $gui) -ne 2) { throw "桌面版子系统不是 GUI(2)" }
+          Write-Output "桌面版 subsystem=2，双击无控制台"
+
+          # 全能版与命令行版必须是 console(3)，否则 --cli 没有 stdout
+          foreach ($p in @(
+            "dist\simple-ebook-converter-versatile\simple-ebook-converter-versatile.exe",
+            "dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe")) {
+            if ((Get-Subsystem $p) -ne 3) { throw "$p 子系统不是 Console(3)" }
+          }
+          Write-Output "全能版与命令行版 subsystem=3，--cli 可输出"
+
+      - name: Package each build separately
         run: |
-          Compress-Archive -Path dist/* -DestinationPath simple-ebook-converter-windows-pyinstaller.zip -Force
+          $ErrorActionPreference = "Stop"
+          # 三份各自打成独立 zip，分别发布，互不依赖
+          Compress-Archive -Path dist\simple-ebook-converter-versatile `
+            -DestinationPath simple-ebook-converter-versatile-windows.zip -Force
+          Compress-Archive -Path dist\simple-ebook-converter-gui `
+            -DestinationPath simple-ebook-converter-gui-windows.zip -Force
+          Compress-Archive -Path dist\simple-ebook-converter-cli `
+            -DestinationPath simple-ebook-converter-cli-windows.zip -Force
+          Get-ChildItem *.zip | Select-Object Name, Length
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: simple-ebook-converter-windows-pyinstaller.zip
+          files: |
+            simple-ebook-converter-versatile-windows.zip
+            simple-ebook-converter-gui-windows.zip
+            simple-ebook-converter-cli-windows.zip
+
+      - name: Upload artifacts (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-onedir-builds
+          path: |
+            simple-ebook-converter-versatile-windows.zip
+            simple-ebook-converter-gui-windows.zip
+            simple-ebook-converter-cli-windows.zip

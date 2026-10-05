@@ -6,7 +6,8 @@
 tests 里的 test_api 会独立断言这一致性，所以改包名时漏掉这里会被测出来。
 
 本模块刻意不导入任何项目内模块，这样顶层包可以零依赖地暴露 `__version__`。
-Nuitka 打包时用 `--include-distribution-metadata=<DIST_NAME>` 把元数据嵌进可执行文件。
+PyInstaller 打包时用 `--copy-metadata=<DIST_NAME>` 把元数据拷进可执行文件，
+否则冻结后的程序 `importlib.metadata.version()` 会抛 `PackageNotFoundError`。
 """
 
 from importlib.metadata import version

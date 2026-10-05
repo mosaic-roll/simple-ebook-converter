@@ -1,7 +1,7 @@
 """`launcher` 分派逻辑测试。
 
-这个模块只用于 PyInstaller 打包，之前多次出问题都出在分派和 ctypes 调用上，
-所以这里对「参数怎么被转发」和「控制台隐藏失败不影响 GUI」做直接断言。
+这个模块只用于 PyInstaller 打包，之前多次出问题都出在参数分派上，
+所以这里对「参数怎么被转发」「exe 名决定默认模式」做直接断言。
 """
 
 from __future__ import annotations
@@ -30,12 +30,13 @@ def dispatched(monkeypatch):
 
     monkeypatch.setattr(launcher, "cli_main", fake_cli)
     monkeypatch.setattr(launcher, "gui_main", FakeGui)
-    monkeypatch.setattr(launcher, "_set_console_visible", lambda visible: None)
     return calls
 
 
 def run_main(
-    monkeypatch, argv: list[str], exe: str = "simple-ebook-converter.exe"
+    monkeypatch,
+    argv: list[str],
+    exe: str = "simple-ebook-converter-versatile.exe",
 ) -> None:
     monkeypatch.setattr(sys, "argv", [exe, *argv])
     monkeypatch.setattr(launcher.sys, "executable", exe)
@@ -67,8 +68,13 @@ def test_cli_exe_name_enables_cli_without_flag(monkeypatch, dispatched):
 
 
 def test_gui_exe_name_with_explicit_cli_flag(monkeypatch, dispatched):
-    run_main(monkeypatch, ["--cli", "book.txt"], exe="simple-ebook-converter.exe")
+    run_main(monkeypatch, ["--cli", "book.txt"], exe="simple-ebook-converter-gui.exe")
     assert dispatched == [("cli", ["book.txt"])]
+
+
+def test_versatile_exe_name_defaults_to_gui(monkeypatch, dispatched):
+    run_main(monkeypatch, [], exe="simple-ebook-converter-versatile.exe")
+    assert dispatched == [("gui", [])]
 
 
 def test_cli_help_is_forwarded_to_cli_frontend(monkeypatch, dispatched):
@@ -81,42 +87,42 @@ def test_help_without_cli_stays_in_launcher(monkeypatch, capsys):
     monkeypatch.setattr(
         launcher, "cli_main", lambda argv=None: pytest.fail("不应进 CLI")
     )
-    monkeypatch.setattr(sys, "argv", ["simple-ebook-converter.exe", "--help"])
-    monkeypatch.setattr(launcher.sys, "executable", "simple-ebook-converter.exe")
+    monkeypatch.setattr(sys, "argv", ["simple-ebook-converter-versatile.exe", "--help"])
+    monkeypatch.setattr(
+        launcher.sys, "executable", "simple-ebook-converter-versatile.exe"
+    )
     with pytest.raises(SystemExit):
         launcher.main()
-    assert "--cli" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "--cli" in out
+    assert "gui.exe" in out
 
 
 def test_is_cli_build_by_name(monkeypatch):
     for name, expected in [
         ("simple-ebook-converter-cli.exe", True),
         ("simple_ebook_converter_cli.exe", True),
-        ("simple-ebook-converter.exe", False),
+        ("simple-ebook-converter-versatile.exe", False),
         ("simple-ebook-converter-gui.exe", False),
     ]:
         monkeypatch.setattr(launcher.sys, "executable", name)
         assert launcher._is_cli_build() is expected, name
 
 
-def test_console_hiding_failure_does_not_break_startup(monkeypatch):
-    """ctypes 拿不到句柄时必须静默继续，不能把 GUI 一起带崩。"""
+def test_launcher_does_not_touch_console_window(monkeypatch, dispatched):
+    """控制台保持原样显示，launcher 不做任何隐藏/最小化处理。"""
     import ctypes
 
-    class Boom:
-        def __getattr__(self, name):
-            raise AttributeError(name)
+    def boom(*args, **kwargs):
+        raise AssertionError("launcher 不应操作控制台窗口")
 
-    monkeypatch.setattr(sys, "platform", "win32")
-    monkeypatch.setattr(ctypes, "windll", Boom())
-    launcher._set_console_visible(False)  # 不应抛异常
-    launcher._set_console_visible(True)
+    monkeypatch.setattr(ctypes, "windll", boom)
+    run_main(monkeypatch, [])
+    assert dispatched == [("gui", [])]
 
 
-def test_gui_startup_failure_restores_console(monkeypatch):
-    """GUI 起不来时要把控制台放出来，否则报错被隐藏、无从排查。"""
-    shown: list[bool] = []
-    monkeypatch.setattr(launcher, "_set_console_visible", shown.append)
+def test_gui_startup_failure_propagates(monkeypatch):
+    """GUI 起不来时异常要照常抛出，控制台可见时用户能直接看到报错。"""
 
     class FailingGui:
         @staticmethod
@@ -124,16 +130,17 @@ def test_gui_startup_failure_restores_console(monkeypatch):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(launcher, "gui_main", FailingGui)
-    monkeypatch.setattr(sys, "argv", ["simple-ebook-converter.exe"])
-    monkeypatch.setattr(launcher.sys, "executable", "simple-ebook-converter.exe")
+    monkeypatch.setattr(sys, "argv", ["simple-ebook-converter-versatile.exe"])
+    monkeypatch.setattr(
+        launcher.sys, "executable", "simple-ebook-converter-versatile.exe"
+    )
 
     with pytest.raises(RuntimeError, match="boom"):
         launcher.main()
-    assert shown == [False, True]
 
 
 def test_exe_stem_uses_executable_name(monkeypatch):
     monkeypatch.setattr(
-        launcher.sys, "executable", r"C:\dist\simple-ebook-converter.exe"
+        launcher.sys, "executable", r"C:\dist\simple-ebook-converter-versatile.exe"
     )
-    assert launcher._exe_stem() == Path("simple-ebook-converter.exe").stem
+    assert launcher._exe_stem() == Path("simple-ebook-converter-versatile.exe").stem
