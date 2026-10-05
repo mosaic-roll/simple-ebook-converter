@@ -53,6 +53,7 @@ jobs:
             --onefile `
             --clean `
             --noconfirm `
+            --noconsole `
             --name=simple-ebook-converter `
             --distpath=dist `
             --hidden-import=customtkinter `
