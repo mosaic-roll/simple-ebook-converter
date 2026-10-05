@@ -29,8 +29,8 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Install nuitka
-        run: uv pip install nuitka
+      - name: Install nuitka with onefile support
+        run: uv pip install "nuitka[onefile]"
 
       - name: Create output directory
         run: mkdir -p dist
@@ -43,6 +43,7 @@ jobs:
             --windows-disable-console `
             --output-filename=simple-ebook-converter-cli.exe `
             --output-dir=dist `
+            --yes `
             simple_ebook_converter/cli/cli.py
         shell: bash
 
@@ -55,6 +56,7 @@ jobs:
             --windows-disable-console `
             --output-filename=simple-ebook-converter.exe `
             --output-dir=dist `
+            --yes `
             simple_ebook_converter/gui/__main__.py
         shell: bash
 
