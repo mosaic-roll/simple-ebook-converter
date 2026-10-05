@@ -30,7 +30,7 @@ jobs:
           pip install uv
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --extra gui
 
       - name: Install nuitka with onefile support
         run: uv pip install "nuitka[onefile]"
