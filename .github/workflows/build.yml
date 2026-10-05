@@ -44,7 +44,6 @@ jobs:
             --windows-disable-console `
             --output-filename=simple-ebook-converter-cli.exe `
             --output-dir=dist `
-            --yes `
             src/simple_ebook_converter/cli/cli.py
 
       - name: Build GUI executable
@@ -57,7 +56,6 @@ jobs:
             --windows-disable-console `
             --output-filename=simple-ebook-converter.exe `
             --output-dir=dist `
-            --yes `
             src/simple_ebook_converter/gui/__main__.py
 
       - name: Package for release
