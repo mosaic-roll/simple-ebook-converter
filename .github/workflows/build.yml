@@ -39,19 +39,19 @@ jobs:
         uses: Nuitka/Nuitka-Action@main
         with:
           script-name: src/simple_ebook_converter/cli/cli.py
-          onefile: true
-          windows-disable-console: true
-          output-filename: simple-ebook-converter-cli.exe
+          mode: onefile
+          disable-console: true
+          output-file: simple-ebook-converter-cli.exe
           output-dir: dist
 
       - name: Build GUI executable
         uses: Nuitka/Nuitka-Action@main
         with:
           script-name: src/simple_ebook_converter/gui/__main__.py
-          onefile: true
-          windows-disable-console: true
+          mode: onefile
+          disable-console: true
           include-package: customtkinter
-          output-filename: simple-ebook-converter.exe
+          output-file: simple-ebook-converter.exe
           output-dir: dist
 
       - name: Package for release
