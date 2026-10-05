@@ -66,7 +66,7 @@ jobs:
 
       - name: Package for release
         run: |
-          zip simple-ebook-converter-windows.zip dist/*.exe
+          Compress-Archive -Path dist/*.exe -DestinationPath simple-ebook-converter-windows.zip -Force
 
       - name: Upload to GitHub Release
         if: github.event_name == 'release'
