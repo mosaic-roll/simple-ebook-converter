@@ -43,7 +43,9 @@ jobs:
             --noconfirm `
             --name=simple-ebook-converter-cli `
             --distpath=dist `
-            src/simple_ebook_converter/cli/cli.py
+            --paths=src `
+            --copy-metadata=simple-ebook-converter `
+            src/simple_ebook_converter/_cli_launcher.py
 
       - name: Build GUI executable
         run: |
@@ -54,7 +56,9 @@ jobs:
             --name=simple-ebook-converter `
             --distpath=dist `
             --hidden-import=customtkinter `
-            src/simple_ebook_converter/gui/__main__.py
+            --paths=src `
+            --copy-metadata=simple-ebook-converter `
+            src/simple_ebook_converter/_gui_launcher.py
 
       - name: Package for release
         run: |
