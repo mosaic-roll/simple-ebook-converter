@@ -150,9 +150,7 @@ def text_cover_body(title: str, author: str = "") -> str:
     return "\n".join(parts)
 
 
-def build_epub(
-    cfg: Config, nodes: list[Node], sources: Sources | None
-) -> bytes:
+def build_epub(cfg: Config, nodes: list[Node], sources: Sources | None) -> bytes:
     """把 `nodes` 组装成 EPUB 字节。CSS、字体、封面都从 `sources` 取，不读也不写文件。
 
     返回字节而不是收 sink，是为了让「组装」完整跑完再落盘：写盘失败或组装失败都
@@ -214,9 +212,7 @@ def build_epub(
     # `raise_exceptions` 是改 `ebooklib` 的默认行为：它默认自己 `except OSError`、
     # `warnings.warn` 后返回 False，写盘失败会被静默吞掉，调用方只会看到
     # 「生成成功」却拿不到东西。
-    epub.write_epub(
-        buf, book, options={"compresslevel": 9, "raise_exceptions": True}
-    )
+    epub.write_epub(buf, book, options={"compresslevel": 9, "raise_exceptions": True})
     return buf.getvalue()
 
 
