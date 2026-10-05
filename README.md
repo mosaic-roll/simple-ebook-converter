@@ -154,12 +154,27 @@ uv run simple-ebook-converter-cli 无卷小说.txt --no-volume
 
 `html` 阶段可用于自定义标题样式。比如把章节编号和标题内容**分行显示**：
 
+正则：
+
+```
+(第.{1,10}章)\s*(.+)
+```
+
+替换：
+
+```
+<span class="chapter-number">\1</span><br /><span class="chapter-title">\2</span>
+```
+
+JSON（正则需要转义）
+
 ```json
-[{ "pattern": "(第.{1,10}章)\\s*(.+)", "replace": "<span class=\"chapter-number\">\\1</span><br><span class=\"chapter-title\">\\2</span>", "stage": "html" }]
+[{ "pattern": "(第.{1,10}章)\\s*(.+)", "replace": "<span class=\"chapter-number\">\\1</span><br /><span class=\"chapter-title\">\\2</span>", "stage": "html" }]
 ```
 
 ```css
 .chapter-number { display: block; font-size: 0.65em; }
+.chapter-title { display:block; }
 ```
 
 默认开启的选项及禁用方式：
