@@ -12,6 +12,7 @@ GUI 模式由本模块在运行时调用 `ShowWindow(GetConsoleWindow(), 0)` 隐
 """
 
 import sys
+from pathlib import Path
 
 import click
 
@@ -76,8 +77,23 @@ def launcher(ctx: click.Context, cli_mode: bool, args: tuple[str, ...]) -> None:
         raise
 
 
+def _exe_stem() -> str:
+    """当前可执行文件名（不含扩展名）；源码运行时是解释器名。"""
+    return Path(sys.executable).stem
+
+
+def _is_cli_build() -> bool:
+    """专用命令行包的 exe 名以 `-cli` 结尾，双击即可直接进命令行模式。"""
+    stem = _exe_stem()
+    return stem.endswith(("-cli", "_cli"))
+
+
 def main() -> int:
-    argv = sys.argv[1:]
+    argv = list(sys.argv[1:])
+    if _is_cli_build() and "--cli" not in argv:
+        argv.insert(0, "--cli")
+    sys.argv = [sys.argv[0], *argv]
+
     # `--cli --help` 时把帮助完整交给命令行前端，而不是显示 launcher 的帮助
     if "--cli" in argv and "--help" in argv:
         cli_main(argv=[arg for arg in argv if arg != "--cli"])

@@ -35,7 +35,7 @@ jobs:
       - name: Install pyinstaller
         run: uv pip install pyinstaller
 
-      - name: Build executable
+      - name: Build universal executable
         run: |
           uv run pyinstaller `
             --clean `
@@ -46,6 +46,49 @@ jobs:
             --paths=src `
             --copy-metadata=simple-ebook-converter `
             src/simple_ebook_converter/launcher.py
+
+      - name: Build dedicated GUI executable
+        run: |
+          uv run pyinstaller `
+            --clean `
+            --noconfirm `
+            --noconsole `
+            --name=simple-ebook-converter-gui `
+            --distpath=dist `
+            --hidden-import=customtkinter `
+            --paths=src `
+            --copy-metadata=simple-ebook-converter `
+            src/simple_ebook_converter/launcher.py
+
+      - name: Build dedicated CLI executable
+        run: |
+          uv run pyinstaller `
+            --clean `
+            --noconfirm `
+            --name=simple-ebook-converter-cli `
+            --distpath=dist `
+            --hidden-import=customtkinter `
+            --paths=src `
+            --copy-metadata=simple-ebook-converter `
+            src/simple_ebook_converter/launcher.py
+
+      - name: Smoke test executables
+        run: |
+          $ErrorActionPreference = "Stop"
+          # 专用 CLI：不需要 --cli，双击即命令行
+          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --version
+          & dist\simple-ebook-converter-cli\simple-ebook-converter-cli.exe --dump-css smoke.css
+          if (-not (Test-Path smoke.css)) { throw "CLI 包未产出 smoke.css" }
+          # 全能版：--cli 进命令行，不带参数进 GUI
+          & dist\simple-ebook-converter\simple-ebook-converter.exe --cli --version
+          & dist\simple-ebook-converter\simple-ebook-converter.exe --version
+          # GUI 专用：确认 PE 子系统是 GUI(2)，双击不会有控制台
+          $bytes = [System.IO.File]::ReadAllBytes(
+            "dist\simple-ebook-converter-gui\simple-ebook-converter-gui.exe")
+          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+          $subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C)
+          if ($subsystem -ne 2) { throw "GUI 包 subsystem=$subsystem，应为 2" }
+          Write-Output "GUI 包 subsystem=2，无控制台"
 
       - name: Package for release
         run: |
