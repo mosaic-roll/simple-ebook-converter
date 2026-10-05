@@ -37,6 +37,7 @@ jobs:
 
       - name: Build CLI executable
         run: |
+          $env:SE_EBOOK_LAUNCH_CLI = "1"
           uv run pyinstaller `
             --clean `
             --noconfirm `
@@ -44,7 +45,7 @@ jobs:
             --distpath=dist `
             --paths=src `
             --copy-metadata=simple-ebook-converter `
-            src/simple_ebook_converter/launcher.py -- --cli
+            src/simple_ebook_converter/launcher.py
 
       - name: Build GUI executable
         run: |
