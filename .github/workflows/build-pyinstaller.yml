@@ -37,7 +37,6 @@ jobs:
 
       - name: Build CLI executable
         run: |
-          $env:SE_EBOOK_LAUNCH_CLI = "1"
           uv run pyinstaller `
             --clean `
             --noconfirm `
